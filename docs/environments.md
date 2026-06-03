@@ -38,14 +38,32 @@ npm run dev:staging
 npm run dev:production
 ```
 
-## Auth Redirects
+## Local Auth Redirects
 
-Supabase Google authentication must allow the callback URL for each environment.
+For current local development, the staging Supabase project should be configured for localhost first.
+
+```text
+Site URL:
+http://localhost:3000
+```
+
+Redirect URLs:
 
 ```text
 http://localhost:3000/auth/callback
-https://staging--flightcrew.netlify.app/auth/callback
-https://flightcrew.netlify.app/auth/callback
+http://localhost:3000/*
+flightcrew://*
 ```
 
 The root route `/` is the protected home screen. `/home` is supported as an alias, but redirects back to `/` after authentication so the browser URL stays clean.
+
+## Hosted Auth Redirects
+
+When the staging and production web domains are finalized, add their callback URLs to Supabase.
+
+```text
+https://your-staging-domain/auth/callback
+https://your-production-domain/auth/callback
+```
+
+If this app takes over password reset or email-change flows, add those URLs for each deployed domain too.
