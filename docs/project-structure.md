@@ -62,4 +62,4 @@ src/lib/supabase/server.ts
 src/lib/supabase/client.ts
 ```
 
-Protected route access is handled by the `(protected)` layout. The root route `/` is the protected home screen, and `/home` redirects back to `/` so the browser URL stays clean.
+Protected route access should happen in the page or data-loading helper that needs it, close to the route/data being protected. The root route `/` is the protected home screen, and `/home` redirects back to `/` so the browser URL stays clean.

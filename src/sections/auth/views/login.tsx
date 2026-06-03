@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { KeyRound } from "lucide-react";
+import Image from "next/image";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -43,19 +43,6 @@ export function Login({ error, message }: LoginProps) {
             </Alert>
           ) : null}
 
-          <form action={signInWithGoogle}>
-            <Button className="w-full" type="submit" variant="outline">
-              <KeyRound className="size-4" />
-              Continue with Google
-            </Button>
-          </form>
-
-          <div className="flex items-center gap-3">
-            <Separator className="flex-1" />
-            <span className="text-xs text-muted-foreground">or</span>
-            <Separator className="flex-1" />
-          </div>
-
           <form action={signInWithPassword} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
@@ -79,6 +66,25 @@ export function Login({ error, message }: LoginProps) {
             </div>
             <Button className="w-full" type="submit">
               Log in
+            </Button>
+          </form>
+
+          <div className="flex items-center gap-3">
+            <Separator className="flex-1" />
+            <span className="text-xs text-muted-foreground">or</span>
+            <Separator className="flex-1" />
+          </div>
+
+          <form action={signInWithGoogle}>
+            <Button className="w-full" type="submit" variant="outline">
+              <Image
+                src="/google-logo.png"
+                alt=""
+                width={16}
+                height={16}
+                aria-hidden="true"
+              />
+              Continue with Google
             </Button>
           </form>
 
