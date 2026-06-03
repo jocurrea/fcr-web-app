@@ -1,6 +1,8 @@
 import Link from "next/link";
-import { Chrome } from "lucide-react";
+import { KeyRound } from "lucide-react";
 
+import { signInWithGoogle, signInWithPassword } from "@/app/(auth)/actions";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -13,7 +15,16 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 
-export default function LoginPage() {
+type LoginPageProps = {
+  searchParams: Promise<{
+    error?: string;
+    message?: string;
+  }>;
+};
+
+export default async function LoginPage({ searchParams }: LoginPageProps) {
+  const { error, message } = await searchParams;
+
   return (
     <main className="flex min-h-screen items-center justify-center bg-muted/40 px-6 py-10">
       <Card className="w-full max-w-md">
@@ -24,10 +35,24 @@ export default function LoginPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-5">
-          <Button className="w-full" variant="outline">
-            <Chrome className="size-4" />
-            Continue with Google
-          </Button>
+          {error ? (
+            <Alert variant="destructive">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          ) : null}
+
+          {message ? (
+            <Alert>
+              <AlertDescription>{message}</AlertDescription>
+            </Alert>
+          ) : null}
+
+          <form action={signInWithGoogle}>
+            <Button className="w-full" type="submit" variant="outline">
+              <KeyRound className="size-4" />
+              Continue with Google
+            </Button>
+          </form>
 
           <div className="flex items-center gap-3">
             <Separator className="flex-1" />
@@ -35,10 +60,16 @@ export default function LoginPage() {
             <Separator className="flex-1" />
           </div>
 
-          <form className="space-y-4">
+          <form action={signInWithPassword} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
-              <Input id="email" name="email" type="email" autoComplete="email" />
+              <Input
+                id="email"
+                name="email"
+                type="email"
+                autoComplete="email"
+                required
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
@@ -47,6 +78,7 @@ export default function LoginPage() {
                 name="password"
                 type="password"
                 autoComplete="current-password"
+                required
               />
             </div>
             <Button className="w-full" type="submit">

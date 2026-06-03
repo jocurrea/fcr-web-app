@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/server";
+import { signOut } from "@/app/(protected)/actions";
 
 export default async function ProtectedLayout({
   children,
@@ -25,7 +26,11 @@ export default async function ProtectedLayout({
           <Link href="/dashboard" className="text-sm font-semibold">
             Flight Crew
           </Link>
-          <Button variant="outline">Sign out</Button>
+          <form action={signOut}>
+            <Button type="submit" variant="outline">
+              Sign out
+            </Button>
+          </form>
         </div>
       </header>
       <div className="mx-auto w-full max-w-6xl px-6 py-8">{children}</div>
