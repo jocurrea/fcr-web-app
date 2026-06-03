@@ -4,12 +4,20 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:staging": "npm run env:staging && next dev",
+    "dev:production": "npm run env:production && next dev",
     "build": "next build",
+    "build:staging": "npm run env:staging && next build",
+    "build:production": "npm run env:production && next build",
+    "env:staging": "node scripts/set-env.mjs staging",
+    "env:production": "node scripts/set-env.mjs production",
     "start": "next start",
     "lint": "eslint"
   },
   "dependencies": {
     "@base-ui/react": "^1.5.0",
+    "@supabase/ssr": "^0.10.3",
+    "@supabase/supabase-js": "^2.107.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^1.17.0",
