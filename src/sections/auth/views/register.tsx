@@ -5,13 +5,12 @@ import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
-  CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { signUpWithPassword } from "@/lib/auth/actions";
+import { AuthBrand } from "@/sections/auth/auth-brand";
 
 type RegisterProps = {
   error?: string;
@@ -21,11 +20,11 @@ export function Register({ error }: RegisterProps) {
   return (
     <main className="flex min-h-screen items-center justify-center bg-muted/40 px-6 py-10">
       <Card className="w-full max-w-md">
-        <CardHeader className="space-y-2 text-center">
-          <CardTitle className="text-2xl">Create your account</CardTitle>
-          <CardDescription>
-            Set up web access for your Flight Crew profile.
-          </CardDescription>
+        <CardHeader>
+          <AuthBrand
+            title="Create your account"
+            description="Set up web access for your Flight Crew profile."
+          />
         </CardHeader>
         <CardContent className="space-y-5">
           {error ? (

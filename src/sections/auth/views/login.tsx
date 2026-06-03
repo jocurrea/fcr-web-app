@@ -6,14 +6,13 @@ import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
-  CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { signInWithGoogle, signInWithPassword } from "@/lib/auth/actions";
+import { AuthBrand } from "@/sections/auth/auth-brand";
 
 type LoginProps = {
   error?: string;
@@ -24,11 +23,11 @@ export function Login({ error, message }: LoginProps) {
   return (
     <main className="flex min-h-screen items-center justify-center bg-muted/40 px-6 py-10">
       <Card className="w-full max-w-md">
-        <CardHeader className="space-y-2 text-center">
-          <CardTitle className="text-2xl">Log in to Flight Crew</CardTitle>
-          <CardDescription>
-            Continue with Google or use your email and password.
-          </CardDescription>
+        <CardHeader>
+          <AuthBrand
+            title="Log in to Flight Crew"
+            description="Continue with Google or use your email and password."
+          />
         </CardHeader>
         <CardContent className="space-y-5">
           {error ? (
