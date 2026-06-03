@@ -27,7 +27,7 @@ export async function signInWithPassword(formData: FormData) {
     redirect(`/login?error=${safeRedirectParam(error.message)}`);
   }
 
-  redirect("/dashboard");
+  redirect("/");
 }
 
 export async function signUpWithPassword(formData: FormData) {
@@ -40,7 +40,7 @@ export async function signUpWithPassword(formData: FormData) {
     email,
     password,
     options: {
-      emailRedirectTo: `${origin}/auth/callback?next=/dashboard`,
+      emailRedirectTo: `${origin}/auth/callback?next=/`,
     },
   });
 
@@ -49,7 +49,7 @@ export async function signUpWithPassword(formData: FormData) {
   }
 
   if (data.session) {
-    redirect("/dashboard");
+    redirect("/");
   }
 
   redirect(
@@ -64,7 +64,7 @@ export async function signInWithGoogle() {
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: "google",
     options: {
-      redirectTo: `${origin}/auth/callback?next=/dashboard`,
+      redirectTo: `${origin}/auth/callback?next=/`,
     },
   });
 
@@ -79,4 +79,12 @@ export async function signInWithGoogle() {
   redirect(
     `/login?error=${safeRedirectParam("Google sign-in did not return a redirect URL.")}`
   );
+}
+
+export async function signOut() {
+  const supabase = await createClient();
+
+  await supabase.auth.signOut();
+
+  redirect("/login");
 }

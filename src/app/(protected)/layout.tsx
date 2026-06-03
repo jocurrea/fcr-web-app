@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/server";
-import { signOut } from "@/app/(protected)/actions";
+import { signOut } from "@/lib/auth/actions";
 
 export default async function ProtectedLayout({
   children,
@@ -23,7 +23,7 @@ export default async function ProtectedLayout({
     <main className="min-h-screen bg-muted/30">
       <header className="border-b bg-background">
         <div className="mx-auto flex h-14 w-full max-w-6xl items-center justify-between px-6">
-          <Link href="/dashboard" className="text-sm font-semibold">
+          <Link href="/" className="text-sm font-semibold">
             Flight Crew
           </Link>
           <form action={signOut}>
