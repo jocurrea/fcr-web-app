@@ -28,12 +28,14 @@ export const isStaging = appEnv === "staging";
 
 export const siteUrl =
   process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ??
+  process.env.URL?.replace(/\/$/, "") ??
   "http://localhost:3000";
 
-export const supabaseUrl = requiredPublicEnv("NEXT_PUBLIC_SUPABASE_URL");
-export const supabaseAnonKey = requiredPublicEnv(
-  "NEXT_PUBLIC_SUPABASE_ANON_KEY"
-);
+export const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+if (!supabaseUrl) throw new Error("Missing required environment variable: NEXT_PUBLIC_SUPABASE_URL");
+
+export const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
+if (!supabaseAnonKey) throw new Error("Missing required environment variable: NEXT_PUBLIC_SUPABASE_ANON_KEY");
 
 const stagingSupabaseProjectRef = optionalProjectRef(
   "NEXT_PUBLIC_STAGING_SUPABASE_PROJECT_REF"

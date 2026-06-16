@@ -1,0 +1,328 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { useRouter, useParams } from "next/navigation";
+import { ChevronLeft, Edit2, Trash2, Send, X, Check } from "lucide-react";
+import { PostCard } from "@/components/home/post-card";
+import { fetchPostById, fetchPostComments, createComment, deleteComment, deletePost, updateComment, Post, Comment } from "@/lib/api/posts";
+import { supabase } from "@/lib/supabase";
+
+export default function PostDetailPage() {
+  const router = useRouter();
+  const params = useParams();
+  const id = params?.id as string;
+  
+  const [post, setPost] = useState<Post | null>(null);
+  const [comments, setComments] = useState<Comment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  
+  const [commentText, setCommentText] = useState("");
+  const [commentToDelete, setCommentToDelete] = useState<string | null>(null);
+  const [showDeletePostModal, setShowDeletePostModal] = useState(false);
+
+  // Edit comment state
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
+  const [editingCommentText, setEditingCommentText] = useState("");
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+
+    async function loadData() {
+      const { data: userData } = await supabase.auth.getUser();
+      if (userData?.user) {
+        setCurrentUserId(userData.user.id);
+      }
+
+      const postData = await fetchPostById(id);
+      if (postData) {
+        setPost(postData);
+        const commentsData = await fetchPostComments(id);
+        setComments(commentsData);
+      }
+      setLoading(false);
+    }
+    
+    if (id) {
+      loadData();
+    }
+  }, [id]);
+
+  const handleAddComment = async () => {
+    if (!commentText.trim() || !post) return;
+
+    const text = commentText.trim();
+    setCommentText(""); // clear input optimistically
+    
+    const success = await createComment(id, text);
+    if (success) {
+      // Reload comments
+      const commentsData = await fetchPostComments(id);
+      setComments(commentsData);
+    } else {
+      alert("Error adding comment");
+    }
+  };
+
+  const handleDeleteCommentClick = (commentId: string) => {
+    setCommentToDelete(commentId);
+  };
+
+  const confirmDeleteComment = async () => {
+    if (!commentToDelete) return;
+    
+    const success = await deleteComment(commentToDelete);
+    if (success) {
+      setComments(comments.filter(c => c.id !== commentToDelete));
+    } else {
+      alert("Error deleting comment");
+    }
+    setCommentToDelete(null);
+  };
+
+  const startEditingComment = (comment: Comment) => {
+    setEditingCommentId(comment.id);
+    setEditingCommentText(comment.text);
+  };
+
+  const cancelEditingComment = () => {
+    setEditingCommentId(null);
+    setEditingCommentText("");
+  };
+
+  const saveEditedComment = async () => {
+    if (!editingCommentId || !editingCommentText.trim()) return;
+
+    const success = await updateComment(editingCommentId, editingCommentText.trim());
+    if (success) {
+      setComments(comments.map(c => 
+        c.id === editingCommentId ? { ...c, text: editingCommentText.trim() } : c
+      ));
+      setEditingCommentId(null);
+      setEditingCommentText("");
+    } else {
+      alert("Error updating comment");
+    }
+  };
+
+  const handleDeletePostClick = () => {
+    setShowDeletePostModal(true);
+  };
+
+  const confirmDeletePost = async () => {
+    const success = await deletePost(id);
+    if (success) {
+      router.back();
+    } else {
+      alert("Error deleting post");
+      setShowDeletePostModal(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-[#f8f9fa] px-4 text-center">
+        <p className="text-gray-500 mt-4 text-lg font-semibold">Loading...</p>
+      </div>
+    );
+  }
+
+  if (!post) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-[#f8f9fa] px-4 text-center">
+        <p className="text-gray-500 mt-4 text-lg font-semibold">Post not found</p>
+        <button onClick={() => router.back()} className="mt-6 px-6 py-2 bg-blue-500 text-white rounded-full font-medium">Go back</button>
+      </div>
+    );
+  }
+
+  const isPostOwner = currentUserId === post.user_id;
+
+  return (
+    <div className="min-h-screen bg-white md:bg-[#f8f9fa] flex flex-col pt-6 pb-24">
+      <div className="px-4 max-w-lg mx-auto w-full relative flex flex-col gap-4">
+        
+        {/* Back Button */}
+        <div className="flex items-center">
+          <button 
+            onClick={() => router.back()}
+            className="w-9 h-9 bg-gray-100 hover:bg-gray-200 rounded-full flex items-center justify-center transition-colors"
+          >
+            <ChevronLeft className="w-5 h-5 text-gray-800" />
+          </button>
+        </div>
+
+        {/* Post Card Area */}
+        <div className="relative">
+          {/* Post Actions overlay on top right of the card */}
+          {isPostOwner && (
+            <div className="absolute top-4 right-4 z-10 flex items-center gap-3 bg-white pl-2">
+              <button onClick={() => router.push(`/new-post?edit=${post.id}`)} className="text-gray-500 hover:text-gray-700">
+                <Edit2 className="w-4 h-4" />
+              </button>
+              <button onClick={handleDeletePostClick} className="text-red-400 hover:text-red-600">
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+
+          <PostCard 
+            id={post.id}
+            user={{
+              name: post.author?.name || "User",
+              avatar: post.author?.avatar || "https://api.dicebear.com/7.x/shapes/svg?seed=user",
+            }}
+            date={post.created_at}
+            content={post.text}
+            image={post.image || undefined}
+            likes={post.likes}
+            liked={post.liked}
+            comments={comments.length}
+            hideActions={true}
+          />
+        </div>
+
+        {/* Comment Input */}
+        <div className="flex items-center gap-3 mt-1">
+          <div className="flex-1">
+            <input 
+              type="text" 
+              value={commentText}
+              onChange={(e) => setCommentText(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleAddComment()}
+              placeholder="Write a comment..."
+              className="w-full border border-gray-300 rounded-full px-5 py-2.5 text-[13.5px] outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors text-gray-700"
+            />
+          </div>
+          <button 
+            onClick={handleAddComment}
+            disabled={!commentText.trim()}
+            className={`w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0 transition-colors border-2 ${
+              commentText.trim() ? "border-[#1a73e8] text-[#1a73e8] bg-white hover:bg-blue-50" : "border-[#1a73e8] text-[#1a73e8] bg-white opacity-50"
+            }`}
+          >
+            <Send className="w-[18px] h-[18px] ml-[-2px]" />
+          </button>
+        </div>
+
+        {/* Comments List */}
+        <div className="mt-1">
+          {comments.length === 0 ? (
+            <p className="text-[13px] text-gray-600 font-medium text-center py-4">Be the first to comment!</p>
+          ) : (
+            <div className="flex flex-col gap-4 mt-2">
+              {comments.map((c, i) => {
+                const isCommentOwner = currentUserId === c.user_id;
+                const isEditing = editingCommentId === c.id;
+
+                return (
+                  <div key={c.id || i} className="flex gap-3 items-start">
+                    {/* Avatar */}
+                    <div className="w-10 h-10 rounded-full overflow-hidden border border-gray-200 bg-white flex-shrink-0 mt-1">
+                      <img 
+                        src={c.author.avatar || "https://api.dicebear.com/7.x/shapes/svg?seed=user"} 
+                        alt={c.author.name} 
+                        className="w-full h-full object-cover" 
+                      />
+                    </div>
+                    {/* Gray Box */}
+                    <div className="flex-1 bg-[#f1f3f4] p-3 rounded-2xl rounded-tl-sm relative">
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-bold text-[13.5px] text-gray-900">{c.author.name}</span>
+                          <span className="text-gray-400 text-[10px]">●</span>
+                          <span className="text-[12px] text-gray-500 font-medium">{c.created_at}</span>
+                        </div>
+                        {/* Actions */}
+                        {isCommentOwner && !isEditing && (
+                          <div className="flex items-center gap-2.5 text-gray-400 ml-2">
+                            <button onClick={() => startEditingComment(c)} className="text-gray-400 hover:text-gray-600 transition-colors">
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </button>
+                            <button onClick={() => handleDeleteCommentClick(c.id)} className="text-red-400 hover:text-red-500 transition-colors">
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                      
+                      {isEditing ? (
+                        <div className="mt-2 flex items-center gap-2">
+                          <input 
+                            type="text" 
+                            value={editingCommentText}
+                            onChange={(e) => setEditingCommentText(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && saveEditedComment()}
+                            autoFocus
+                            className="flex-1 border border-gray-300 rounded-md px-3 py-1.5 text-[13.5px] outline-none focus:border-blue-500"
+                          />
+                          <button onClick={saveEditedComment} className="w-7 h-7 bg-blue-100 hover:bg-blue-200 text-blue-600 rounded-full flex items-center justify-center transition-colors">
+                            <Check className="w-3.5 h-3.5" />
+                          </button>
+                          <button onClick={cancelEditingComment} className="w-7 h-7 bg-gray-200 hover:bg-gray-300 text-gray-600 rounded-full flex items-center justify-center transition-colors">
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ) : (
+                        <p className="text-[14px] text-gray-800 mt-1 leading-snug">{c.text}</p>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+      </div>
+
+      {/* Delete Comment Modal */}
+      {commentToDelete && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[100] p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl p-6 max-w-[320px] w-full shadow-2xl animate-in zoom-in-95 duration-200">
+            <h3 className="text-[18px] font-bold text-gray-900 mb-2">Delete Comment</h3>
+            <p className="text-gray-500 text-[14px] leading-relaxed mb-6">Are you sure you want to delete this comment?</p>
+            <div className="flex gap-3 justify-end">
+              <button 
+                onClick={() => setCommentToDelete(null)}
+                className="px-5 py-2.5 rounded-full font-semibold text-[14px] text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={confirmDeleteComment}
+                className="px-5 py-2.5 rounded-full font-semibold text-[14px] text-white bg-red-500 hover:bg-red-600 transition-colors shadow-sm"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Post Modal */}
+      {showDeletePostModal && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[100] p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl p-6 max-w-[320px] w-full shadow-2xl animate-in zoom-in-95 duration-200">
+            <h3 className="text-[18px] font-bold text-gray-900 mb-2">Delete Post</h3>
+            <p className="text-gray-500 text-[14px] leading-relaxed mb-6">Are you sure you want to delete this post? This action cannot be undone.</p>
+            <div className="flex gap-3 justify-end">
+              <button 
+                onClick={() => setShowDeletePostModal(false)}
+                className="px-5 py-2.5 rounded-full font-semibold text-[14px] text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={confirmDeletePost}
+                className="px-5 py-2.5 rounded-full font-semibold text-[14px] text-white bg-red-500 hover:bg-red-600 transition-colors shadow-sm"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
