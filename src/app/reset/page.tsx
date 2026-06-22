@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 
 export default function ResetPage() {
   const router = useRouter();
-  const [status, setStatus] = useState("Borrando datos locales...");
+  const [status, setStatus] = useState("Clearing local data...");
 
   useEffect(() => {
     // 1. Borrar TODO el almacenamiento local
@@ -14,7 +14,7 @@ export default function ResetPage() {
     
     // 2. Dar un pequeño retraso para asegurar que el navegador limpie todo
     setTimeout(() => {
-      setStatus("Datos borrados con éxito. Redirigiendo...");
+      setStatus("Data cleared successfully. Redirecting...");
       setTimeout(() => {
         router.push("/welcome");
       }, 1500);
@@ -26,7 +26,7 @@ export default function ResetPage() {
       <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
       <h1 className="text-xl font-bold text-gray-800">{status}</h1>
       <p className="text-gray-500 text-sm max-w-md text-center">
-        Esto limpiará todas las mezclas de credenciales antiguas como las de Jose Urrea. Luego debes crear la cuenta desde cero.
+        This will clear all old credentials mixtures like those of Jose Urrea. Then you must create the account from scratch.
       </p>
     </div>
   );

@@ -13,7 +13,7 @@ const MOCK_POSTS = [
       avatar: "https://i.pravatar.cc/150?img=33", // Usually would be user's actual photo
     },
     date: "May 30",
-    content: "Hola",
+    content: "Hello",
     image: "https://images.unsplash.com/photo-1569058242253-92a9c755a0ec?w=800&q=80", // placeholder chicken
     likes: 1,
     comments: 1,
@@ -25,7 +25,7 @@ const MOCK_POSTS = [
       avatar: "https://i.pravatar.cc/150?u=a042581f4e29026024d",
     },
     date: "May 20",
-    content: "Prueba foto3",
+    content: "Test photo3",
     image: "https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=800&q=80", // placeholder desk man
     likes: 0,
     comments: 0,
@@ -109,7 +109,7 @@ export default function ProfilePage() {
   ];
 
   const fullName = personal ? `${personal.firstName || ""} ${personal.middleName || ""} ${personal.lastName || ""}`.trim().replace(/\s+/g, ' ') : "asdasd asdasd asdasd";
-  const description = personal?.description || "Pruebaasdasd";
+  const description = personal?.description || "Testasdasd";
   const rawCountry = personal?.selectedCountry || "br";
   const country = COUNTRIES.find(c => c.id === rawCountry)?.label.split(" ")[1] || "Brazil";
   

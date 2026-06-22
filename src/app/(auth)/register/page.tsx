@@ -34,7 +34,7 @@ export default function RegisterPage() {
       }
 
       // Successful registration
-      router.push("/onboarding");
+      router.push("/role-selection");
     } catch (err: any) {
       setError(err.message || "An error occurred during registration");
     } finally {

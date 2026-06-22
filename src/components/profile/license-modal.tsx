@@ -19,7 +19,7 @@ export function LicenseModal() {
   const [license, setLicense] = useState("");
 
   const handleLicenseChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    // QA Fix: Solo permitir números enteros
+    // QA Fix: Only allow integers
     const value = e.target.value.replace(/[^0-9]/g, "");
     setLicense(value);
   };

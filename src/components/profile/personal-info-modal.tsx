@@ -25,7 +25,7 @@ export function PersonalInfoModal() {
   const [children, setChildren] = useState("");
 
   const handleChildrenChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    // QA Fix: Children solo acepta números enteros
+    // QA Fix: Children only accepts integers
     const value = e.target.value.replace(/[^0-9]/g, "");
     setChildren(value);
   };
@@ -35,7 +35,7 @@ export function PersonalInfoModal() {
       <DialogTrigger render={<Button variant="outline" />}>
         Edit Personal Info
       </DialogTrigger>
-      {/* QA Fix: Ampliar ancho/alto del modal para que los Selectors no se colapsen */}
+      {/* QA Fix: Expand width/height of modal so Selectors do not collapse */}
       <DialogContent className="sm:max-w-[500px] min-h-[380px] flex flex-col justify-between">
         <DialogHeader>
           <DialogTitle>Personal Information</DialogTitle>

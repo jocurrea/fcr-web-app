@@ -10,39 +10,39 @@ export default function UITestPage() {
         <div>
           <h1 className="text-3xl font-bold mb-2">Flight Crew UI Sandbox</h1>
           <p className="text-muted-foreground">
-            Entorno aislado para maquetar modales y probar sanitización de inputs (QA Fixes).
+            Isolated environment to mock modals and test input sanitization (QA Fixes).
           </p>
         </div>
 
         <div className="bg-white p-6 rounded-lg shadow-sm border space-y-6">
           <div className="flex items-center justify-between border-b pb-4">
             <div>
-              <h2 className="text-xl font-semibold">1. Modal de Licencia</h2>
-              <p className="text-sm text-muted-foreground">Prueba la validación estricta numérica en Nro de licencia.</p>
+              <h2 className="text-xl font-semibold">1. License Modal</h2>
+              <p className="text-sm text-muted-foreground">Test strict numeric validation on license number.</p>
             </div>
             <LicenseModal />
           </div>
 
           <div className="flex items-center justify-between border-b pb-4">
             <div>
-              <h2 className="text-xl font-semibold">2. Modal de Horas de Vuelo</h2>
-              <p className="text-sm text-muted-foreground">Total flight hours: Solo enteros positivos permitidos.</p>
+              <h2 className="text-xl font-semibold">2. Flight Hours Modal</h2>
+              <p className="text-sm text-muted-foreground">Total flight hours: Only positive integers allowed.</p>
             </div>
             <FlightsModal />
           </div>
 
           <div className="flex items-center justify-between border-b pb-4">
             <div>
-              <h2 className="text-xl font-semibold">3. Modal de Contacto</h2>
-              <p className="text-sm text-muted-foreground">Validación de teléfono, correo y listado de países (incluyendo Venezuela).</p>
+              <h2 className="text-xl font-semibold">3. Contact Modal</h2>
+              <p className="text-sm text-muted-foreground">Validation of phone, email, and country list (including Venezuela).</p>
             </div>
             <ContactModal />
           </div>
 
           <div className="flex items-center justify-between pt-2">
             <div>
-              <h2 className="text-xl font-semibold">4. Modal de Información Personal</h2>
-              <p className="text-sm text-muted-foreground">Validación de Children y corrección de espacio visual en Selectores.</p>
+              <h2 className="text-xl font-semibold">4. Personal Info Modal</h2>
+              <p className="text-sm text-muted-foreground">Children validation and visual spacing correction on Selectors.</p>
             </div>
             <PersonalInfoModal />
           </div>

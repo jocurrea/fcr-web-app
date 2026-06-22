@@ -18,7 +18,7 @@ export function FlightsModal() {
   const [hours, setHours] = useState("");
 
   const handleHoursChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    // QA Fix: Solo enteros positivos permitidos
+    // QA Fix: Only positive integers allowed
     const value = e.target.value.replace(/[^0-9]/g, "");
     setHours(value);
   };

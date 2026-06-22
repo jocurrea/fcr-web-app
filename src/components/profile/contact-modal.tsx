@@ -27,7 +27,7 @@ export function ContactModal() {
   const [emailError, setEmailError] = useState("");
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    // QA Fix: Phone acepta solo números y el símbolo +
+    // QA Fix: Phone accepts only numbers and + symbol
     const value = e.target.value.replace(/[^0-9+]/g, "");
     setPhone(value);
   };
@@ -36,7 +36,7 @@ export function ContactModal() {
     const value = e.target.value;
     setEmail(value);
     
-    // QA Fix: Validación estricta formato de correo
+    // QA Fix: Strict email format validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (value && !emailRegex.test(value)) {
       setEmailError("Invalid email format");
@@ -98,7 +98,7 @@ export function ContactModal() {
                   <SelectItem value="us">United States</SelectItem>
                   <SelectItem value="mx">Mexico</SelectItem>
                   <SelectItem value="co">Colombia</SelectItem>
-                  {/* QA Fix: Incluir Venezuela en la lista */}
+                  {/* QA Fix: Include Venezuela in the list */}
                   <SelectItem value="ve">Venezuela</SelectItem>
                   <SelectItem value="es">Spain</SelectItem>
                 </SelectContent>

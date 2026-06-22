@@ -51,7 +51,7 @@ export default function OnboardingPage() {
       {/* 
         Container simulates mobile width on large screens and full width on mobile 
       */}
-      <div className="mx-auto max-w-lg h-screen flex flex-col px-4 sm:px-6">
+      <div className="mx-auto max-w-xl h-screen flex flex-col px-4 sm:px-6">
         
         {/* Header */}
         <header className="flex items-center py-4 mt-2">

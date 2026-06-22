@@ -42,7 +42,7 @@ export default function LoginPage() {
         if (profile && profile.first_name) {
           router.push("/home");
         } else {
-          router.push("/onboarding");
+          router.push("/role-selection");
         }
       } else {
         // Fallback just in case

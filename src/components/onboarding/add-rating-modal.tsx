@@ -125,7 +125,7 @@ export function AddRatingModal({ open, onOpenChange, onAddRating }: AddRatingMod
                   <SelectItem value="a359">A359 AIRBUS A350-900 XWB</SelectItem>
                   <SelectItem value="a388">A388 AIRBUS A380-800</SelectItem>
                   <SelectItem value="a500">A500 ADAM A-500</SelectItem>
-                  <SelectItem value="a600">A600 ROTORWAY A-600 Talón</SelectItem>
+                  <SelectItem value="a600">A600 ROTORWAY A-600 Talon</SelectItem>
                   <SelectItem value="a660">A660 AYRES S-2R-T660 TURBO</SelectItem>
                   <SelectItem value="a700">A700 ADAM A-700 Adamjet</SelectItem>
                   <SelectItem value="a743">A743 ANTONOV An-74-300</SelectItem>
@@ -170,7 +170,7 @@ export function AddRatingModal({ open, onOpenChange, onAddRating }: AddRatingMod
                   <SelectItem value="ar11">AR11 AERONCA Chief</SelectItem>
                   <SelectItem value="ar15">AR15 AERONCA 15 Sedan</SelectItem>
                   <SelectItem value="arce">ARCE SCHEMPP-HIRTH</SelectItem>
-                  <SelectItem value="as3b">AS3B AS32 EUROCOPTER Súper Puma</SelectItem>
+                  <SelectItem value="as3b">AS3B AS32 EUROCOPTER Super Puma</SelectItem>
                   <SelectItem value="as20">AS20 SCHLEICHER ASW-20</SelectItem>
                   <SelectItem value="as50">AS50 AS55 EUROCOPTER Ecureuil</SelectItem>
                   <SelectItem value="as65">AS65 EUROCOPTER AS-365 Dauphin</SelectItem>
@@ -184,15 +184,15 @@ export function AddRatingModal({ open, onOpenChange, onAddRating }: AddRatingMod
                   <SelectItem value="atp">ATP BRITISH AEROSPACE ATP</SelectItem>
                   <SelectItem value="b06">B06 BELL 406</SelectItem>
                   <SelectItem value="b06t">B06T BELL 206LT TwinRanger</SelectItem>
-                  <SelectItem value="b13">B13 AKAFLIEG BERLÍN B_13</SelectItem>
+                  <SelectItem value="b13">B13 AKAFLIEG BERLIN B_13</SelectItem>
                   <SelectItem value="b36t">B36T ALLISON 36 Turbine Bonanza</SelectItem>
-                  <SelectItem value="b58t">B58T BEECH 58 Barón</SelectItem>
+                  <SelectItem value="b58t">B58T BEECH 58 Baron</SelectItem>
                   <SelectItem value="b60t">B60T BEECH 60 Duke</SelectItem>
                   <SelectItem value="b74s">B74S BOEING 747SP</SelectItem>
                   <SelectItem value="b77l">B77L BOEING 777-200LR</SelectItem>
                   <SelectItem value="b77w">B77W BOEING 777-300ER</SelectItem>
                   <SelectItem value="b78x">B78X BOEING 787-10 Dreamliner</SelectItem>
-                  <SelectItem value="b105">B105 EUROCOPTER Súper Five</SelectItem>
+                  <SelectItem value="b105">B105 EUROCOPTER Super Five</SelectItem>
                   <SelectItem value="b190">B190 BEECH 1900</SelectItem>
                   <SelectItem value="b212">B212 BELL 212</SelectItem>
                   <SelectItem value="b214">B214 BELL 214</SelectItem>
@@ -244,7 +244,7 @@ export function AddRatingModal({ open, onOpenChange, onAddRating }: AddRatingMod
                   <SelectItem value="be30">BE30 BEECHCRAFT 300 King Air 300</SelectItem>
                   <SelectItem value="be36">BE36 BEECH Bonanza</SelectItem>
                   <SelectItem value="be40">BE40 HAWKER BEECHCRAFT, Hawker400</SelectItem>
-                  <SelectItem value="be58">BE58 BEECHCRAFT 58 Barón</SelectItem>
+                  <SelectItem value="be58">BE58 BEECHCRAFT 58 Baron</SelectItem>
                   <SelectItem value="be60">BE60 BEECH 60 Duke</SelectItem>
                   <SelectItem value="be70">BE70 BEECH Queen Air</SelectItem>
                   <SelectItem value="be76">BE76 BEECH 76 Duchess</SelectItem>
@@ -252,7 +252,7 @@ export function AddRatingModal({ open, onOpenChange, onAddRating }: AddRatingMod
                   <SelectItem value="bisc">BISC BILSAM Sky Cruiser</SelectItem>
                   <SelectItem value="bk17">BK17 EUROCOPTER-KAWASAKI BK 117B</SelectItem>
                   <SelectItem value="bl8">BL8 BELLANCA 8 Decathlon</SelectItem>
-                  <SelectItem value="bl17">BL17 BELLANCA Turbo Súper Vikingo</SelectItem>
+                  <SelectItem value="bl17">BL17 BELLANCA Turbo Super Vikingo</SelectItem>
                   <SelectItem value="blcf">BLCF BOEING 747-400CF Dreamlifter</SelectItem>
                   <SelectItem value="bn2p">BN2P BN2T BRITTEN-NORMAN BN-2B BN-2T</SelectItem>
                   <SelectItem value="brez">BREZ AEROSTYLE Breezer</SelectItem>

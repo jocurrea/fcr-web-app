@@ -183,7 +183,7 @@ export function PersonalInfoForm({ onNext }: PersonalInfoFormProps) {
 
   return (
     <div className="flex flex-col flex-1 h-full mt-6">
-      <div className="flex-1 overflow-y-auto pb-24 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+      <div className="flex-1 overflow-y-auto pb-24 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] px-2 -mx-2">
         <form className="space-y-6">
           {/* Role Toggle */}
           <div className="space-y-3">

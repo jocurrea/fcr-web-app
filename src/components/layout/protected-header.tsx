@@ -33,8 +33,8 @@ export function ProtectedHeader() {
 
         if (profile && profile.first_name) {
           if (profile.avatar_url) setProfilePhoto(profile.avatar_url);
-        } else if (pathname !== '/onboarding') {
-          router.push("/onboarding");
+        } else if (pathname !== '/role-selection' && pathname !== '/onboarding' && !pathname.startsWith('/onboarding-business')) {
+          router.push("/role-selection");
         }
       } catch (e) {
         console.error("Failed to fetch profile", e);
