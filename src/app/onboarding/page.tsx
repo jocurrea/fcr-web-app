@@ -58,7 +58,7 @@ export default function OnboardingPage() {
               onClick={handleBack}
               className="p-2 border rounded-full hover:bg-gray-50 transition-colors"
             >
-              <LogOut className="w-5 h-5 text-gray-700 rotate-180" />
+              <ChevronLeft className="w-5 h-5 text-gray-700" />
             </button>
           ) : (
             <button
