@@ -1,120 +1,325 @@
-"use client";
-
-import { Button } from "@/components/ui/button";
-import { User, MapPin, Mail, Phone, Globe, Calendar, Map, Settings } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
+import { 
+  Users, User, MapPin, Mail, Phone, Globe, Calendar, Briefcase, Eye, Plane, Loader2
+} from "lucide-react";
+import { registerBusinessAccount } from "@/lib/api/business";
 
 interface ReviewFinishStepProps {
   onNext: () => void;
 }
 
 export function ReviewFinishStep({ onNext }: ReviewFinishStepProps) {
-  const router = useRouter();
+  const [showModal, setShowModal] = useState(false);
+  const [data, setData] = useState({
+    companyTypes: [] as string[],
+    profile: {
+      companyName: "Not provided",
+      location: "Not provided",
+      email: "Not provided",
+      phone: "Not provided",
+      website: "Not provided",
+      foundedYear: "Not provided",
+      description: "Not provided",
+      operatingAreas: [] as string[],
+      servicesOffered: [] as string[],
+      fleetTypes: [] as string[],
+      logo: null as string | null,
+    },
+    visibility: {} as Record<string, boolean>
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleConfirm = () => {
-    // In a real app we'd save to DB here
+  useEffect(() => {
+    const COMPANY_TYPES_MAP: Record<string, string> = {
+      airline: "Airline / Operator",
+      charter: "Charter Company",
+      flight_school: "Flight School",
+      fbo: "FBO",
+      mro: "MRO / Maintenance",
+      ground: "Ground Handling",
+      recruitment: "Aviation Recruitment",
+      training: "Training Center",
+      technology: "Aviation Technology",
+      airport: "Airport Services",
+      management: "Aircraft Management",
+      sales: "Aircraft Sales / Brokerage",
+      retail: "Aviation Retail",
+      other: "Other"
+    };
+
+    const typesStr = localStorage.getItem("business_company_types");
+    const types = typesStr ? JSON.parse(typesStr) : [];
+    const mappedTypes = types.map((t: string) => COMPANY_TYPES_MAP[t] || t);
+
+    const profileStr = localStorage.getItem("business_profile");
+    const profile = profileStr ? JSON.parse(profileStr) : {};
+
+    const visStr = localStorage.getItem("business_visibility");
+    const visibility = visStr ? JSON.parse(visStr) : {};
+
+    setData({
+      companyTypes: mappedTypes,
+      profile: {
+        companyName: profile.companyName || "Not provided",
+        location: profile.location || "Not provided",
+        email: profile.email || "Not provided",
+        phone: profile.phone || "Not provided",
+        website: profile.website || "Not provided",
+        foundedYear: profile.foundedYear || "Not provided",
+        description: profile.description || "Not provided",
+        operatingAreas: profile.operatingAreas || [],
+        servicesOffered: profile.servicesOffered || [],
+        fleetTypes: profile.fleetTypes || [],
+        logo: profile.logo || null,
+      },
+      visibility
+    });
+  }, []);
+
+  const renderPills = (items: string[]) => {
+    if (!items || items.length === 0) return null;
+    return (
+      <div className="flex flex-wrap gap-2 mt-3">
+        {items.map((item, idx) => (
+          <div key={idx} className="bg-[#eef4ff] text-[#2d73f5] px-4 py-[10px] rounded-full text-[14px] font-semibold leading-tight">
+            {item}
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  const getVisibilityLabels = () => {
+    const labels = [];
+    if (data.visibility.advertising) labels.push("Interested in Advertising on Flight Crew Ranked");
+    if (data.visibility.hiringPilots) labels.push("Interested in Hiring Pilots");
+    if (data.visibility.hiringCabinCrew) labels.push("Interested in Hiring Cabin Crew");
+    if (data.visibility.offerDiscounts) labels.push("Offer Discounts to Crew Members");
+    if (data.visibility.joinFounding) labels.push("Join Founding Business Partners");
+    if (data.visibility.allowDMs) labels.push("Allow Direct Messages from Crew Members");
+    return labels;
+  };
+
+  const visibilityPills = getVisibilityLabels();
+
+  const handleCreateAccount = async () => {
+    setIsSubmitting(true);
+    setError(null);
+    
+    // Convert current state back into the API expected format
+    const typesStr = localStorage.getItem("business_company_types");
+    const rawTypes = typesStr ? JSON.parse(typesStr) : [];
+    
+    const payload = {
+      companyTypes: rawTypes,
+      profile: {
+        companyName: data.profile.companyName !== "Not provided" ? data.profile.companyName : "",
+        location: data.profile.location !== "Not provided" ? data.profile.location : "",
+        email: data.profile.email !== "Not provided" ? data.profile.email : "",
+        phone: data.profile.phone !== "Not provided" ? data.profile.phone : undefined,
+        website: data.profile.website !== "Not provided" ? data.profile.website : undefined,
+        foundedYear: data.profile.foundedYear !== "Not provided" ? data.profile.foundedYear : undefined,
+        description: data.profile.description !== "Not provided" ? data.profile.description : undefined,
+        operatingAreas: data.profile.operatingAreas,
+        servicesOffered: data.profile.servicesOffered,
+        fleetTypes: data.profile.fleetTypes,
+        logo: data.profile.logo,
+      },
+      visibility: {
+        advertising: !!data.visibility.advertising,
+        hiringPilots: !!data.visibility.hiringPilots,
+        hiringCabinCrew: !!data.visibility.hiringCabinCrew,
+        offerDiscounts: !!data.visibility.offerDiscounts,
+        joinFounding: !!data.visibility.joinFounding,
+        allowDMs: !!data.visibility.allowDMs,
+      }
+    };
+
+    const res = await registerBusinessAccount(payload);
+    
+    setIsSubmitting(false);
+
+    if (res.success) {
+      setShowModal(true);
+    } else {
+      setError(res.error || "Failed to create account.");
+    }
+  };
+
+  const handleModalOk = () => {
+    localStorage.removeItem("business_company_types");
+    localStorage.removeItem("business_profile");
+    localStorage.removeItem("business_visibility");
     onNext();
   };
 
   return (
-    <div className="flex flex-col flex-1 h-full mt-4">
-      <div className="flex-1 overflow-y-auto pb-24 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] px-2 -mx-2">
+    <div className="flex flex-col flex-1 h-full relative">
+      <div className="flex-1 overflow-y-auto pb-6 custom-scrollbar space-y-8 mt-4">
         
-        <div className="space-y-6">
-          
-          {/* Company Type */}
+        {/* Company Type Section */}
+        {data.companyTypes.length > 0 && (
           <div>
-            <h3 className="text-sm font-bold text-gray-900 mb-2">Company Type</h3>
-            <div className="flex items-center gap-2">
-              <User className="w-4 h-4 text-gray-500" />
-              <span className="text-sm text-gray-700">Airline / Operator, Charter Company</span>
-            </div>
-          </div>
-
-          <div className="h-px bg-gray-100" />
-
-          {/* Company Information */}
-          <div>
-            <h3 className="text-sm font-bold text-gray-900 mb-3">Company Information</h3>
-            <div className="space-y-2.5">
-              <div className="flex items-start gap-2">
-                <User className="w-4 h-4 text-gray-500 mt-0.5 shrink-0" />
-                <span className="text-sm text-gray-700">Pilot Insight Aviation</span>
-              </div>
-              <div className="flex items-start gap-2">
-                <MapPin className="w-4 h-4 text-gray-500 mt-0.5 shrink-0" />
-                <span className="text-sm text-gray-700">Miami, Florida, United States</span>
-              </div>
-              <div className="flex items-start gap-2">
-                <Mail className="w-4 h-4 text-gray-500 mt-0.5 shrink-0" />
-                <span className="text-sm text-gray-700">info@pilotinsight.com</span>
-              </div>
-              <div className="flex items-start gap-2">
-                <Phone className="w-4 h-4 text-gray-500 mt-0.5 shrink-0" />
-                <span className="text-sm text-gray-700">+1 (305) 555-0198</span>
-              </div>
-              <div className="flex items-start gap-2">
-                <Globe className="w-4 h-4 text-gray-500 mt-0.5 shrink-0" />
-                <span className="text-sm text-gray-700">www.pilotinsight.com</span>
-              </div>
-              <div className="flex items-start gap-2">
-                <Calendar className="w-4 h-4 text-gray-500 mt-0.5 shrink-0" />
-                <span className="text-sm text-gray-700">Founded in 2018</span>
-              </div>
-              <div className="flex items-start gap-2">
-                <Map className="w-4 h-4 text-gray-500 mt-0.5 shrink-0" />
-                <span className="text-sm text-gray-700">Areas: North America, Europe, Latin America, Middle East</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="h-px bg-gray-100" />
-
-          {/* Company Profile */}
-          <div>
-            <h3 className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
-              <span className="w-4 h-4 text-gray-400 shrink-0 border border-gray-300 rounded-sm inline-flex items-center justify-center">
-                <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
-              </span>
-              Company Profile
-            </h3>
-            
-            <div className="flex gap-3 mb-4">
-              <div className="w-16 h-16 bg-gray-50 border border-gray-200 rounded-xl flex items-center justify-center shrink-0 text-gray-400">
-                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
-              </div>
-              <p className="text-[13px] text-gray-600 leading-snug">
-                Pilot Insight Aviation is a global aviation solutions company providing executive charter, aircraft management, and crew services with the highest safety and...
+            <h2 className="font-bold text-[16px] text-gray-900 mb-3">Company Type</h2>
+            <div className="flex items-start">
+              <Users className="w-5 h-5 text-gray-800 mr-3 mt-0.5 shrink-0" />
+              <p className="text-[15px] text-gray-800 leading-snug">
+                {data.companyTypes.join(", ")}
               </p>
             </div>
+          </div>
+        )}
 
-            <div className="flex items-start gap-2">
-              <Settings className="w-4 h-4 text-gray-500 mt-0.5 shrink-0" />
-              <div className="flex-1">
-                <span className="text-sm font-semibold text-gray-900">Services: </span>
-                <span className="text-[13px] text-gray-600 leading-snug">
-                  Pilot Hiring, Cabin Crew Hiring, Training, Aircraft Charter, Maintenance, Ground Services, Dispatch, Crew Accommodation, Aviation Software
-                </span>
+        {/* Company Information Section */}
+        <div>
+          <h2 className="font-bold text-[16px] text-gray-900 mb-4">Company Information</h2>
+          <div className="space-y-4">
+            <div className="flex items-center">
+              <User className="w-5 h-5 text-gray-800 mr-3 shrink-0" />
+              <p className="text-[15px] text-gray-800">{data.profile.companyName}</p>
+            </div>
+            <div className="flex items-center">
+              <MapPin className="w-5 h-5 text-gray-800 mr-3 shrink-0" />
+              <p className="text-[15px] text-gray-800">{data.profile.location}</p>
+            </div>
+            <div className="flex items-center">
+              <Mail className="w-5 h-5 text-gray-800 mr-3 shrink-0" />
+              <p className="text-[15px] text-gray-800">{data.profile.email}</p>
+            </div>
+            {data.profile.phone !== "Not provided" && (
+              <div className="flex items-center">
+                <Phone className="w-5 h-5 text-gray-800 mr-3 shrink-0" />
+                <p className="text-[15px] text-gray-800">{data.profile.phone}</p>
               </div>
+            )}
+            {data.profile.website !== "Not provided" && (
+              <div className="flex items-center">
+                <Globe className="w-5 h-5 text-gray-800 mr-3 shrink-0" />
+                <p className="text-[15px] text-gray-800">{data.profile.website}</p>
+              </div>
+            )}
+            {data.profile.foundedYear !== "Not provided" && (
+              <div className="flex items-center">
+                <Calendar className="w-5 h-5 text-gray-800 mr-3 shrink-0" />
+                <p className="text-[15px] text-gray-800">Founded in {data.profile.foundedYear}</p>
+              </div>
+            )}
+            {data.profile.operatingAreas.length > 0 && (
+              <div className="flex items-start">
+                <Globe className="w-5 h-5 text-gray-800 mr-3 mt-0.5 shrink-0" />
+                <p className="text-[15px] text-gray-800 leading-snug">Areas: {data.profile.operatingAreas.join(", ")}</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Company Profile Section */}
+        <div>
+          <div className="flex items-center mb-3">
+            <User className="w-5 h-5 text-gray-900 mr-2 shrink-0" />
+            <h2 className="font-bold text-[16px] text-gray-900">Company Profile</h2>
+          </div>
+          <div className="p-4 border border-gray-100 rounded-[20px] flex items-start shadow-sm">
+            <div className="w-[60px] h-[60px] bg-[#eef4ff] rounded-2xl flex items-center justify-center shrink-0 mr-4 overflow-hidden relative">
+              {data.profile.logo ? (
+                <img src={data.profile.logo} alt="Logo" className="w-full h-full object-contain p-1" />
+              ) : (
+                <Briefcase className="w-6 h-6 text-[#2d73f5] fill-current" />
+              )}
+            </div>
+            <div className="flex-1 mt-1">
+              <p className="font-bold text-[15px] text-gray-900 mb-1">{data.profile.companyName}</p>
+              <p className="text-[14px] text-gray-500 leading-snug line-clamp-4">
+                {data.profile.description}
+              </p>
             </div>
           </div>
-
         </div>
+
+        {/* Services Section */}
+        {data.profile.servicesOffered.length > 0 && (
+          <div>
+            <div className="flex items-center mb-2">
+              <Briefcase className="w-5 h-5 text-gray-900 mr-2 shrink-0" />
+              <h2 className="font-bold text-[16px] text-gray-900">Services</h2>
+            </div>
+            {renderPills(data.profile.servicesOffered)}
+          </div>
+        )}
+
+        {/* Fleet Types Section */}
+        {data.profile.fleetTypes.length > 0 && (
+          <div>
+            <div className="flex items-center mb-2">
+              <Plane className="w-5 h-5 text-gray-900 mr-2 shrink-0" />
+              <h2 className="font-bold text-[16px] text-gray-900">Fleet Types</h2>
+            </div>
+            {renderPills(data.profile.fleetTypes)}
+          </div>
+        )}
+
+        {/* Operating Areas Section (Pills format) */}
+        {data.profile.operatingAreas.length > 0 && (
+          <div>
+            <div className="flex items-center mb-2">
+              <Globe className="w-5 h-5 text-gray-900 mr-2 shrink-0" />
+              <h2 className="font-bold text-[16px] text-gray-900">Operating Areas</h2>
+            </div>
+            {renderPills(data.profile.operatingAreas)}
+          </div>
+        )}
+
+        {/* Community & Visibility Section */}
+        {visibilityPills.length > 0 && (
+          <div className="pb-4">
+            <div className="flex items-center mb-2">
+              <Eye className="w-5 h-5 text-gray-900 mr-2 shrink-0" />
+              <h2 className="font-bold text-[16px] text-gray-900">Community & Visibility</h2>
+            </div>
+            {renderPills(visibilityPills)}
+          </div>
+        )}
+
       </div>
 
-      <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/80 backdrop-blur-sm border-t sm:static sm:bg-transparent sm:border-0 sm:p-0 sm:mt-6 sm:backdrop-blur-none">
-        <Button 
-          type="button" 
-          onClick={handleConfirm}
-          className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-full py-6 text-lg font-semibold"
+      {/* Error Message */}
+      {error && (
+        <div className="text-red-500 text-sm text-center mb-2 px-4">
+          {error}
+        </div>
+      )}
+
+      {/* Footer */}
+      <div className="pt-4 pb-8 mt-auto bg-white border-t border-transparent z-10 relative">
+        <button
+          onClick={handleCreateAccount}
+          disabled={isSubmitting}
+          className="w-full py-4 rounded-full font-bold text-white transition-colors bg-[#2d73f5] hover:bg-[#2d73f5]/90 disabled:opacity-70 flex items-center justify-center"
         >
-          Confirm & Create Account
-        </Button>
+          {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : "Create account"}
+        </button>
       </div>
+
+      {/* Modal Overlay */}
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-6">
+          <div className="bg-[#383838] rounded-lg p-6 w-full max-w-sm shadow-2xl">
+            <h3 className="text-white font-semibold text-lg mb-3">Request Submitted</h3>
+            <p className="text-gray-300 text-[15px] leading-snug mb-8">
+              Your company account request is ready to be sent for platform approval.
+            </p>
+            <div className="flex justify-end">
+              <button
+                onClick={handleModalOk}
+                className="text-[#5eead4] font-semibold tracking-wide hover:text-[#2dd4bf] transition-colors uppercase text-[15px]"
+              >
+                OK
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

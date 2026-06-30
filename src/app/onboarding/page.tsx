@@ -28,10 +28,8 @@ export default function OnboardingPage() {
     if (step > 1) {
       setStep(step - 1);
     } else {
-      // Step 1: Log out and go back to welcome screen
-      await supabase.auth.signOut();
-      localStorage.removeItem("current_user_id");
-      router.push("/welcome");
+      // Step 1: Go back to role selection
+      router.push("/role-selection");
     }
   };
 

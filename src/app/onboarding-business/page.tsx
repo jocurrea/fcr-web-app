@@ -14,6 +14,7 @@ export default function OnboardingBusinessPage() {
   const [step, setStep] = useState(1);
 
   const handleNext = () => {
+    window.scrollTo(0, 0);
     if (step < 4) {
       setStep(step + 1);
     } else {
@@ -22,6 +23,7 @@ export default function OnboardingBusinessPage() {
   };
 
   const handleBack = () => {
+    window.scrollTo(0, 0);
     if (step > 1) {
       setStep(step - 1);
     } else {
@@ -42,7 +44,7 @@ export default function OnboardingBusinessPage() {
 
   return (
     <div className="min-h-screen bg-white">
-      <div className="mx-auto max-w-xl h-screen flex flex-col px-4 sm:px-6">
+      <div className="mx-auto max-w-xl min-h-[100dvh] flex flex-col px-4 sm:px-6">
         
         {/* Header */}
         <header className="flex items-center py-4 mt-2">

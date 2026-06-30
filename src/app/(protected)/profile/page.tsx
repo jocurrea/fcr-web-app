@@ -2,35 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { PostCard } from "@/components/home/post-card";
-import { MapPin, Pencil } from "lucide-react";
+import { MapPin, Pencil, Clock } from "lucide-react";
 import Link from "next/link";
-
-const MOCK_POSTS = [
-  {
-    id: "1",
-    user: {
-      name: "asdasd asdasd asdasd",
-      avatar: "https://i.pravatar.cc/150?img=33", // Usually would be user's actual photo
-    },
-    date: "May 30",
-    content: "Hello",
-    image: "https://images.unsplash.com/photo-1569058242253-92a9c755a0ec?w=800&q=80", // placeholder chicken
-    likes: 1,
-    comments: 1,
-  },
-  {
-    id: "2",
-    user: {
-      name: "Andres Silva",
-      avatar: "https://i.pravatar.cc/150?u=a042581f4e29026024d",
-    },
-    date: "May 20",
-    content: "Test photo3",
-    image: "https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=800&q=80", // placeholder desk man
-    likes: 0,
-    comments: 0,
-  }
-];
+import { supabase } from "@/lib/supabase";
+import { fetchPosts } from "@/lib/api/posts";
 
 export default function ProfilePage() {
   const [profilePhoto, setProfilePhoto] = useState<string | null>(null);
@@ -43,12 +18,15 @@ export default function ProfilePage() {
   const [userPosts, setUserPosts] = useState<any[]>([]);
   const [resume, setResume] = useState<any>(null);
 
+  // Business Profile State
+  const [isBusiness, setIsBusiness] = useState(false);
+  const [companyInfo, setCompanyInfo] = useState<{ name: string, status: string, logo?: string | null } | null>(null);
+  const [loading, setLoading] = useState(true);
+
   useEffect(() => {
     const savedPhoto = localStorage.getItem("userProfilePhoto");
     if (savedPhoto) {
       setProfilePhoto(savedPhoto);
-      // Update mock posts with the user's uploaded photo for realism
-      MOCK_POSTS[0].user.avatar = savedPhoto;
     }
 
     const savedPersonal = localStorage.getItem("onboarding_personal");
@@ -70,20 +48,60 @@ export default function ProfilePage() {
       if (parsedResume.languages) setLanguages(parsedResume.languages);
     }
     
-    // Load User Posts from Supabase
-    async function loadUserPosts() {
-      const { fetchPosts } = await import("@/lib/api/posts");
-      const { supabase } = await import("@/lib/supabase");
-      const { data: userData } = await supabase.auth.getUser();
-      
-      const allPosts = await fetchPosts();
-      if (userData?.user) {
-        setUserPosts(allPosts.filter(p => p.user_id === userData.user.id));
+    // Load Data from Supabase
+    async function loadData() {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        const allPosts = await fetchPosts();
+        if (session?.user) {
+          setUserPosts(allPosts.filter(p => p.user_id === session.user.id));
+
+          // Check if user has a business company
+          const { data: companies, error } = await supabase
+            .from('companies')
+            .select('name, status')
+            .eq('owner_user_id', session.user.id)
+            .order('created_at', { ascending: false })
+            .limit(1);
+
+          if (error) {
+            console.error("Error fetching companies:", error);
+          }
+
+          if (companies && companies.length > 0) {
+            // Fetch logo from profiles
+            const { data: profileData } = await supabase
+              .from('profiles')
+              .select('avatar_url')
+              .eq('id', session.user.id)
+              .single();
+
+            setIsBusiness(true);
+            setCompanyInfo({
+              name: companies[0].name,
+              status: companies[0].status,
+              logo: profileData?.avatar_url || savedPhoto
+            });
+          }
+        }
+      } catch (err) {
+        console.error("Error loading profile data:", err);
+      } finally {
+        setLoading(false);
       }
     }
-    loadUserPosts();
+    loadData();
 
   }, []);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#f8f9fa]">
+        <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
 
   const COUNTRIES = [
     { id: "ar", label: "AR Argentina" }, { id: "au", label: "AU Australia" }, { id: "at", label: "AT Austria" },
@@ -120,6 +138,86 @@ export default function ProfilePage() {
   const website = resume?.websites?.[0] || "";
   const skills = resume?.skills || [];
 
+  // =====================
+  // BUSINESS PROFILE VIEW
+  // =====================
+  if (isBusiness) {
+    return (
+      <div className="max-w-lg mx-auto flex flex-col w-full pb-12 bg-[#f8f9fa] min-h-screen px-4 py-8 gap-6">
+        
+        {/* Company Card */}
+        <div className="bg-white rounded-[24px] p-6 flex flex-col shadow-sm border border-gray-100">
+          <div className="flex items-center gap-5">
+            {/* Logo */}
+            <div className="w-20 h-20 shrink-0 rounded-2xl overflow-hidden border border-gray-100 bg-gray-50 flex items-center justify-center shadow-sm">
+              {companyInfo?.logo ? (
+                <img src={companyInfo.logo} alt="Company Logo" className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-gray-400">
+                  <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+                </div>
+              )}
+            </div>
+            
+            {/* Info */}
+            <div className="flex flex-col">
+              <h1 className="text-[22px] font-extrabold text-gray-900 leading-tight tracking-tight">{companyInfo?.name || "Company Name"}</h1>
+              <span className="text-[15px] text-gray-500 mt-0.5 mb-2.5 font-medium">Corporate associate account</span>
+              
+              {companyInfo?.status === 'pending' && (
+                <div className="inline-flex">
+                  <div className="bg-[#fff4d1] text-[#b38800] px-4 py-1 rounded-full text-[13px] font-bold tracking-wide">
+                    Pending review
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Pending Review Banner */}
+        {companyInfo?.status === 'pending' && (
+          <div className="bg-[#f0f6ff] border border-[#e0eaff] p-5 rounded-[16px] flex items-start gap-4 w-full">
+            <div className="w-11 h-11 bg-white rounded-full flex items-center justify-center shrink-0 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+              <Clock className="w-[22px] h-[22px] text-[#1a56db]" strokeWidth={2.5} />
+            </div>
+            <div className="mt-0.5">
+              <h3 className="font-bold text-[16px] text-gray-900 mb-1.5">Company profile under review</h3>
+              <p className="text-[14.5px] text-gray-500 leading-relaxed pr-2">
+                Posting, commenting, liking, and creating Frequencies are disabled until your company is approved.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Posts */}
+        <div className="flex flex-col gap-6 mt-4">
+          {userPosts.length > 0 ? userPosts.map(post => (
+            <PostCard 
+              key={post.id} 
+              id={post.id}
+              user={{
+                name: post.author?.name || "User",
+                avatar: post.author?.avatar || "https://api.dicebear.com/7.x/shapes/svg?seed=user",
+              }}
+              date={post.created_at}
+              content={post.text}
+              image={post.image || undefined}
+              likes={post.likes}
+              liked={post.liked}
+              comments={post.comments}
+            />
+          )) : (
+            <div className="text-center text-gray-800 text-[16px] py-10 mt-10">No posts yet</div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // =====================
+  // CREW PROFILE VIEW
+  // =====================
   return (
     <div className="max-w-lg mx-auto flex flex-col w-full pb-12 bg-[#f8f9fa] min-h-screen">
       

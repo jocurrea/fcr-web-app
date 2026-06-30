@@ -1,213 +1,339 @@
-"use client";
-
-import { useState, useRef } from "react";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { X, Plus } from "lucide-react";
+import React, { useState, useEffect, useRef, ChangeEvent } from "react";
+import { Upload, X } from "lucide-react";
+import { supabase } from "@/lib/supabase";
 
 interface CompanyProfileStepProps {
   onNext: () => void;
 }
 
 export function CompanyProfileStep({ onNext }: CompanyProfileStepProps) {
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [companyName, setCompanyName] = useState("");
+  const [location, setLocation] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [website, setWebsite] = useState("");
+  const [foundedYear, setFoundedYear] = useState("");
   const [description, setDescription] = useState("");
   
-  const [services, setServices] = useState<string[]>([
-    "Pilot Hiring", "Cabin Crew Hiring", "Training", "Maintenance", 
-    "Aircraft Charter", "Ground Services", "Dispatch", 
-    "Crew Accommodation", "Aviation Software"
-  ]);
-  const [newService, setNewService] = useState("");
-  const [isAddingService, setIsAddingService] = useState(false);
+  const [operatingAreaInput, setOperatingAreaInput] = useState("");
+  const [operatingAreas, setOperatingAreas] = useState<string[]>([]);
 
-  const [fleet, setFleet] = useState<string[]>([
-    "Gulfstream", "Bombardier", "Cessna", "Airbus", "Boeing"
-  ]);
-  const [newFleet, setNewFleet] = useState("");
-  const [isAddingFleet, setIsAddingFleet] = useState(false);
+  const [servicesInput, setServicesInput] = useState("");
+  const [servicesOffered, setServicesOffered] = useState<string[]>([]);
 
-  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const url = URL.createObjectURL(file);
-      setLogoPreview(url);
+  const [fleetInput, setFleetInput] = useState("");
+  const [fleetTypes, setFleetTypes] = useState<string[]>([]);
+
+  // Load existing data if any
+  useEffect(() => {
+    let storedEmail = "";
+    const saved = localStorage.getItem("business_profile");
+    if (saved) {
+      try {
+        const data = JSON.parse(saved);
+        if (data.companyName) setCompanyName(data.companyName);
+        if (data.location) setLocation(data.location);
+        if (data.email) {
+          setEmail(data.email);
+          storedEmail = data.email;
+        }
+        if (data.phone) setPhone(data.phone);
+        if (data.website) setWebsite(data.website);
+        if (data.foundedYear) setFoundedYear(data.foundedYear);
+        if (data.description) setDescription(data.description);
+        if (data.operatingAreas) setOperatingAreas(data.operatingAreas);
+        if (data.servicesOffered) setServicesOffered(data.servicesOffered);
+        if (data.fleetTypes) setFleetTypes(data.fleetTypes);
+        if (data.logo) setLogo(data.logo);
+      } catch(e) {}
     }
-  };
 
-  const removeService = (service: string) => {
-    setServices(services.filter(s => s !== service));
-  };
-
-  const addService = () => {
-    if (newService.trim() && !services.includes(newService.trim())) {
-      setServices([...services, newService.trim()]);
+    if (!storedEmail) {
+      supabase.auth.getUser().then(({ data: { user } }) => {
+        if (user?.email) {
+          setEmail(user.email);
+        }
+      });
     }
-    setNewService("");
-    setIsAddingService(false);
-  };
-
-  const removeFleet = (item: string) => {
-    setFleet(fleet.filter(f => f !== item));
-  };
-
-  const addFleet = () => {
-    if (newFleet.trim() && !fleet.includes(newFleet.trim())) {
-      setFleet([...fleet, newFleet.trim()]);
-    }
-    setNewFleet("");
-    setIsAddingFleet(false);
-  };
+  }, []);
 
   const handleNext = () => {
-    // We would normally save data to localStorage here
+    localStorage.setItem("business_profile", JSON.stringify({
+      companyName,
+      location,
+      email,
+      phone,
+      website,
+      foundedYear,
+      description,
+      operatingAreas,
+      servicesOffered,
+      fleetTypes,
+      logo
+    }));
     onNext();
   };
 
+  const isEmailValid = (val: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val);
+  const isFormValid = companyName.trim() !== "" && location.trim() !== "" && email.trim() !== "" && isEmailValid(email);
+
+  const addPill = (
+    input: string, 
+    setInput: (val: string) => void, 
+    list: string[], 
+    setList: (val: string[]) => void
+  ) => {
+    if (input.trim() && !list.includes(input.trim())) {
+      setList([...list, input.trim()]);
+      setInput("");
+    }
+  };
+
+  const removePill = (itemToRemove: string, list: string[], setList: (val: string[]) => void) => {
+    setList(list.filter(item => item !== itemToRemove));
+  };
+
+  const renderPills = (list: string[], setList: (val: string[]) => void) => {
+    if (list.length === 0) return null;
+    return (
+      <div className="flex flex-wrap gap-2 mt-3 ml-1">
+        {list.map(item => (
+          <div key={item} className="flex items-center bg-[#eef4ff] text-[#2d73f5] px-4 py-2 rounded-full text-[14px] font-medium">
+            {item}
+            <button onClick={() => removePill(item, list, setList)} className="ml-2 hover:text-[#1554d6]">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  const [logo, setLogo] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleLogoUpload = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        alert("File is too large. Maximum size is 5MB.");
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setLogo(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  // ... (dentro del componente se usará setLogo en useEffect y handleNext)
+
   return (
-    <div className="flex flex-col flex-1 h-full mt-4">
-      <div className="flex-1 overflow-y-auto pb-24 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] px-2 -mx-2">
-        <div className="space-y-6">
+    <div className="flex flex-col flex-1 h-full">
+      <div className="flex-1 overflow-y-auto pb-6 custom-scrollbar p-1 -mx-1 px-1">
+        {/* Logo Section */}
+        <div className="mb-8 mt-4">
+          <h2 className="font-bold text-base text-gray-900 mb-3">Logo</h2>
+          <input
+            type="file"
+            accept="image/jpeg, image/png, image/svg+xml"
+            className="hidden"
+            ref={fileInputRef}
+            onChange={handleLogoUpload}
+          />
+          <button 
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            className="w-full flex flex-col items-center justify-center p-8 border-[1.5px] border-dashed border-gray-300 rounded-[28px] bg-[#f8fafc] hover:bg-gray-50 transition-colors overflow-hidden relative"
+          >
+            {logo ? (
+              <img src={logo} alt="Company Logo" className="w-full h-full object-contain absolute inset-0 p-2" />
+            ) : (
+              <>
+                <div className="w-14 h-14 bg-[#f0f5ff] rounded-full flex items-center justify-center mb-4">
+                  <Upload className="w-6 h-6 text-[#2d73f5]" />
+                </div>
+                <h3 className="font-bold text-[15px] text-gray-900 mb-1">Tap to upload</h3>
+                <p className="text-[13px] text-gray-500">JPG, PNG or SVG (max 5MB)</p>
+              </>
+            )}
+          </button>
+        </div>
+
+        {/* Company Information Section */}
+        <div>
+          <h2 className="font-bold text-base text-gray-900 mb-5">Company Information</h2>
           
-          {/* Logo Upload */}
-          <div className="space-y-2">
-            <Label className="text-xs font-semibold text-gray-700">Logo</Label>
-            <input 
-              type="file" 
-              accept="image/*" 
-              className="hidden" 
-              ref={fileInputRef} 
-              onChange={handleLogoUpload} 
-            />
-            <div 
-              onClick={() => fileInputRef.current?.click()}
-              className="border border-gray-200 rounded-2xl bg-white h-40 flex flex-col items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors relative overflow-hidden"
-            >
-              {logoPreview ? (
-                <img src={logoPreview} alt="Logo preview" className="w-full h-full object-contain p-4" />
-              ) : (
-                <div className="flex flex-col items-center gap-2">
-                  <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center text-gray-400">
-                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                    </svg>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-xs text-gray-500 mt-2">Tap to upload</p>
-                    <p className="text-[10px] text-gray-400">JPG, PNG or SVG (max 2MB)</p>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Company Description */}
-          <div className="space-y-2">
-            <Label className="text-xs font-semibold text-gray-700">Company Description</Label>
-            <div className="relative">
-              <Textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value.slice(0, 500))}
-                placeholder="Pilot Insight Aviation is a global aviation solutions company..."
-                className="min-h-[100px] rounded-2xl resize-none text-sm p-4 pb-8 bg-white"
+          <div className="space-y-5">
+            <div>
+              <label className="block text-[14px] font-semibold text-gray-800 mb-2 ml-1">Company Name</label>
+              <input
+                type="text"
+                value={companyName}
+                onChange={(e) => setCompanyName(e.target.value)}
+                placeholder="Pilot Insight Aviation"
+                className="w-full px-5 py-[14px] bg-white border border-gray-300 rounded-[24px] text-[15px] placeholder-gray-400 focus:outline-none focus:border-[#2d73f5] focus:ring-1 focus:ring-[#2d73f5] transition-shadow"
               />
-              <span className="absolute bottom-3 right-4 text-[10px] text-gray-400">
-                {description.length}/500
-              </span>
             </div>
-          </div>
 
-          {/* Services Offered */}
-          <div className="space-y-2">
-            <Label className="text-xs font-semibold text-gray-700">Services Offered</Label>
-            <div className="flex flex-wrap gap-2">
-              {services.map(service => (
-                <div key={service} className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-blue-100 rounded-full text-[13px] text-blue-600 font-medium">
-                  {service}
-                  <button onClick={() => removeService(service)} className="hover:text-blue-800 transition-colors">
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              ))}
-              
-              {isAddingService ? (
-                <div className="flex items-center gap-1">
-                  <input
-                    type="text"
-                    value={newService}
-                    onChange={(e) => setNewService(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && addService()}
-                    autoFocus
-                    className="px-3 py-1 text-[13px] border border-blue-200 rounded-full outline-none focus:border-blue-400 w-28"
-                  />
-                  <button onClick={addService} className="text-blue-600 p-1">
-                    <Plus className="w-4 h-4" />
-                  </button>
-                </div>
-              ) : (
-                <button 
-                  onClick={() => setIsAddingService(true)}
-                  className="flex items-center gap-1 px-3 py-1.5 text-[13px] text-blue-600 font-semibold hover:bg-blue-50 rounded-full transition-colors"
-                >
-                  <Plus className="w-3.5 h-3.5" /> Add
-                </button>
+            <div>
+              <label className="block text-[14px] font-semibold text-gray-800 mb-2 ml-1">Location / Headquarters</label>
+              <input
+                type="text"
+                value={location}
+                onChange={(e) => setLocation(e.target.value)}
+                placeholder="Miami, Florida, United States"
+                className="w-full px-5 py-[14px] bg-white border border-gray-300 rounded-[24px] text-[15px] placeholder-gray-400 focus:outline-none focus:border-[#2d73f5] focus:ring-1 focus:ring-[#2d73f5] transition-shadow"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[14px] font-semibold text-gray-800 mb-2 ml-1">Company Email</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="info@pilotinsight.com"
+                className={`w-full px-5 py-[14px] bg-white border ${email && !isEmailValid(email) ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:border-[#2d73f5] focus:ring-[#2d73f5]'} rounded-[24px] text-[15px] placeholder-gray-400 focus:outline-none focus:ring-1 transition-shadow`}
+              />
+              {email && !isEmailValid(email) && (
+                <p className="text-red-500 text-sm mt-1 ml-2">Please enter a valid email address</p>
               )}
             </div>
-          </div>
 
-          {/* Fleet Types */}
-          <div className="space-y-2">
-            <Label className="text-xs font-semibold text-gray-700">
-              Fleet Types <span className="text-gray-400 font-normal">(optional)</span>
-            </Label>
-            <div className="flex flex-wrap gap-2">
-              {fleet.map(item => (
-                <div key={item} className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-blue-100 rounded-full text-[13px] text-blue-600 font-medium">
-                  {item}
-                  <button onClick={() => removeFleet(item)} className="hover:text-blue-800 transition-colors">
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              ))}
-              
-              {isAddingFleet ? (
-                <div className="flex items-center gap-1">
-                  <input
-                    type="text"
-                    value={newFleet}
-                    onChange={(e) => setNewFleet(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && addFleet()}
-                    autoFocus
-                    className="px-3 py-1 text-[13px] border border-blue-200 rounded-full outline-none focus:border-blue-400 w-28"
-                  />
-                  <button onClick={addFleet} className="text-blue-600 p-1">
-                    <Plus className="w-4 h-4" />
-                  </button>
-                </div>
-              ) : (
+            <div>
+              <label className="block text-[14px] font-semibold text-gray-800 mb-2 ml-1">Phone</label>
+              <input
+                type="tel"
+                value={phone}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  // Permitir solo números y opcionalmente el signo + al principio
+                  const onlyNums = val.replace(/[^\d+]/g, '');
+                  setPhone(onlyNums);
+                }}
+                placeholder="+13055550198"
+                className="w-full px-5 py-[14px] bg-white border border-gray-300 rounded-[24px] text-[15px] placeholder-gray-400 focus:outline-none focus:border-[#2d73f5] focus:ring-1 focus:ring-[#2d73f5] transition-shadow"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[14px] font-semibold text-gray-800 mb-2 ml-1">Website</label>
+              <input
+                type="url"
+                value={website}
+                onChange={(e) => setWebsite(e.target.value)}
+                placeholder="www.pilotinsight.com"
+                className="w-full px-5 py-[14px] bg-white border border-gray-300 rounded-[24px] text-[15px] placeholder-gray-400 focus:outline-none focus:border-[#2d73f5] focus:ring-1 focus:ring-[#2d73f5] transition-shadow"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[14px] font-semibold text-gray-800 mb-2 ml-1">Founded Year</label>
+              <input
+                type="text"
+                value={foundedYear}
+                onChange={(e) => setFoundedYear(e.target.value)}
+                placeholder="2018"
+                className="w-full px-5 py-[14px] bg-white border border-gray-300 rounded-[24px] text-[15px] placeholder-gray-400 focus:outline-none focus:border-[#2d73f5] focus:ring-1 focus:ring-[#2d73f5] transition-shadow"
+              />
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-2 ml-1 mr-1">
+                <label className="block text-[14px] font-semibold text-gray-800">Company Description</label>
+                <span className="text-[13px] text-gray-500">{description.length}/500</span>
+              </div>
+              <textarea
+                value={description}
+                onChange={(e) => {
+                  if (e.target.value.length <= 500) setDescription(e.target.value);
+                }}
+                placeholder="Describe your company"
+                rows={5}
+                className="w-full px-5 py-4 bg-white border border-gray-300 rounded-[24px] text-[15px] placeholder-gray-400 focus:outline-none focus:border-[#2d73f5] focus:ring-1 focus:ring-[#2d73f5] transition-shadow resize-none"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[14px] font-semibold text-gray-800 mb-2 ml-1">Operating Areas</label>
+              <div className="flex gap-3">
+                <input
+                  type="text"
+                  value={operatingAreaInput}
+                  onChange={(e) => setOperatingAreaInput(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && addPill(operatingAreaInput, setOperatingAreaInput, operatingAreas, setOperatingAreas)}
+                  placeholder="North America"
+                  className="flex-1 px-5 py-[14px] bg-white border border-gray-300 rounded-[24px] text-[15px] placeholder-gray-400 focus:outline-none focus:border-[#2d73f5] focus:ring-1 focus:ring-[#2d73f5] transition-shadow"
+                />
                 <button 
-                  onClick={() => setIsAddingFleet(true)}
-                  className="flex items-center gap-1 px-3 py-1.5 text-[13px] text-blue-600 font-semibold hover:bg-blue-50 rounded-full transition-colors"
+                  type="button"
+                  onClick={() => addPill(operatingAreaInput, setOperatingAreaInput, operatingAreas, setOperatingAreas)}
+                  className="px-7 py-[14px] bg-[#1a66ff] hover:bg-[#1554d6] text-white font-bold rounded-full transition-colors text-[15px]"
                 >
-                  <Plus className="w-3.5 h-3.5" /> Add
+                  Add
                 </button>
-              )}
+              </div>
+              {renderPills(operatingAreas, setOperatingAreas)}
+            </div>
+
+            <div>
+              <label className="block text-[14px] font-semibold text-gray-800 mb-2 ml-1">Services Offered</label>
+              <div className="flex gap-3">
+                <input
+                  type="text"
+                  value={servicesInput}
+                  onChange={(e) => setServicesInput(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && addPill(servicesInput, setServicesInput, servicesOffered, setServicesOffered)}
+                  placeholder="Pilot Hiring"
+                  className="flex-1 px-5 py-[14px] bg-white border border-gray-300 rounded-[24px] text-[15px] placeholder-gray-400 focus:outline-none focus:border-[#2d73f5] focus:ring-1 focus:ring-[#2d73f5] transition-shadow"
+                />
+                <button 
+                  type="button"
+                  onClick={() => addPill(servicesInput, setServicesInput, servicesOffered, setServicesOffered)}
+                  className="px-7 py-[14px] bg-[#1a66ff] hover:bg-[#1554d6] text-white font-bold rounded-full transition-colors text-[15px]"
+                >
+                  Add
+                </button>
+              </div>
+              {renderPills(servicesOffered, setServicesOffered)}
+            </div>
+
+            <div>
+              <label className="block text-[14px] font-semibold text-gray-800 mb-2 ml-1">Fleet Types</label>
+              <div className="flex gap-3">
+                <input
+                  type="text"
+                  value={fleetInput}
+                  onChange={(e) => setFleetInput(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && addPill(fleetInput, setFleetInput, fleetTypes, setFleetTypes)}
+                  placeholder="Gulfstream"
+                  className="flex-1 px-5 py-[14px] bg-white border border-gray-300 rounded-[24px] text-[15px] placeholder-gray-400 focus:outline-none focus:border-[#2d73f5] focus:ring-1 focus:ring-[#2d73f5] transition-shadow"
+                />
+                <button 
+                  type="button"
+                  onClick={() => addPill(fleetInput, setFleetInput, fleetTypes, setFleetTypes)}
+                  className="px-7 py-[14px] bg-[#1a66ff] hover:bg-[#1554d6] text-white font-bold rounded-full transition-colors text-[15px]"
+                >
+                  Add
+                </button>
+              </div>
+              {renderPills(fleetTypes, setFleetTypes)}
             </div>
           </div>
-
         </div>
       </div>
 
-      <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/80 backdrop-blur-sm border-t sm:static sm:bg-transparent sm:border-0 sm:p-0 sm:mt-6 sm:backdrop-blur-none">
-        <Button 
-          type="button" 
+      {/* Footer */}
+      <div className="pt-4 pb-8 mt-auto bg-white border-t border-transparent">
+        <button
           onClick={handleNext}
-          className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-full py-6 text-lg font-semibold"
+          disabled={!isFormValid}
+          className="w-full py-4 rounded-full font-bold text-white transition-colors bg-[#2d73f5] hover:bg-[#2d73f5]/90 disabled:bg-[#85b0fa] disabled:cursor-not-allowed"
         >
           Next
-        </Button>
+        </button>
       </div>
     </div>
   );
