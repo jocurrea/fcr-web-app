@@ -12,6 +12,9 @@ export default function HomePage() {
   const [isCompanyPending, setIsCompanyPending] = useState(false);
 
   useEffect(() => {
+    // Ensure the page always starts at the top, fixing Next.js scroll restoration bugs
+    window.scrollTo(0, 0);
+
     async function loadData() {
       try {
         const { data: { session } } = await supabase.auth.getSession();
