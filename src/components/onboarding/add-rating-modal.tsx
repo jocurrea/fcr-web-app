@@ -73,7 +73,7 @@ export function AddRatingModal({ open, onOpenChange, onAddRating }: AddRatingMod
             
             <div className="space-y-2">
               <Label>Choose Rating</Label>
-              <Select name="ratingVal" value={selectedValue} onValueChange={setSelectedValue}>
+              <Select name="ratingVal" value={selectedValue} onValueChange={(val) => setSelectedValue(val || "")}>
                 <SelectTrigger className="w-full rounded-2xl py-6">
                   <SelectValue placeholder="Search models..." />
                 </SelectTrigger>
