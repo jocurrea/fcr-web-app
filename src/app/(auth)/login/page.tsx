@@ -98,9 +98,11 @@ export default function LoginPage() {
               type="email" 
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="jocurrea@gmail.com" 
+              placeholder="email@example.com" 
               className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-full text-sm text-gray-900 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 bg-[#edf2f7] bg-opacity-40"
               required
+              onInvalid={(e) => (e.target as HTMLInputElement).setCustomValidity('Please fill out this field.')}
+              onInput={(e) => (e.target as HTMLInputElement).setCustomValidity('')}
             />
           </div>
         </div>
@@ -116,9 +118,11 @@ export default function LoginPage() {
               type={showPassword ? "text" : "password"} 
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="123456" 
+              placeholder="••••••••" 
               className="w-full pl-12 pr-12 py-3 border border-gray-300 rounded-full text-sm text-gray-900 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 bg-[#edf2f7] bg-opacity-40"
               required
+              onInvalid={(e) => (e.target as HTMLInputElement).setCustomValidity('Please fill out this field.')}
+              onInput={(e) => (e.target as HTMLInputElement).setCustomValidity('')}
             />
             <button 
               type="button"
