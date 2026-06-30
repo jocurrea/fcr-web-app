@@ -10,25 +10,49 @@ export default function ResumePreviewPage() {
   const [profilePhoto, setProfilePhoto] = useState<string>("");
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const savedPersonal = localStorage.getItem("onboarding_personal");
-      if (savedPersonal) {
-        setPersonal(JSON.parse(savedPersonal));
+    async function loadData() {
+      const { supabase } = await import('@/lib/supabase');
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      let loadedFromDb = false;
+
+      if (session?.user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('avatar_url, crew_data')
+          .eq('id', session.user.id)
+          .single();
+
+        if (profile) {
+          if (profile.avatar_url) setProfilePhoto(profile.avatar_url);
+          if (profile.crew_data) {
+            loadedFromDb = true;
+            const crewData = profile.crew_data as any;
+            if (crewData.personal) setPersonal(crewData.personal);
+            if (crewData.resume) setResume(crewData.resume);
+          }
+        }
       }
 
-      const savedResume = localStorage.getItem("onboarding_resume");
-      if (savedResume) {
-        setResume(JSON.parse(savedResume));
-      }
+      if (!loadedFromDb && typeof window !== 'undefined') {
+        const savedPersonal = localStorage.getItem("onboarding_personal");
+        if (savedPersonal) {
+          setPersonal(JSON.parse(savedPersonal));
+        }
 
-      const savedPhoto = localStorage.getItem("userProfilePhoto");
-      if (savedPhoto) {
-        setProfilePhoto(savedPhoto);
-      }
+        const savedResume = localStorage.getItem("onboarding_resume");
+        if (savedResume) {
+          setResume(JSON.parse(savedResume));
+        }
 
-      // Automatically trigger print dialog when component is mounted and data is loaded
-      // setTimeout(() => window.print(), 1000);
+        const savedPhoto = localStorage.getItem("userProfilePhoto");
+        if (savedPhoto && !profilePhoto) {
+          setProfilePhoto(savedPhoto);
+        }
+      }
     }
+    
+    loadData();
   }, []);
 
   const fullName = `${personal.firstName || "Jose"} ${personal.middleName || ""} ${personal.lastName || "UrrutiaPilot Urrea"}`.trim().replace(/\s+/g, ' ');

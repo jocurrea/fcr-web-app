@@ -176,11 +176,23 @@ export function ResumeStep({ onNext }: ResumeStepProps) {
       }
 
       const personalRaw = localStorage.getItem("onboarding_personal");
+      const licensesRaw = localStorage.getItem("onboarding_licenses");
+      const ratingsRaw = localStorage.getItem("onboarding_ratings");
+      const workRaw = localStorage.getItem("onboarding_work");
+      const resumeRaw = localStorage.getItem("onboarding_resume");
       const avatarPhoto = localStorage.getItem("userProfilePhoto");
 
       if (personalRaw) {
         const personalData = JSON.parse(personalRaw);
         
+        const crewData = {
+          personal: personalData,
+          licenses: licensesRaw ? JSON.parse(licensesRaw) : [],
+          ratings: ratingsRaw ? JSON.parse(ratingsRaw) : [],
+          work: workRaw ? JSON.parse(workRaw) : {},
+          resume: resumeRaw ? JSON.parse(resumeRaw) : {},
+        };
+
         const { error } = await supabase
           .from('profiles')
           .upsert({
@@ -188,6 +200,7 @@ export function ResumeStep({ onNext }: ResumeStepProps) {
             first_name: personalData.firstName || "Unknown",
             last_name: personalData.lastName || "",
             avatar_url: avatarPhoto || null,
+            crew_data: crewData
           });
           
         if (error) {

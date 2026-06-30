@@ -24,30 +24,6 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const savedPhoto = localStorage.getItem("userProfilePhoto");
-    if (savedPhoto) {
-      setProfilePhoto(savedPhoto);
-    }
-
-    const savedPersonal = localStorage.getItem("onboarding_personal");
-    if (savedPersonal) setPersonal(JSON.parse(savedPersonal));
-
-    const savedLicenses = localStorage.getItem("onboarding_licenses");
-    if (savedLicenses) setLicenses(JSON.parse(savedLicenses));
-
-    const savedRatings = localStorage.getItem("onboarding_ratings");
-    if (savedRatings) setRatings(JSON.parse(savedRatings));
-
-    const savedWork = localStorage.getItem("onboarding_work");
-    if (savedWork) setWork(JSON.parse(savedWork));
-
-    const savedResume = localStorage.getItem("onboarding_resume");
-    if (savedResume) {
-      const parsedResume = JSON.parse(savedResume);
-      setResume(parsedResume);
-      if (parsedResume.languages) setLanguages(parsedResume.languages);
-    }
-    
     // Load Data from Supabase
     async function loadData() {
       try {
@@ -56,6 +32,45 @@ export default function ProfilePage() {
         const allPosts = await fetchPosts();
         if (session?.user) {
           setUserPosts(allPosts.filter(p => p.user_id === session.user.id));
+
+          // Fetch user profile data (crew_data)
+          const { data: profileData, error: profileError } = await supabase
+            .from('profiles')
+            .select('avatar_url, crew_data')
+            .eq('id', session.user.id)
+            .single();
+
+          if (profileData) {
+            setProfilePhoto(profileData.avatar_url || localStorage.getItem("userProfilePhoto"));
+            
+            if (profileData.crew_data) {
+              const crewData = profileData.crew_data as any;
+              if (crewData.personal) setPersonal(crewData.personal);
+              if (crewData.licenses) setLicenses(crewData.licenses);
+              if (crewData.ratings) setRatings(crewData.ratings);
+              if (crewData.work) setWork(crewData.work);
+              if (crewData.resume) {
+                setResume(crewData.resume);
+                if (crewData.resume.languages) setLanguages(crewData.resume.languages);
+              }
+            } else {
+              // Fallback for older sessions that didn't save to Supabase yet
+              const savedPersonal = localStorage.getItem("onboarding_personal");
+              if (savedPersonal) setPersonal(JSON.parse(savedPersonal));
+              const savedLicenses = localStorage.getItem("onboarding_licenses");
+              if (savedLicenses) setLicenses(JSON.parse(savedLicenses));
+              const savedRatings = localStorage.getItem("onboarding_ratings");
+              if (savedRatings) setRatings(JSON.parse(savedRatings));
+              const savedWork = localStorage.getItem("onboarding_work");
+              if (savedWork) setWork(JSON.parse(savedWork));
+              const savedResume = localStorage.getItem("onboarding_resume");
+              if (savedResume) {
+                const parsedResume = JSON.parse(savedResume);
+                setResume(parsedResume);
+                if (parsedResume.languages) setLanguages(parsedResume.languages);
+              }
+            }
+          }
 
           // Check if user has a business company
           const { data: companies, error } = await supabase
@@ -70,18 +85,11 @@ export default function ProfilePage() {
           }
 
           if (companies && companies.length > 0) {
-            // Fetch logo from profiles
-            const { data: profileData } = await supabase
-              .from('profiles')
-              .select('avatar_url')
-              .eq('id', session.user.id)
-              .single();
-
             setIsBusiness(true);
             setCompanyInfo({
               name: companies[0].name,
               status: companies[0].status,
-              logo: profileData?.avatar_url || savedPhoto
+              logo: profileData?.avatar_url || localStorage.getItem("userProfilePhoto")
             });
           }
         }
