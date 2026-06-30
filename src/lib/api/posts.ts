@@ -115,8 +115,8 @@ export async function fetchPostById(postId: string): Promise<Post | null> {
   const { data: userData } = await supabase.auth.getUser();
   const currentUserId = userData?.user?.id;
 
-  const firstName = data.profiles?.first_name || '';
-  const lastName = data.profiles?.last_name || '';
+  const firstName = (data.profiles as any)?.first_name || '';
+  const lastName = (data.profiles as any)?.last_name || '';
   const fullName = `${firstName} ${lastName}`.trim() || 'User';
 
   return {
@@ -128,7 +128,7 @@ export async function fetchPostById(postId: string): Promise<Post | null> {
     image: data.image,
     author: {
       name: fullName,
-      avatar: data.profiles?.avatar_url || 'https://api.dicebear.com/7.x/shapes/svg?seed=user'
+      avatar: (data.profiles as any)?.avatar_url || 'https://api.dicebear.com/7.x/shapes/svg?seed=user'
     },
     likes: data.post_likes?.length || 0,
     liked: currentUserId ? data.post_likes?.some((like: any) => like.user_id === currentUserId) : false,

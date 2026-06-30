@@ -677,7 +677,7 @@ export function ResumeStep({ onNext }: ResumeStepProps) {
             
             <div className="space-y-2">
               <Label className="text-gray-700 font-normal">Name</Label>
-              <Select value={langName} onValueChange={setLangName}>
+              <Select value={langName} onValueChange={(val) => setLangName(val || "")}>
                 <SelectTrigger className="w-full rounded-2xl py-6 text-gray-500">
                   <SelectValue placeholder="Select an Item" />
                 </SelectTrigger>
@@ -691,7 +691,7 @@ export function ResumeStep({ onNext }: ResumeStepProps) {
 
             <div className="space-y-2">
               <Label className="text-gray-700 font-normal">Proficiency</Label>
-              <Select value={langProficiency} onValueChange={setLangProficiency}>
+              <Select value={langProficiency} onValueChange={(val) => setLangProficiency(val || "")}>
                 <SelectTrigger className="w-full rounded-2xl py-6 text-gray-500">
                   <SelectValue placeholder="Select an Item" />
                 </SelectTrigger>
@@ -880,7 +880,7 @@ export function ResumeStep({ onNext }: ResumeStepProps) {
 
             <div className="space-y-2">
               <Label className="text-gray-700 font-normal">Country</Label>
-              <Select value={expCountry} onValueChange={setExpCountry}>
+              <Select value={expCountry} onValueChange={(val) => setExpCountry(val || "")}>
                 <SelectTrigger className="w-full rounded-2xl py-6 text-gray-500">
                   <SelectValue placeholder="Select an Item" />
                 </SelectTrigger>
