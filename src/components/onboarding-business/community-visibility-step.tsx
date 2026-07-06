@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { fetchBusinessOnboarding, saveCompanySettings } from "@/lib/api/business";
 
 interface CommunityVisibilityStepProps {
   onNext: () => void;
@@ -11,31 +12,65 @@ export function CommunityVisibilityStep({ onNext }: CommunityVisibilityStepProps
   const [offerDiscounts, setOfferDiscounts] = useState(false);
   const [joinFounding, setJoinFounding] = useState(false);
   const [allowDMs, setAllowDMs] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const saved = localStorage.getItem("business_visibility");
-    if (saved) {
-      try {
-        const data = JSON.parse(saved);
-        if (typeof data.advertising === 'boolean') setAdvertising(data.advertising);
-        if (typeof data.hiringPilots === 'boolean') setHiringPilots(data.hiringPilots);
-        if (typeof data.hiringCabinCrew === 'boolean') setHiringCabinCrew(data.hiringCabinCrew);
-        if (typeof data.offerDiscounts === 'boolean') setOfferDiscounts(data.offerDiscounts);
-        if (typeof data.joinFounding === 'boolean') setJoinFounding(data.joinFounding);
-        if (typeof data.allowDMs === 'boolean') setAllowDMs(data.allowDMs);
-      } catch(e) {}
+    let isMounted = true;
+
+    async function loadSettings() {
+      setIsLoading(true);
+      setError(null);
+
+      const response = await fetchBusinessOnboarding();
+      if (!isMounted) return;
+
+      if (!response.success) {
+        setError(response.error);
+        setIsLoading(false);
+        return;
+      }
+
+      const settings = response.data.settings;
+      setAdvertising(!!settings?.interested_in_advertising);
+      setHiringPilots(!!settings?.interested_in_hiring_pilots);
+      setHiringCabinCrew(!!settings?.interested_in_hiring_cabin_crew);
+      setOfferDiscounts(!!settings?.offers_crew_discounts);
+      setJoinFounding(!!settings?.join_founding_partners);
+      setAllowDMs(!!settings?.allow_crew_direct_messages);
+      setIsLoading(false);
     }
+
+    loadSettings();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
-  const handleNext = () => {
-    localStorage.setItem("business_visibility", JSON.stringify({
+  const handleNext = async () => {
+    if (isSaving) return;
+
+    setIsSaving(true);
+    setError(null);
+
+    const response = await saveCompanySettings({
       advertising,
       hiringPilots,
       hiringCabinCrew,
       offerDiscounts,
       joinFounding,
-      allowDMs
-    }));
+      allowDMs,
+    });
+
+    setIsSaving(false);
+
+    if (!response.success) {
+      setError(response.error);
+      return;
+    }
+
     onNext();
   };
 
@@ -77,6 +112,16 @@ export function CommunityVisibilityStep({ onNext }: CommunityVisibilityStepProps
   return (
     <div className="flex flex-col flex-1 h-full">
       <div className="flex-1 overflow-y-auto pb-6 custom-scrollbar">
+        {error && (
+          <div className="mb-4 rounded-3xl border border-red-100 bg-red-50 p-4 text-sm text-red-600">
+            {error}
+          </div>
+        )}
+        {isLoading && (
+          <div className="mb-4 rounded-3xl border border-gray-100 bg-white p-4 text-sm text-gray-500 shadow-sm">
+            Loading visibility settings...
+          </div>
+        )}
         <div className="mt-4">
           <h2 className="font-bold text-base text-gray-900 mb-2">Visibility Options</h2>
           
@@ -120,9 +165,10 @@ export function CommunityVisibilityStep({ onNext }: CommunityVisibilityStepProps
       <div className="pt-4 pb-8 mt-auto bg-white border-t border-transparent">
         <button
           onClick={handleNext}
-          className="w-full py-4 rounded-full font-bold text-white transition-colors bg-[#2d73f5] hover:bg-[#2d73f5]/90"
+          disabled={isLoading || isSaving}
+          className="w-full py-4 rounded-full font-bold text-white transition-colors bg-[#2d73f5] hover:bg-[#2d73f5]/90 disabled:bg-[#85b0fa] disabled:cursor-not-allowed"
         >
-          Next
+          {isSaving ? "Saving..." : "Next"}
         </button>
       </div>
     </div>

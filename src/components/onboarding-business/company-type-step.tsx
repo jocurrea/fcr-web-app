@@ -3,7 +3,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { supabase } from "@/lib/supabase";
+import {
+  fetchBusinessOnboarding,
+  saveCompanyTypeSelections,
+  type CompanyType,
+} from "@/lib/api/business";
 import {
   Plane,
   GraduationCap,
@@ -19,12 +23,6 @@ import {
   MoreHorizontal,
   LucideIcon,
 } from "lucide-react";
-
-type CompanyType = {
-  id: string;
-  key: string;
-  label: string;
-};
 
 const COMPANY_TYPE_ICONS: Record<string, LucideIcon> = {
   airline_operator: Plane,
@@ -51,37 +49,25 @@ export function CompanyTypeStep({ onNext }: CompanyTypeStepProps) {
   const [companyTypes, setCompanyTypes] = useState<CompanyType[]>([]);
   const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const saved = localStorage.getItem("business_company_types");
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) setSelectedTypes(parsed);
-      } catch {
-        localStorage.removeItem("business_company_types");
-      }
-    }
-
     let isMounted = true;
 
     async function loadCompanyTypes() {
       setIsLoading(true);
       setError(null);
 
-      const { data, error: companyTypesError } = await supabase
-        .from("company_types")
-        .select("id, key, label")
-        .order("label", { ascending: true });
-
+      const response = await fetchBusinessOnboarding();
       if (!isMounted) return;
 
-      if (companyTypesError) {
-        setError(companyTypesError.message);
+      if (!response.success) {
+        setError(response.error);
         setCompanyTypes([]);
       } else {
-        setCompanyTypes(data ?? []);
+        setCompanyTypes(response.data.companyTypes);
+        setSelectedTypes(response.data.selectedCompanyTypeKeys);
       }
 
       setIsLoading(false);
@@ -95,7 +81,7 @@ export function CompanyTypeStep({ onNext }: CompanyTypeStepProps) {
   }, []);
 
   const selectedSet = useMemo(() => new Set(selectedTypes), [selectedTypes]);
-  const canContinue = selectedTypes.length > 0 && !isLoading;
+  const canContinue = selectedTypes.length > 0 && !isLoading && !isSaving;
 
   const toggleType = (key: string) => {
     setSelectedTypes((prev) =>
@@ -103,9 +89,19 @@ export function CompanyTypeStep({ onNext }: CompanyTypeStepProps) {
     );
   };
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (!canContinue) return;
-    localStorage.setItem("business_company_types", JSON.stringify(selectedTypes));
+    setIsSaving(true);
+    setError(null);
+
+    const response = await saveCompanyTypeSelections(selectedTypes);
+    setIsSaving(false);
+
+    if (!response.success) {
+      setError(response.error);
+      return;
+    }
+
     onNext();
   };
 
@@ -123,12 +119,12 @@ export function CompanyTypeStep({ onNext }: CompanyTypeStepProps) {
         )}
 
         {!isLoading && error && (
-          <div className="rounded-3xl border border-red-100 bg-red-50 p-4 text-sm text-red-600">
-            Could not load company types. {error}
+          <div className="mb-4 rounded-3xl border border-red-100 bg-red-50 p-4 text-sm text-red-600">
+            {error}
           </div>
         )}
 
-        {!isLoading && !error && (
+        {!isLoading && (
           <div className="space-y-3">
             {companyTypes.map((type) => {
               const Icon = COMPANY_TYPE_ICONS[type.key] ?? MoreHorizontal;
@@ -172,7 +168,7 @@ export function CompanyTypeStep({ onNext }: CompanyTypeStepProps) {
           disabled={!canContinue}
           className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-full py-6 text-lg font-semibold disabled:cursor-not-allowed disabled:opacity-50"
         >
-          Next
+          {isSaving ? "Saving..." : "Next"}
         </Button>
       </div>
     </div>

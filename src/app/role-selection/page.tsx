@@ -4,17 +4,34 @@ import { useState } from "react";
 import { LogOut, ChevronRight, Users, Building2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { ensureBusinessDraft } from "@/lib/api/business";
 
 export default function RoleSelectionPage() {
   const router = useRouter();
   const [selectedType, setSelectedType] = useState<"flight_crew" | "business" | null>(null);
+  const [isContinuing, setIsContinuing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
+    if (!selectedType || isContinuing) return;
+
+    setIsContinuing(true);
+    setError(null);
+
     if (selectedType === "flight_crew") {
       router.push("/onboarding");
-    } else if (selectedType === "business") {
-      router.push("/onboarding-business");
+      return;
     }
+
+    const response = await ensureBusinessDraft();
+    setIsContinuing(false);
+
+    if (!response.success) {
+      setError(response.error);
+      return;
+    }
+
+    router.push("/onboarding-business");
   };
 
   const handleLogout = async () => {
@@ -94,14 +111,20 @@ export default function RoleSelectionPage() {
           </button>
         </div>
 
+        {error && (
+          <div className="mb-3 rounded-2xl border border-red-100 bg-red-50 p-3 text-sm text-red-600">
+            {error}
+          </div>
+        )}
+
         {/* Footer */}
         <div className="pb-8 pt-4">
           <button
             onClick={handleContinue}
-            disabled={!selectedType}
+            disabled={!selectedType || isContinuing}
             className="w-full py-4 rounded-full font-bold text-white transition-colors bg-[#2d73f5] hover:bg-[#2d73f5]/90 disabled:bg-[#85b0fa] disabled:cursor-not-allowed"
           >
-            Continue
+            {isContinuing ? "Please wait..." : "Continue"}
           </button>
         </div>
       </div>
