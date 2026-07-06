@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { 
   Users, User, MapPin, Mail, Phone, Globe, Calendar, Briefcase, Eye, Plane, Loader2
 } from "lucide-react";
-import { fetchBusinessOnboarding, submitBusinessOnboarding } from "@/lib/api/business";
+import { useBusinessOnboarding } from "@/components/onboarding-business/business-onboarding-context";
 
 interface ReviewFinishStepProps {
   onNext: () => void;
@@ -30,53 +30,39 @@ export function ReviewFinishStep({ onNext }: ReviewFinishStepProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const { onboarding, error: loadError, submit } = useBusinessOnboarding();
+
   useEffect(() => {
-    let isMounted = true;
+    if (!onboarding) return;
 
-    async function loadReviewData() {
-      const response = await fetchBusinessOnboarding();
-      if (!isMounted) return;
+    const { company, companyTypes, selectedCompanyTypeKeys, settings } = onboarding;
+    const labelsByKey = new Map(companyTypes.map((companyType) => [companyType.key, companyType.label]));
 
-      if (!response.success) {
-        setError(response.error);
-        return;
-      }
-
-      const { company, companyTypes, selectedCompanyTypeKeys, settings } = response.data;
-      const labelsByKey = new Map(companyTypes.map((companyType) => [companyType.key, companyType.label]));
-
-      setData({
-        companyTypes: selectedCompanyTypeKeys.map((typeKey) => labelsByKey.get(typeKey) || typeKey),
-        profile: {
-          companyName: company.name || "Not provided",
-          location: company.location || "Not provided",
-          email: company.contact_email || "Not provided",
-          phone: company.phone || "Not provided",
-          website: company.website || "Not provided",
-          foundedYear: company.founded_year ? String(company.founded_year) : "Not provided",
-          description: company.description || "Not provided",
-          operatingAreas: company.operating_areas || [],
-          servicesOffered: company.services || [],
-          fleetTypes: company.fleet_types || [],
-          logo: company.logo_url || null,
-        },
-        visibility: {
-          advertising: !!settings?.interested_in_advertising,
-          hiringPilots: !!settings?.interested_in_hiring_pilots,
-          hiringCabinCrew: !!settings?.interested_in_hiring_cabin_crew,
-          offerDiscounts: !!settings?.offers_crew_discounts,
-          joinFounding: !!settings?.join_founding_partners,
-          allowDMs: !!settings?.allow_crew_direct_messages,
-        },
-      });
-    }
-
-    loadReviewData();
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
+    setData({
+      companyTypes: selectedCompanyTypeKeys.map((typeKey) => labelsByKey.get(typeKey) || typeKey),
+      profile: {
+        companyName: company.name || "Not provided",
+        location: company.location || "Not provided",
+        email: company.contact_email || "Not provided",
+        phone: company.phone || "Not provided",
+        website: company.website || "Not provided",
+        foundedYear: company.founded_year ? String(company.founded_year) : "Not provided",
+        description: company.description || "Not provided",
+        operatingAreas: company.operating_areas || [],
+        servicesOffered: company.services || [],
+        fleetTypes: company.fleet_types || [],
+        logo: company.logo_url || null,
+      },
+      visibility: {
+        advertising: !!settings?.interested_in_advertising,
+        hiringPilots: !!settings?.interested_in_hiring_pilots,
+        hiringCabinCrew: !!settings?.interested_in_hiring_cabin_crew,
+        offerDiscounts: !!settings?.offers_crew_discounts,
+        joinFounding: !!settings?.join_founding_partners,
+        allowDMs: !!settings?.allow_crew_direct_messages,
+      },
+    });
+  }, [onboarding]);
 
   const renderPills = (items: string[]) => {
     if (!items || items.length === 0) return null;
@@ -108,7 +94,7 @@ export function ReviewFinishStep({ onNext }: ReviewFinishStepProps) {
     setIsSubmitting(true);
     setError(null);
 
-    const res = await submitBusinessOnboarding();
+    const res = await submit();
 
     setIsSubmitting(false);
 
@@ -253,9 +239,9 @@ export function ReviewFinishStep({ onNext }: ReviewFinishStepProps) {
       </div>
 
       {/* Error Message */}
-      {error && (
+      {(error || loadError) && (
         <div className="text-red-500 text-sm text-center mb-2 px-4">
-          {error}
+          {error || loadError}
         </div>
       )}
 

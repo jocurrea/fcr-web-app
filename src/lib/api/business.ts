@@ -325,10 +325,15 @@ export async function saveCompanySettings(visibility: CommunityVisibilityInput):
   }
 }
 
-export async function submitBusinessOnboarding(): Promise<ApiResult<CompanyRow>> {
+export async function submitBusinessOnboarding(
+  onboardingData?: BusinessOnboardingData,
+): Promise<ApiResult<CompanyRow>> {
   try {
     const userId = await getCurrentUserId();
-    const onboardingResponse = await fetchBusinessOnboarding();
+    const onboardingResponse = onboardingData
+      ? ({ success: true, data: onboardingData } as const)
+      : await fetchBusinessOnboarding();
+
     if (!onboardingResponse.success) return onboardingResponse;
 
     const { company, selectedCompanyTypeKeys } = onboardingResponse.data;

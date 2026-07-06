@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { fetchBusinessOnboarding, saveCompanySettings } from "@/lib/api/business";
+import { useBusinessOnboarding } from "@/components/onboarding-business/business-onboarding-context";
 
 interface CommunityVisibilityStepProps {
   onNext: () => void;
@@ -12,42 +12,19 @@ export function CommunityVisibilityStep({ onNext }: CommunityVisibilityStepProps
   const [offerDiscounts, setOfferDiscounts] = useState(false);
   const [joinFounding, setJoinFounding] = useState(false);
   const [allowDMs, setAllowDMs] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { onboarding, isLoading, error: loadError, saveVisibility } = useBusinessOnboarding();
 
   useEffect(() => {
-    let isMounted = true;
-
-    async function loadSettings() {
-      setIsLoading(true);
-      setError(null);
-
-      const response = await fetchBusinessOnboarding();
-      if (!isMounted) return;
-
-      if (!response.success) {
-        setError(response.error);
-        setIsLoading(false);
-        return;
-      }
-
-      const settings = response.data.settings;
-      setAdvertising(!!settings?.interested_in_advertising);
-      setHiringPilots(!!settings?.interested_in_hiring_pilots);
-      setHiringCabinCrew(!!settings?.interested_in_hiring_cabin_crew);
-      setOfferDiscounts(!!settings?.offers_crew_discounts);
-      setJoinFounding(!!settings?.join_founding_partners);
-      setAllowDMs(!!settings?.allow_crew_direct_messages);
-      setIsLoading(false);
-    }
-
-    loadSettings();
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
+    const settings = onboarding?.settings;
+    setAdvertising(!!settings?.interested_in_advertising);
+    setHiringPilots(!!settings?.interested_in_hiring_pilots);
+    setHiringCabinCrew(!!settings?.interested_in_hiring_cabin_crew);
+    setOfferDiscounts(!!settings?.offers_crew_discounts);
+    setJoinFounding(!!settings?.join_founding_partners);
+    setAllowDMs(!!settings?.allow_crew_direct_messages);
+  }, [onboarding?.settings]);
 
   const handleNext = async () => {
     if (isSaving) return;
@@ -55,7 +32,7 @@ export function CommunityVisibilityStep({ onNext }: CommunityVisibilityStepProps
     setIsSaving(true);
     setError(null);
 
-    const response = await saveCompanySettings({
+    const response = await saveVisibility({
       advertising,
       hiringPilots,
       hiringCabinCrew,
@@ -112,9 +89,9 @@ export function CommunityVisibilityStep({ onNext }: CommunityVisibilityStepProps
   return (
     <div className="flex flex-col flex-1 h-full">
       <div className="flex-1 overflow-y-auto pb-6 custom-scrollbar">
-        {error && (
+        {(error || loadError) && (
           <div className="mb-4 rounded-3xl border border-red-100 bg-red-50 p-4 text-sm text-red-600">
-            {error}
+            {error || loadError}
           </div>
         )}
         {isLoading && (

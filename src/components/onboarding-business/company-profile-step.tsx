@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, ChangeEvent } from "react";
 import { Upload, X } from "lucide-react";
-import { fetchBusinessOnboarding, saveCompanyProfile } from "@/lib/api/business";
+import { useBusinessOnboarding } from "@/components/onboarding-business/business-onboarding-context";
 
 interface CompanyProfileStepProps {
   onNext: () => void;
@@ -24,47 +24,26 @@ export function CompanyProfileStep({ onNext }: CompanyProfileStepProps) {
   const [fleetInput, setFleetInput] = useState("");
   const [fleetTypes, setFleetTypes] = useState<string[]>([]);
   const [logo, setLogo] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { onboarding, isLoading, error: loadError, saveProfile } = useBusinessOnboarding();
 
   useEffect(() => {
-    let isMounted = true;
+    const company = onboarding?.company;
+    if (!company) return;
 
-    async function loadCompanyProfile() {
-      setIsLoading(true);
-      setError(null);
-
-      const response = await fetchBusinessOnboarding();
-      if (!isMounted) return;
-
-      if (!response.success) {
-        setError(response.error);
-        setIsLoading(false);
-        return;
-      }
-
-      const { company } = response.data;
-      setCompanyName(company.name || "");
-      setLocation(company.location || "");
-      setEmail(company.contact_email || "");
-      setPhone(company.phone || "");
-      setWebsite(company.website || "");
-      setFoundedYear(company.founded_year ? String(company.founded_year) : "");
-      setDescription(company.description || "");
-      setOperatingAreas(company.operating_areas || []);
-      setServicesOffered(company.services || []);
-      setFleetTypes(company.fleet_types || []);
-      setLogo(company.logo_url || null);
-      setIsLoading(false);
-    }
-
-    loadCompanyProfile();
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
+    setCompanyName(company.name || "");
+    setLocation(company.location || "");
+    setEmail(company.contact_email || "");
+    setPhone(company.phone || "");
+    setWebsite(company.website || "");
+    setFoundedYear(company.founded_year ? String(company.founded_year) : "");
+    setDescription(company.description || "");
+    setOperatingAreas(company.operating_areas || []);
+    setServicesOffered(company.services || []);
+    setFleetTypes(company.fleet_types || []);
+    setLogo(company.logo_url || null);
+  }, [onboarding?.company]);
 
   const handleNext = async () => {
     if (!isFormValid) return;
@@ -72,7 +51,7 @@ export function CompanyProfileStep({ onNext }: CompanyProfileStepProps) {
     setIsSaving(true);
     setError(null);
 
-    const response = await saveCompanyProfile({
+    const response = await saveProfile({
       companyName,
       location,
       email,
@@ -161,9 +140,9 @@ export function CompanyProfileStep({ onNext }: CompanyProfileStepProps) {
   return (
     <div className="flex flex-col flex-1 h-full">
       <div className="flex-1 overflow-y-auto pb-6 custom-scrollbar p-1 -mx-1 px-1">
-        {error && (
+        {(error || loadError) && (
           <div className="mb-4 rounded-3xl border border-red-100 bg-red-50 p-4 text-sm text-red-600">
-            {error}
+            {error || loadError}
           </div>
         )}
         {isLoading && (

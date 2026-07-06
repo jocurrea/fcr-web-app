@@ -8,6 +8,7 @@ import { CompanyTypeStep } from "@/components/onboarding-business/company-type-s
 import { CompanyProfileStep } from "@/components/onboarding-business/company-profile-step";
 import { CommunityVisibilityStep } from "@/components/onboarding-business/community-visibility-step";
 import { ReviewFinishStep } from "@/components/onboarding-business/review-finish-step";
+import { BusinessOnboardingProvider } from "@/components/onboarding-business/business-onboarding-context";
 
 export default function OnboardingBusinessPage() {
   const router = useRouter();
@@ -43,7 +44,8 @@ export default function OnboardingBusinessPage() {
   };
 
   return (
-    <div className="min-h-screen bg-white">
+    <BusinessOnboardingProvider>
+      <div className="min-h-screen bg-white">
       <div className="mx-auto max-w-xl min-h-[100dvh] flex flex-col px-4 sm:px-6">
         
         {/* Header */}
@@ -70,6 +72,7 @@ export default function OnboardingBusinessPage() {
         {step === 3 && <CommunityVisibilityStep onNext={handleNext} />}
         {step === 4 && <ReviewFinishStep onNext={handleNext} />}
       </div>
-    </div>
+      </div>
+    </BusinessOnboardingProvider>
   );
 }

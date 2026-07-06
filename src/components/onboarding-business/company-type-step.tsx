@@ -3,11 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import {
-  fetchBusinessOnboarding,
-  saveCompanyTypeSelections,
-  type CompanyType,
-} from "@/lib/api/business";
+import { useBusinessOnboarding } from "@/components/onboarding-business/business-onboarding-context";
 import {
   Plane,
   GraduationCap,
@@ -46,39 +42,15 @@ interface CompanyTypeStepProps {
 }
 
 export function CompanyTypeStep({ onNext }: CompanyTypeStepProps) {
-  const [companyTypes, setCompanyTypes] = useState<CompanyType[]>([]);
+  const { onboarding, isLoading, error: loadError, saveTypes } = useBusinessOnboarding();
   const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const companyTypes = onboarding?.companyTypes ?? [];
 
   useEffect(() => {
-    let isMounted = true;
-
-    async function loadCompanyTypes() {
-      setIsLoading(true);
-      setError(null);
-
-      const response = await fetchBusinessOnboarding();
-      if (!isMounted) return;
-
-      if (!response.success) {
-        setError(response.error);
-        setCompanyTypes([]);
-      } else {
-        setCompanyTypes(response.data.companyTypes);
-        setSelectedTypes(response.data.selectedCompanyTypeKeys);
-      }
-
-      setIsLoading(false);
-    }
-
-    loadCompanyTypes();
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
+    setSelectedTypes(onboarding?.selectedCompanyTypeKeys ?? []);
+  }, [onboarding?.selectedCompanyTypeKeys]);
 
   const selectedSet = useMemo(() => new Set(selectedTypes), [selectedTypes]);
   const canContinue = selectedTypes.length > 0 && !isLoading && !isSaving;
@@ -94,7 +66,7 @@ export function CompanyTypeStep({ onNext }: CompanyTypeStepProps) {
     setIsSaving(true);
     setError(null);
 
-    const response = await saveCompanyTypeSelections(selectedTypes);
+    const response = await saveTypes(selectedTypes);
     setIsSaving(false);
 
     if (!response.success) {
@@ -118,9 +90,9 @@ export function CompanyTypeStep({ onNext }: CompanyTypeStepProps) {
           </div>
         )}
 
-        {!isLoading && error && (
+        {!isLoading && (error || loadError) && (
           <div className="mb-4 rounded-3xl border border-red-100 bg-red-50 p-4 text-sm text-red-600">
-            {error}
+            {error || loadError}
           </div>
         )}
 
