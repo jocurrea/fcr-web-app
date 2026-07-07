@@ -1,5 +1,40 @@
 import { supabase } from '@/lib/supabase';
 
+const DEFAULT_AVATAR = 'https://api.dicebear.com/7.x/shapes/svg?seed=user';
+
+const USER_IDENTITY_SELECT = `
+  id,
+  accountType,
+  firstName,
+  middleName,
+  lastName,
+  profileImage,
+  associateCompany:companies!companies_owner_user_id_fkey (
+    id,
+    name,
+    logo_url,
+    status
+  )
+`;
+
+function formatDate(value: string) {
+  return new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+function getUserName(user: any) {
+  const company = Array.isArray(user?.associateCompany) ? user.associateCompany[0] : user?.associateCompany;
+  if (user?.accountType === 'business' && company?.name) return company.name;
+
+  return [user?.firstName, user?.middleName, user?.lastName].filter(Boolean).join(' ').trim() || 'User';
+}
+
+function getUserAvatar(user: any) {
+  const company = Array.isArray(user?.associateCompany) ? user.associateCompany[0] : user?.associateCompany;
+  if (user?.accountType === 'business' && company?.logo_url) return company.logo_url;
+
+  return user?.profileImage || DEFAULT_AVATAR;
+}
+
 // Types
 export interface Post {
   id: string;
@@ -37,20 +72,20 @@ export async function fetchPosts(frequencyId?: string): Promise<Post[]> {
     .select(`
       id,
       created_at,
-      user_id,
-      frequency_id,
-      text,
-      image,
-      profiles:user_id ( first_name, last_name, avatar_url ),
-      post_likes ( user_id ),
-      post_comments ( id )
+      userId,
+      groupId,
+      body,
+      file,
+      user:users ( ${USER_IDENTITY_SELECT} ),
+      postLikes ( id, userId ),
+      comments ( id )
     `)
     .order('created_at', { ascending: false });
 
   if (frequencyId) {
-    query = query.eq('frequency_id', frequencyId);
+    query = query.eq('groupId', frequencyId);
   } else {
-    query = query.is('frequency_id', null);
+    query = query.is('groupId', null);
   }
 
   const { data, error } = await query;
@@ -64,25 +99,20 @@ export async function fetchPosts(frequencyId?: string): Promise<Post[]> {
   const currentUserId = userData?.user?.id;
 
   return data.map((post: any) => {
-    // Format name properly based on profiles
-    const firstName = post.profiles?.first_name || '';
-    const lastName = post.profiles?.last_name || '';
-    const fullName = `${firstName} ${lastName}`.trim() || 'User';
-
     return {
       id: post.id,
-      created_at: new Date(post.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-      user_id: post.user_id,
-      frequency_id: post.frequency_id,
-      text: post.text,
-      image: post.image,
+      created_at: formatDate(post.created_at),
+      user_id: post.userId,
+      frequency_id: post.groupId,
+      text: post.body || '',
+      image: post.file || null,
       author: {
-        name: fullName,
-        avatar: post.profiles?.avatar_url || 'https://api.dicebear.com/7.x/shapes/svg?seed=user'
+        name: getUserName(post.user),
+        avatar: getUserAvatar(post.user),
       },
-      likes: post.post_likes?.length || 0,
-      liked: currentUserId ? post.post_likes?.some((like: any) => like.user_id === currentUserId) : false,
-      comments: post.post_comments?.length || 0,
+      likes: post.postLikes?.length || 0,
+      liked: currentUserId ? post.postLikes?.some((like: any) => like.userId === currentUserId) : false,
+      comments: post.comments?.length || 0,
     };
   });
 }
@@ -96,13 +126,13 @@ export async function fetchPostById(postId: string): Promise<Post | null> {
     .select(`
       id,
       created_at,
-      user_id,
-      frequency_id,
-      text,
-      image,
-      profiles:user_id ( first_name, last_name, avatar_url ),
-      post_likes ( user_id ),
-      post_comments ( id )
+      userId,
+      groupId,
+      body,
+      file,
+      user:users ( ${USER_IDENTITY_SELECT} ),
+      postLikes ( id, userId ),
+      comments ( id )
     `)
     .eq('id', postId)
     .single();
@@ -115,24 +145,20 @@ export async function fetchPostById(postId: string): Promise<Post | null> {
   const { data: userData } = await supabase.auth.getUser();
   const currentUserId = userData?.user?.id;
 
-  const firstName = (data.profiles as any)?.first_name || '';
-  const lastName = (data.profiles as any)?.last_name || '';
-  const fullName = `${firstName} ${lastName}`.trim() || 'User';
-
   return {
     id: data.id,
-    created_at: new Date(data.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-    user_id: data.user_id,
-    frequency_id: data.frequency_id,
-    text: data.text,
-    image: data.image,
+    created_at: formatDate(data.created_at),
+    user_id: data.userId,
+    frequency_id: data.groupId,
+    text: data.body || '',
+    image: data.file || null,
     author: {
-      name: fullName,
-      avatar: (data.profiles as any)?.avatar_url || 'https://api.dicebear.com/7.x/shapes/svg?seed=user'
+      name: getUserName((data as any).user),
+      avatar: getUserAvatar((data as any).user),
     },
-    likes: data.post_likes?.length || 0,
-    liked: currentUserId ? data.post_likes?.some((like: any) => like.user_id === currentUserId) : false,
-    comments: data.post_comments?.length || 0,
+    likes: (data as any).postLikes?.length || 0,
+    liked: currentUserId ? (data as any).postLikes?.some((like: any) => like.userId === currentUserId) : false,
+    comments: (data as any).comments?.length || 0,
   };
 }
 
@@ -141,15 +167,15 @@ export async function fetchPostById(postId: string): Promise<Post | null> {
  */
 export async function fetchPostComments(postId: string): Promise<Comment[]> {
   const { data, error } = await supabase
-    .from('post_comments')
+    .from('comments')
     .select(`
       id,
       created_at,
-      user_id,
-      text,
-      profiles:user_id ( first_name, last_name, avatar_url )
+      userId,
+      body,
+      user:users ( ${USER_IDENTITY_SELECT} )
     `)
-    .eq('post_id', postId)
+    .eq('postId', postId)
     .order('created_at', { ascending: true });
 
   if (error) {
@@ -158,18 +184,14 @@ export async function fetchPostComments(postId: string): Promise<Comment[]> {
   }
 
   return data.map((comment: any) => {
-    const firstName = comment.profiles?.first_name || '';
-    const lastName = comment.profiles?.last_name || '';
-    const fullName = `${firstName} ${lastName}`.trim() || 'User';
-
     return {
       id: comment.id,
-      created_at: new Date(comment.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-      user_id: comment.user_id,
-      text: comment.text,
+      created_at: formatDate(comment.created_at),
+      user_id: comment.userId,
+      text: comment.body || '',
       author: {
-        name: fullName,
-        avatar: comment.profiles?.avatar_url || 'https://api.dicebear.com/7.x/shapes/svg?seed=user'
+        name: getUserName(comment.user),
+        avatar: getUserAvatar(comment.user),
       }
     };
   });
@@ -211,10 +233,10 @@ export async function createPost(text: string, frequencyId?: string, imageFile?:
   const { error } = await supabase
     .from('posts')
     .insert({
-      user_id: userData.user.id,
-      text: text,
-      frequency_id: frequencyId || null,
-      image: imageUrl
+      userId: userData.user.id,
+      body: text,
+      groupId: frequencyId || null,
+      file: imageUrl
     });
 
   if (error) {
@@ -261,9 +283,9 @@ export async function updatePost(postId: string, text: string, frequencyId?: str
   const { error } = await supabase
     .from('posts')
     .update({
-      text: text,
-      frequency_id: frequencyId || null,
-      image: imageUrl
+      body: text,
+      groupId: frequencyId || null,
+      file: imageUrl
     })
     .eq('id', postId);
 
@@ -285,9 +307,9 @@ export async function toggleLike(postId: string, currentLikedState: boolean): Pr
   if (currentLikedState) {
     // Unlike
     const { error } = await supabase
-      .from('post_likes')
+      .from('postLikes')
       .delete()
-      .match({ post_id: postId, user_id: userData.user.id });
+      .match({ postId: postId, userId: userData.user.id });
       
     if (error) {
       console.error('Error removing like:', error);
@@ -296,10 +318,10 @@ export async function toggleLike(postId: string, currentLikedState: boolean): Pr
   } else {
     // Like
     const { error } = await supabase
-      .from('post_likes')
+      .from('postLikes')
       .insert({
-        post_id: postId,
-        user_id: userData.user.id
+        postId: postId,
+        userId: userData.user.id
       });
       
     if (error) {
@@ -319,11 +341,11 @@ export async function createComment(postId: string, text: string): Promise<boole
   if (!userData?.user) return false;
 
   const { error } = await supabase
-    .from('post_comments')
+    .from('comments')
     .insert({
-      post_id: postId,
-      user_id: userData.user.id,
-      text: text
+      postId: postId,
+      userId: userData.user.id,
+      body: text
     });
 
   if (error) {
@@ -356,7 +378,7 @@ export async function deletePost(postId: string): Promise<boolean> {
  */
 export async function deleteComment(commentId: string): Promise<boolean> {
   const { error } = await supabase
-    .from('post_comments')
+    .from('comments')
     .delete()
     .eq('id', commentId);
 
@@ -373,8 +395,8 @@ export async function deleteComment(commentId: string): Promise<boolean> {
  */
 export async function updateComment(commentId: string, text: string): Promise<boolean> {
   const { error } = await supabase
-    .from('post_comments')
-    .update({ text: text })
+    .from('comments')
+    .update({ body: text })
     .eq('id', commentId);
 
   if (error) {

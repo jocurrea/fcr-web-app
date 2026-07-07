@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { LogOut, ChevronRight, Users, Building2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
@@ -11,6 +11,79 @@ export default function RoleSelectionPage() {
   const [selectedType, setSelectedType] = useState<"flight_crew" | "business" | null>(null);
   const [isContinuing, setIsContinuing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isCheckingAccess, setIsCheckingAccess] = useState(true);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const params = new URLSearchParams(window.location.search);
+    const isExplicitEdit = params.get("edit") === "company" || params.get("from") === "profile";
+
+    async function redirectCompletedUsers() {
+      const { data: { session } } = await supabase.auth.getSession();
+
+      if (!session) {
+        router.push("/login");
+        return;
+      }
+
+      const { data: userRecord } = await supabase
+        .from("users")
+        .select("onboarded, accountType")
+        .eq("id", session.user.id)
+        .single();
+
+      if (!isMounted) return;
+
+      if (!userRecord?.onboarded) {
+        if (userRecord?.accountType === "business") {
+          const response = await ensureBusinessDraft();
+          if (!isMounted) return;
+
+          if (!response.success) {
+            setError(response.error);
+            setIsCheckingAccess(false);
+            return;
+          }
+
+          router.replace("/onboarding-business");
+          return;
+        }
+
+        if (userRecord?.accountType === "flight_crew") {
+          router.replace("/onboarding");
+          return;
+        }
+
+        setIsCheckingAccess(false);
+        return;
+      }
+
+      if (userRecord.accountType === "business") {
+        const { data: companies } = await supabase
+          .from("companies")
+          .select("status")
+          .eq("owner_user_id", session.user.id)
+          .order("created_at", { ascending: false })
+          .limit(1);
+
+        if (!isMounted) return;
+
+        if (companies?.[0]?.status === "rejected" && isExplicitEdit) {
+          setIsCheckingAccess(false);
+          return;
+        }
+      }
+
+      router.replace("/home");
+    }
+
+    redirectCompletedUsers();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [router]);
 
   const handleContinue = async () => {
     if (!selectedType || isContinuing) return;
@@ -38,6 +111,14 @@ export default function RoleSelectionPage() {
     await supabase.auth.signOut();
     router.push("/login");
   };
+
+  if (isCheckingAccess) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-white">
