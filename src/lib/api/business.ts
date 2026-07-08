@@ -162,18 +162,7 @@ export async function ensureBusinessDraft(): Promise<ApiResult<CompanyRow>> {
 
     if (error) throw new Error(error.message);
 
-    const { error: memberError } = await supabase
-      .from("company_members")
-      .upsert(
-        {
-          company_id: company.id,
-          user_id: userId,
-          role: "owner",
-        },
-        { onConflict: "company_id,user_id" },
-      );
 
-    if (memberError) throw new Error(memberError.message);
 
     const { error: userError } = await supabase
       .from("users")
