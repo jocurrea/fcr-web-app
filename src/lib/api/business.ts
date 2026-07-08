@@ -167,7 +167,7 @@ export async function ensureBusinessDraft(): Promise<ApiResult<CompanyRow>> {
     const existingCompany = await findEditableCompany(userId);
 
     if (existingCompany) {
-      await supabase.from("users").update({ accountType: "business" }).eq("id", userId);
+      await supabase.from("users").update({ account_type: "business" }).eq("id", userId);
       return { success: true, data: existingCompany };
     }
 
@@ -195,7 +195,7 @@ export async function ensureBusinessDraft(): Promise<ApiResult<CompanyRow>> {
 
     const { error: userError } = await supabase
       .from("users")
-      .update({ accountType: "business" })
+      .update({ account_type: "business" })
       .eq("id", userId);
 
     if (userError) throw new Error(userError.message);
@@ -423,7 +423,7 @@ export async function submitBusinessOnboarding(
 
     const { error: userError } = await supabase
       .from("users")
-      .update({ accountType: "business", onboarded: 1 })
+      .update({ account_type: "business", onboarded: 1 })
       .eq("id", userId);
 
     if (userError) throw new Error(userError.message);

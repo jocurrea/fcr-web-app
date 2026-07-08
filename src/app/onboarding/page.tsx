@@ -30,7 +30,7 @@ export default function OnboardingPage() {
 
       const { data: userRecord } = await supabase
         .from("users")
-        .select("onboarded, accountType")
+        .select("onboarded, account_type")
         .eq("id", session.user.id)
         .single();
 
@@ -41,7 +41,7 @@ export default function OnboardingPage() {
         return;
       }
 
-      if (userRecord?.accountType === "business") {
+      if (userRecord?.account_type === "business") {
         router.replace("/onboarding-business");
         return;
       }

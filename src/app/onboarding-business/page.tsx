@@ -31,7 +31,7 @@ export default function OnboardingBusinessPage() {
 
       const { data: userRecord } = await supabase
         .from("users")
-        .select("onboarded, accountType")
+        .select("onboarded, account_type")
         .eq("id", session.user.id)
         .single();
 
@@ -49,12 +49,12 @@ export default function OnboardingBusinessPage() {
       const hasCompany = companies && companies.length > 0;
 
       if (!userRecord?.onboarded) {
-        if (userRecord?.accountType === "flight_crew") {
+        if (userRecord?.account_type === "flight_crew") {
           router.replace("/onboarding");
           return;
         }
 
-        if (!userRecord?.accountType && !hasCompany) {
+        if (!userRecord?.account_type && !hasCompany) {
           router.replace("/role-selection");
           return;
         }
@@ -66,7 +66,7 @@ export default function OnboardingBusinessPage() {
       if (!isMounted) return;
 
       const companyStatus = companies?.[0]?.status;
-      if (userRecord.accountType === "business" && companyStatus === "rejected" && isExplicitEdit) {
+      if (userRecord.account_type === "business" && companyStatus === "rejected" && isExplicitEdit) {
         setIsCheckingAccess(false);
         return;
       }
