@@ -25,24 +25,54 @@ export function ProtectedHeader() {
           return;
         }
 
-        const { data: userRecord } = await supabase
-          .from('users')
-          .select('onboarded, accounttype')
-          .eq('id', session.user.id)
-          .single();
+        let onboarded = false;
+        let accounttype = '';
+
+        try {
+          const { data: userRecord } = await supabase
+            .from('users')
+            .select('onboarded, accounttype')
+            .eq('id', session.user.id)
+            .maybeSingle();
+            
+          if (userRecord) {
+            onboarded = !!userRecord.onboarded;
+            accounttype = userRecord.accounttype || '';
+          }
+        } catch (e) {
+          console.error("Failed to fetch from users", e);
+        }
+
+        // Fallback: If the database trigger failed to create the users row, check if they have a company
+        if (!onboarded) {
+          const { data: companies } = await supabase
+            .from('companies')
+            .select('status')
+            .eq('owner_user_id', session.user.id)
+            .order('created_at', { ascending: false })
+            .limit(1);
+
+          if (companies && companies.length > 0) {
+            accounttype = 'business';
+            const status = companies[0].status;
+            if (status === 'approved' || status === 'pending') {
+              onboarded = true;
+            }
+          }
+        }
 
         const isOnboardingRoute =
           pathname === '/role-selection' ||
           pathname === '/onboarding' ||
           pathname.startsWith('/onboarding-business');
 
-        if (!userRecord?.onboarded && !isOnboardingRoute) {
-          if (userRecord?.accounttype === 'business') {
+        if (!onboarded && !isOnboardingRoute) {
+          if (accounttype === 'business') {
             router.push("/onboarding-business");
             return;
           }
 
-          if (userRecord?.accounttype === 'flight_crew') {
+          if (accounttype === 'flight_crew') {
             router.push("/onboarding");
             return;
           }
@@ -50,7 +80,7 @@ export function ProtectedHeader() {
           router.push("/role-selection");
         }
       } catch (e) {
-        console.error("Failed to fetch profile", e);
+        console.error("Failed to load session/profile", e);
       }
     }
 

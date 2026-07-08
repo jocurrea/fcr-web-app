@@ -27,16 +27,40 @@ export default function RoleSelectionPage() {
         return;
       }
 
+      let onboarded = false;
+      let accounttype = '';
+
       const { data: userRecord } = await supabase
         .from("users")
         .select("onboarded, accounttype")
         .eq("id", session.user.id)
-        .single();
+        .maybeSingle();
+
+      if (userRecord) {
+        onboarded = !!userRecord.onboarded;
+        accounttype = userRecord.accounttype || '';
+      }
+
+      // Fallback: If the database trigger failed to create the users row, check if they have a company
+      const { data: companies } = await supabase
+        .from("companies")
+        .select("status")
+        .eq("owner_user_id", session.user.id)
+        .order("created_at", { ascending: false })
+        .limit(1);
+
+      if (companies && companies.length > 0) {
+        accounttype = "business";
+        const status = companies[0].status;
+        if (status === "approved" || status === "pending") {
+          onboarded = true;
+        }
+      }
 
       if (!isMounted) return;
 
-      if (!userRecord?.onboarded) {
-        if (userRecord?.accounttype === "business") {
+      if (!onboarded) {
+        if (accounttype === "business") {
           const response = await ensureBusinessDraft();
           if (!isMounted) return;
 
@@ -50,7 +74,7 @@ export default function RoleSelectionPage() {
           return;
         }
 
-        if (userRecord?.accounttype === "flight_crew") {
+        if (accounttype === "flight_crew") {
           router.replace("/onboarding");
           return;
         }
@@ -59,14 +83,7 @@ export default function RoleSelectionPage() {
         return;
       }
 
-      if (userRecord.accounttype === "business") {
-        const { data: companies } = await supabase
-          .from("companies")
-          .select("status")
-          .eq("owner_user_id", session.user.id)
-          .order("created_at", { ascending: false })
-          .limit(1);
-
+      if (accounttype === "business") {
         if (!isMounted) return;
 
         if (companies?.[0]?.status === "rejected" && isExplicitEdit) {
