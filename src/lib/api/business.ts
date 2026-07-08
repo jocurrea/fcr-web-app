@@ -322,6 +322,14 @@ export async function saveCompanyProfile(profile: CompanyProfileInput): Promise<
       .single<CompanyRow>();
 
     if (error) throw new Error(error.message);
+    
+    // Temporary fix: Re-inject the uploaded logo into the returned object
+    // because the database schema no longer stores it, but the UI context 
+    // needs to retain it for the "Review & Confirm" step to display it.
+    if (data) {
+      data.logo_url = profile.logo;
+    }
+
     return { success: true, data };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "Could not save company profile." };
