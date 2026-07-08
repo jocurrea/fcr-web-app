@@ -334,20 +334,37 @@ export async function saveCompanySettings(visibility: CommunityVisibilityInput):
     if (!companyResponse.success) return companyResponse;
 
     const company = companyResponse.data;
-    const { error } = await supabase
+    const { data: existingSettings, error: fetchError } = await supabase
       .from("company_settings")
-      .upsert(
-        {
-          company_id: company.id,
-          interested_in_advertising: visibility.advertising,
-          interested_in_hiring_pilots: visibility.hiringPilots,
-          interested_in_hiring_cabin_crew: visibility.hiringCabinCrew,
-          offers_crew_discounts: visibility.offerDiscounts,
-          join_founding_partners: visibility.joinFounding,
-          allow_crew_direct_messages: visibility.allowDMs,
-        },
-        { onConflict: "company_id" },
-      );
+      .select("id")
+      .eq("company_id", company.id)
+      .maybeSingle();
+
+    if (fetchError) throw new Error(fetchError.message);
+
+    const payload = {
+      company_id: company.id,
+      interested_in_advertising: visibility.advertising,
+      interested_in_hiring_pilots: visibility.hiringPilots,
+      interested_in_hiring_cabin_crew: visibility.hiringCabinCrew,
+      offers_crew_discounts: visibility.offerDiscounts,
+      join_founding_partners: visibility.joinFounding,
+      allow_crew_direct_messages: visibility.allowDMs,
+    };
+
+    let error;
+    if (existingSettings) {
+      const { error: updateError } = await supabase
+        .from("company_settings")
+        .update(payload)
+        .eq("company_id", company.id);
+      error = updateError;
+    } else {
+      const { error: insertError } = await supabase
+        .from("company_settings")
+        .insert(payload);
+      error = insertError;
+    }
 
     if (error) throw new Error(error.message);
     return { success: true, data: company };
