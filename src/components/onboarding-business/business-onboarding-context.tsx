@@ -120,7 +120,6 @@ export function BusinessOnboardingProvider({ children }: { children: ReactNode }
       current
         ? {
             ...current,
-            company: response.data,
             settings: toSettings(visibility),
           }
         : current,
