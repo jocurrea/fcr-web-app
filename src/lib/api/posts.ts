@@ -4,16 +4,10 @@ const DEFAULT_AVATAR = 'https://api.dicebear.com/7.x/shapes/svg?seed=user';
 
 const USER_IDENTITY_SELECT = `
   id,
-  accounttype,
-  firstName,
-  middleName,
-  lastName,
-  profileImage,
-  associateCompany:companies!companies_owner_user_id_fkey (
-    id,
-    name,
-    status
-  )
+  first_name,
+  middle_name,
+  last_name,
+  avatar_url
 `;
 
 function formatDate(value: string) {
@@ -21,34 +15,28 @@ function formatDate(value: string) {
 }
 
 function getUserName(user: any) {
-  const company = Array.isArray(user?.associateCompany) ? user.associateCompany[0] : user?.associateCompany;
-  if (user?.accounttype === 'business' && company?.name) return company.name;
-
-  return [user?.firstName, user?.middleName, user?.lastName].filter(Boolean).join(' ').trim() || 'User';
+  return [user?.first_name, user?.middle_name, user?.last_name].filter(Boolean).join(' ').trim() || 'User';
 }
 
 function getUserAvatar(user: any) {
-  const company = Array.isArray(user?.associateCompany) ? user.associateCompany[0] : user?.associateCompany;
-  if (user?.accounttype === 'business' && company?.logo_url) return company.logo_url;
-
-  return user?.profileImage || DEFAULT_AVATAR;
+  return user?.avatar_url || DEFAULT_AVATAR;
 }
 
 // Types
 export interface Post {
   id: string;
-  created_at: string;
   user_id: string;
   frequency_id: string | null;
   text: string;
   image: string | null;
+  created_at: string;
   author: {
     name: string;
     avatar: string;
   };
   likes: number;
-  liked: boolean;
   comments: number;
+  liked: boolean;
 }
 
 export interface Comment {
@@ -71,20 +59,20 @@ export async function fetchPosts(frequencyId?: string): Promise<Post[]> {
     .select(`
       id,
       created_at,
-      userId,
-      groupId,
-      body,
-      file,
-      user:users ( ${USER_IDENTITY_SELECT} ),
-      postLikes ( id, userId ),
-      comments ( id )
+      user_id,
+      frequency_id,
+      text,
+      image,
+      user:user_id ( ${USER_IDENTITY_SELECT} ),
+      postLikes:post_likes ( id, user_id ),
+      comments:post_comments ( id )
     `)
     .order('created_at', { ascending: false });
 
   if (frequencyId) {
-    query = query.eq('groupId', frequencyId);
+    query = query.eq('frequency_id', frequencyId);
   } else {
-    query = query.is('groupId', null);
+    query = query.is('frequency_id', null);
   }
 
   const { data, error } = await query;
@@ -101,17 +89,17 @@ export async function fetchPosts(frequencyId?: string): Promise<Post[]> {
     return {
       id: post.id,
       created_at: formatDate(post.created_at),
-      user_id: post.userId,
-      frequency_id: post.groupId,
-      text: post.body || '',
-      image: post.file || null,
+      user_id: post.user_id,
+      frequency_id: post.frequency_id,
+      text: post.text || '',
+      image: post.image || null,
       author: {
         name: getUserName(post.user),
         avatar: getUserAvatar(post.user),
       },
       likes: post.postLikes?.length || 0,
-      liked: currentUserId ? post.postLikes?.some((like: any) => like.userId === currentUserId) : false,
       comments: post.comments?.length || 0,
+      liked: post.postLikes?.some((like: any) => like.user_id === currentUserId) || false,
     };
   });
 }
