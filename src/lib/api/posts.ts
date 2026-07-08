@@ -12,7 +12,6 @@ const USER_IDENTITY_SELECT = `
   associateCompany:companies!companies_owner_user_id_fkey (
     id,
     name,
-    logo_url,
     status
   )
 `;
