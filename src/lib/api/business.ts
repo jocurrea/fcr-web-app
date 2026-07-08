@@ -316,7 +316,6 @@ export async function saveCompanyProfile(profile: CompanyProfileInput): Promise<
         operating_areas: profile.operatingAreas ?? [],
         services: profile.servicesOffered ?? [],
         fleet_types: profile.fleetTypes ?? [],
-        updated_at: new Date().toISOString(),
       })
       .eq("id", company.id)
       .select("*")
@@ -346,7 +345,6 @@ export async function saveCompanySettings(visibility: CommunityVisibilityInput):
           offers_crew_discounts: visibility.offerDiscounts,
           join_founding_partners: visibility.joinFounding,
           allow_crew_direct_messages: visibility.allowDMs,
-          updated_at: new Date().toISOString(),
         },
         { onConflict: "company_id" },
       );
@@ -392,7 +390,6 @@ export async function submitBusinessOnboarding(
       .update({
         status: "pending",
         rejection_reason: null,
-        updated_at: new Date().toISOString(),
       })
       .eq("id", company.id)
       .select("*")
