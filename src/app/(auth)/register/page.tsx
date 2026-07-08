@@ -84,22 +84,30 @@ export default function RegisterPage() {
             <input 
               type="email" 
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                const target = e.target as HTMLInputElement;
+                if (target.value === '') {
+                  target.setCustomValidity('Please fill out this field.');
+                } else if (!target.value.includes('@')) {
+                  target.setCustomValidity(`Please include an '@' in the email address. '${target.value}' is missing an '@'.`);
+                } else {
+                  target.setCustomValidity('');
+                }
+              }}
               placeholder="email@example.com" 
               className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-full text-sm text-gray-900 focus:outline-none focus:border-[#2d73f5] focus:ring-1 focus:ring-[#2d73f5] bg-white"
               required
-              title="Please fill out this field."
               onInvalid={(e) => {
                 const target = e.target as HTMLInputElement;
-                if (target.validity.valueMissing) {
+                if (target.value === '') {
                   target.setCustomValidity('Please fill out this field.');
-                } else if (target.validity.typeMismatch) {
+                } else if (!target.value.includes('@')) {
                   target.setCustomValidity(`Please include an '@' in the email address. '${target.value}' is missing an '@'.`);
                 } else {
-                  target.setCustomValidity('Invalid email address.');
+                  target.setCustomValidity('');
                 }
               }}
-              onInput={(e) => (e.target as HTMLInputElement).setCustomValidity('')}
             />
           </div>
         </div>
@@ -114,13 +122,18 @@ export default function RegisterPage() {
             <input 
               type={showPassword ? "text" : "password"} 
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={(e) => {
+                setPassword(e.target.value);
+                const target = e.target as HTMLInputElement;
+                target.setCustomValidity(target.value === '' ? 'Please fill out this field.' : '');
+              }}
               placeholder="••••••••" 
               className="w-full pl-12 pr-12 py-3 border border-gray-300 rounded-full text-sm text-gray-900 focus:outline-none focus:border-[#2d73f5] focus:ring-1 focus:ring-[#2d73f5] bg-white"
               required
-              title="Please fill out this field."
-              onInvalid={(e) => (e.target as HTMLInputElement).setCustomValidity('Please fill out this field.')}
-              onInput={(e) => (e.target as HTMLInputElement).setCustomValidity('')}
+              onInvalid={(e) => {
+                const target = e.target as HTMLInputElement;
+                target.setCustomValidity(target.value === '' ? 'Please fill out this field.' : '');
+              }}
             />
             <button 
               type="button"
@@ -142,12 +155,17 @@ export default function RegisterPage() {
             type="checkbox" 
             id="terms" 
             checked={termsAccepted}
-            onChange={(e) => setTermsAccepted(e.target.checked)}
+            onChange={(e) => {
+              setTermsAccepted(e.target.checked);
+              const target = e.target as HTMLInputElement;
+              target.setCustomValidity(target.checked ? '' : 'Please check this box if you want to proceed.');
+            }}
             className="mt-1 w-4 h-4 rounded border-gray-300 text-[#2d73f5] focus:ring-[#2d73f5]" 
             required
-            title="Please check this box if you want to proceed."
-            onInvalid={(e) => (e.target as HTMLInputElement).setCustomValidity('Please check this box if you want to proceed.')}
-            onInput={(e) => (e.target as HTMLInputElement).setCustomValidity('')}
+            onInvalid={(e) => {
+              const target = e.target as HTMLInputElement;
+              target.setCustomValidity(target.checked ? '' : 'Please check this box if you want to proceed.');
+            }}
           />
           <label htmlFor="terms" className="text-[10px] text-gray-600">
             I agree to the <Link href="#" className="text-[#2d73f5] hover:underline">Terms & Conditions</Link>, <Link href="#" className="text-[#2d73f5] hover:underline">Community Guidelines</Link> and <Link href="#" className="text-[#2d73f5] hover:underline">Privacy Policy</Link>

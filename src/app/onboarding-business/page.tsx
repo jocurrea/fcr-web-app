@@ -37,13 +37,24 @@ export default function OnboardingBusinessPage() {
 
       if (!isMounted) return;
 
+      const { data: companies } = await supabase
+        .from("companies")
+        .select("status")
+        .eq("owner_user_id", session.user.id)
+        .order("created_at", { ascending: false })
+        .limit(1);
+
+      if (!isMounted) return;
+
+      const hasCompany = companies && companies.length > 0;
+
       if (!userRecord?.onboarded) {
         if (userRecord?.accountType === "flight_crew") {
           router.replace("/onboarding");
           return;
         }
 
-        if (!userRecord?.accountType) {
+        if (!userRecord?.accountType && !hasCompany) {
           router.replace("/role-selection");
           return;
         }
@@ -51,13 +62,6 @@ export default function OnboardingBusinessPage() {
         setIsCheckingAccess(false);
         return;
       }
-
-      const { data: companies } = await supabase
-        .from("companies")
-        .select("status")
-        .eq("owner_user_id", session.user.id)
-        .order("created_at", { ascending: false })
-        .limit(1);
 
       if (!isMounted) return;
 
