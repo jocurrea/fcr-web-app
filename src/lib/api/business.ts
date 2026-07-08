@@ -148,7 +148,14 @@ export async function ensureBusinessDraft(): Promise<ApiResult<CompanyRow>> {
         status: "draft", 
         name: "", 
         location: "", 
-        contact_email: "" 
+        contact_email: "",
+        logo_url: "",
+        description: "",
+        phone: "",
+        website: "",
+        operating_areas: [],
+        services: [],
+        fleet_types: []
       })
       .select("*")
       .single<CompanyRow>();
