@@ -173,7 +173,6 @@ export async function ensureBusinessDraft(): Promise<ApiResult<CompanyRow>> {
         name: "", 
         location: "", 
         contact_email: "",
-        logo_url: "",
         description: "",
         phone: "",
         website: "",
@@ -302,7 +301,6 @@ export async function saveCompanyProfile(profile: CompanyProfileInput): Promise<
       .from("companies")
       .update({
         name: profile.companyName.trim(),
-        logo_url: profile.logo,
         description: normalizeOptionalText(profile.description),
         contact_email: profile.email.trim(),
         phone: normalizeOptionalText(profile.phone),
