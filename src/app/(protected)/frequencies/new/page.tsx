@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
-import { ChevronLeft, Upload, ChevronDown, XCircle } from "lucide-react";
+import { ChevronLeft, Upload, ChevronDown, XCircle, Info, X, Clock } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 const MOCK_USERS = [
@@ -23,7 +23,27 @@ export default function NewFrequencyPage() {
   const [name, setName] = useState("");
   const dropdownRef = useRef<HTMLDivElement>(null);
 
+  const [isCompanyPending, setIsCompanyPending] = useState(false);
+  const [showPendingModal, setShowPendingModal] = useState(false);
+
   useEffect(() => {
+    async function loadCompanyStatus() {
+      const { supabase } = await import('@/lib/supabase');
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        const { data: companies } = await supabase
+          .from('companies')
+          .select('status')
+          .eq('owner_user_id', session.user.id)
+          .order('created_at', { ascending: false })
+          .limit(1);
+        
+        if (companies && companies.length > 0 && companies[0].status === 'pending') {
+          setIsCompanyPending(true);
+        }
+      }
+    }
+    loadCompanyStatus();
     function handleClickOutside(event: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsDropdownOpen(false);
@@ -57,6 +77,10 @@ export default function NewFrequencyPage() {
   };
 
   const handleCreateFrequency = async () => {
+    if (isCompanyPending) {
+      setShowPendingModal(true);
+      return;
+    }
     if (!name.trim()) {
       alert("Please provide a name for the frequency.");
       return;
@@ -86,6 +110,20 @@ export default function NewFrequencyPage() {
       </header>
 
       <div className="px-6 mt-4">
+        {isCompanyPending && (
+          <div className="bg-[#f0f6ff] border border-[#e0eaff] p-5 rounded-[16px] flex items-start gap-4 w-full mb-6">
+            <div className="w-11 h-11 bg-white rounded-full flex items-center justify-center shrink-0 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+              <Clock className="w-[22px] h-[22px] text-[#1a56db]" strokeWidth={2.5} />
+            </div>
+            <div className="mt-0.5">
+              <h3 className="font-bold text-[16px] text-gray-900 mb-1.5">Company profile under review</h3>
+              <p className="text-[14.5px] text-gray-500 leading-relaxed pr-2">
+                Posting, commenting, liking, and creating Frequencies are disabled until your company is approved.
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Toggle Public / Private */}
         <div className="flex bg-[#e2e8f0] rounded-full p-1 mb-8 shadow-inner">
           <button
@@ -216,6 +254,25 @@ export default function NewFrequencyPage() {
           Create Frequency
         </button>
       </div>
+
+      {showPendingModal && (
+        <div className="fixed top-[88px] left-1/2 -translate-x-1/2 w-[calc(100%-32px)] max-w-md z-[100]">
+          <div className="bg-white rounded-[24px] shadow-[0_4px_24px_rgba(0,0,0,0.12)] border border-gray-100 p-5 relative">
+            <button onClick={() => setShowPendingModal(false)} className="absolute top-5 right-5 text-gray-800 hover:text-black">
+              <X className="w-5 h-5" />
+            </button>
+            <div className="flex items-start gap-3">
+              <Info className="w-[22px] h-[22px] text-[#1a73e8] shrink-0 mt-0.5" strokeWidth={2.5} />
+              <div className="flex-1 pr-6">
+                <h3 className="text-[16px] font-bold text-gray-900 mb-1.5">Company profile under review</h3>
+                <p className="text-[14px] text-gray-600 leading-snug">
+                  Your company profile is being reviewed. Posting, commenting, liking, and creating Frequencies are disabled until approval.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

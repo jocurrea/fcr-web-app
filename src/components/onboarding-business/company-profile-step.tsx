@@ -115,8 +115,8 @@ export function CompanyProfileStep({ onNext }: CompanyProfileStepProps) {
   const handleLogoUpload = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        alert("File is too large. Maximum size is 5MB.");
+      if (file.size > 2 * 1024 * 1024) {
+        alert("File is too large. Maximum size is 2MB.");
         return;
       }
       const reader = new FileReader();
@@ -155,7 +155,7 @@ export function CompanyProfileStep({ onNext }: CompanyProfileStepProps) {
                   <Upload className="w-6 h-6 text-[#2d73f5]" />
                 </div>
                 <h3 className="font-bold text-[15px] text-gray-900 mb-1">Tap to upload</h3>
-                <p className="text-[13px] text-gray-500">JPG, PNG or SVG (max 5MB)</p>
+                <p className="text-[13px] text-gray-500">JPG, PNG or SVG (max 2MB)</p>
               </>
             )}
           </button>
@@ -233,8 +233,13 @@ export function CompanyProfileStep({ onNext }: CompanyProfileStepProps) {
               <label className="block text-[14px] font-semibold text-gray-800 mb-2 ml-1">Founded Year</label>
               <input
                 type="text"
+                inputMode="numeric"
+                maxLength={4}
                 value={foundedYear}
-                onChange={(e) => setFoundedYear(e.target.value)}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/\D/g, '');
+                  setFoundedYear(val);
+                }}
                 placeholder="2018"
                 className="w-full px-5 py-[14px] bg-white border border-gray-300 rounded-[24px] text-[15px] placeholder-gray-400 focus:outline-none focus:border-[#2d73f5] focus:ring-1 focus:ring-[#2d73f5] transition-shadow"
               />

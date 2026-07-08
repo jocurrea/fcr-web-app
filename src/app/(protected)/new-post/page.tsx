@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ChevronDown, X } from "lucide-react";
+import { ChevronDown, X, Info, Clock } from "lucide-react";
 
 function NewPostContent() {
   const router = useRouter();
@@ -20,6 +20,8 @@ function NewPostContent() {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isPosting, setIsPosting] = useState(false);
+  const [isCompanyPending, setIsCompanyPending] = useState(false);
+  const [showPendingModal, setShowPendingModal] = useState(false);
 
   useEffect(() => {
     async function loadFrequencies() {
@@ -66,6 +68,24 @@ function NewPostContent() {
         });
       });
     }
+
+    async function loadCompanyStatus() {
+      const { supabase } = await import('@/lib/supabase');
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        const { data: companies } = await supabase
+          .from('companies')
+          .select('status')
+          .eq('owner_user_id', session.user.id)
+          .order('created_at', { ascending: false })
+          .limit(1);
+        
+        if (companies && companies.length > 0 && companies[0].status === 'pending') {
+          setIsCompanyPending(true);
+        }
+      }
+    }
+    loadCompanyStatus();
   }, [editId]);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -81,6 +101,10 @@ function NewPostContent() {
   };
 
   const handlePost = async () => {
+    if (isCompanyPending) {
+      setShowPendingModal(true);
+      return;
+    }
     if (!text.trim() && !attachedImage) return;
 
     setIsPosting(true);
@@ -119,6 +143,20 @@ function NewPostContent() {
   return (
     <div className="max-w-lg mx-auto flex flex-col w-full min-h-[calc(100vh-88px)] px-4 pt-4 pb-10">
       
+      {isCompanyPending && (
+        <div className="bg-[#f0f6ff] border border-[#e0eaff] p-5 rounded-[16px] flex items-start gap-4 w-full mb-6">
+          <div className="w-11 h-11 bg-white rounded-full flex items-center justify-center shrink-0 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+            <Clock className="w-[22px] h-[22px] text-[#1a56db]" strokeWidth={2.5} />
+          </div>
+          <div className="mt-0.5">
+            <h3 className="font-bold text-[16px] text-gray-900 mb-1.5">Company profile under review</h3>
+            <p className="text-[14.5px] text-gray-500 leading-relaxed pr-2">
+              Posting, commenting, liking, and creating Frequencies are disabled until your company is approved.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* User Info & Frequency Selector */}
       <div className="flex items-center gap-3 mb-6 relative">
         <img 
@@ -243,6 +281,25 @@ function NewPostContent() {
       {isPosting && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-white/50 backdrop-blur-[2px]">
           <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+        </div>
+      )}
+
+      {showPendingModal && (
+        <div className="fixed top-[88px] left-1/2 -translate-x-1/2 w-[calc(100%-32px)] max-w-md z-[100]">
+          <div className="bg-white rounded-[24px] shadow-[0_4px_24px_rgba(0,0,0,0.12)] border border-gray-100 p-5 relative">
+            <button onClick={() => setShowPendingModal(false)} className="absolute top-5 right-5 text-gray-800 hover:text-black">
+              <X className="w-5 h-5" />
+            </button>
+            <div className="flex items-start gap-3">
+              <Info className="w-[22px] h-[22px] text-[#1a73e8] shrink-0 mt-0.5" strokeWidth={2.5} />
+              <div className="flex-1 pr-6">
+                <h3 className="text-[16px] font-bold text-gray-900 mb-1.5">Company profile under review</h3>
+                <p className="text-[14px] text-gray-600 leading-snug">
+                  Your company profile is being reviewed. Posting, commenting, liking, and creating Frequencies are disabled until approval.
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

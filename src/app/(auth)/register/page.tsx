@@ -86,7 +86,7 @@ export default function RegisterPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="email@example.com" 
-              className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-full text-sm text-gray-900 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 bg-white"
+              className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-full text-sm text-gray-900 focus:outline-none focus:border-[#2d73f5] focus:ring-1 focus:ring-[#2d73f5] bg-white"
               required
               title="Please fill out this field."
               onInvalid={(e) => (e.target as HTMLInputElement).setCustomValidity('Please fill out this field.')}
@@ -107,7 +107,7 @@ export default function RegisterPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••" 
-              className="w-full pl-12 pr-12 py-3 border border-gray-300 rounded-full text-sm text-gray-900 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 bg-white"
+              className="w-full pl-12 pr-12 py-3 border border-gray-300 rounded-full text-sm text-gray-900 focus:outline-none focus:border-[#2d73f5] focus:ring-1 focus:ring-[#2d73f5] bg-white"
               required
               title="Please fill out this field."
               onInvalid={(e) => (e.target as HTMLInputElement).setCustomValidity('Please fill out this field.')}
@@ -134,14 +134,14 @@ export default function RegisterPage() {
             id="terms" 
             checked={termsAccepted}
             onChange={(e) => setTermsAccepted(e.target.checked)}
-            className="mt-1 w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" 
+            className="mt-1 w-4 h-4 rounded border-gray-300 text-[#2d73f5] focus:ring-[#2d73f5]" 
             required
             title="Please check this box if you want to proceed."
             onInvalid={(e) => (e.target as HTMLInputElement).setCustomValidity('Please check this box if you want to proceed.')}
             onInput={(e) => (e.target as HTMLInputElement).setCustomValidity('')}
           />
           <label htmlFor="terms" className="text-[10px] text-gray-600">
-            I agree to the <Link href="#" className="text-blue-500 hover:underline">Terms & Conditions</Link>, <Link href="#" className="text-blue-500 hover:underline">Community Guidelines</Link> and <Link href="#" className="text-blue-500 hover:underline">Privacy Policy</Link>
+            I agree to the <Link href="#" className="text-[#2d73f5] hover:underline">Terms & Conditions</Link>, <Link href="#" className="text-[#2d73f5] hover:underline">Community Guidelines</Link> and <Link href="#" className="text-[#2d73f5] hover:underline">Privacy Policy</Link>
           </label>
         </div>
 
@@ -150,7 +150,7 @@ export default function RegisterPage() {
           <button 
             type="submit"
             disabled={isLoading || !termsAccepted}
-            className={`w-full text-white font-bold text-lg py-3.5 rounded-full transition-colors ${(isLoading || !termsAccepted) ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#6ea1ed] hover:bg-[#5b8cdd]'}`}
+            className={`w-full text-white font-bold text-lg py-3.5 rounded-full transition-colors ${(isLoading || !termsAccepted) ? 'bg-[#85b0fa] cursor-not-allowed' : 'bg-[#2d73f5] hover:bg-[#2d73f5]/90'}`}
           >
             {isLoading ? 'Registering...' : 'Signup'}
           </button>
