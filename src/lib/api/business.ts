@@ -428,6 +428,13 @@ export async function submitBusinessOnboarding(
 
     if (userError) throw new Error(userError.message);
 
+    if (company.logo_url) {
+      await supabase
+        .from("profiles")
+        .update({ avatar_url: company.logo_url })
+        .eq("id", userId);
+    }
+
     return { success: true, data };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "Could not submit company profile." };

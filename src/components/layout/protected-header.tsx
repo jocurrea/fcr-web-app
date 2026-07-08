@@ -39,8 +39,18 @@ export function ProtectedHeader() {
             onboarded = !!userRecord.onboarded;
             accounttype = userRecord.accounttype || '';
           }
+
+          const { data: profileRecord } = await supabase
+            .from('profiles')
+            .select('avatar_url')
+            .eq('id', session.user.id)
+            .maybeSingle();
+
+          if (profileRecord?.avatar_url) {
+            setProfilePhoto(profileRecord.avatar_url);
+          }
         } catch (e) {
-          console.error("Failed to fetch from users", e);
+          console.error("Failed to fetch from users/profiles", e);
         }
 
         // Fallback: If the database trigger failed to create the users row, check if they have a company
