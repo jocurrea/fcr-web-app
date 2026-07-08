@@ -128,13 +128,19 @@ export async function fetchCompanyTypes(): Promise<ApiResult<CompanyType[]>> {
     if (!rawCompanyTypes || rawCompanyTypes.length === 0) {
       // Fallback if the database table was emptied or RLS blocks it
       companyTypes = [
-        { id: "00000000-0000-0000-0000-000000000001", key: "airline_operator", label: "Airline Operator" },
+        { id: "00000000-0000-0000-0000-000000000001", key: "airline_operator", label: "Airline / Operator" },
         { id: "00000000-0000-0000-0000-000000000002", key: "charter_company", label: "Charter Company" },
         { id: "00000000-0000-0000-0000-000000000003", key: "flight_school", label: "Flight School" },
         { id: "00000000-0000-0000-0000-000000000004", key: "fbo", label: "FBO" },
-        { id: "00000000-0000-0000-0000-000000000005", key: "mro_maintenance", label: "MRO/Maintenance" },
+        { id: "00000000-0000-0000-0000-000000000005", key: "mro_maintenance", label: "MRO / Maintenance" },
         { id: "00000000-0000-0000-0000-000000000006", key: "ground_handling", label: "Ground Handling" },
         { id: "00000000-0000-0000-0000-000000000007", key: "aviation_recruitment", label: "Aviation Recruitment" },
+        { id: "00000000-0000-0000-0000-000000000009", key: "training_center", label: "Training Center" },
+        { id: "00000000-0000-0000-0000-000000000010", key: "aviation_technology", label: "Aviation Technology" },
+        { id: "00000000-0000-0000-0000-000000000011", key: "airport_services", label: "Airport Services" },
+        { id: "00000000-0000-0000-0000-000000000012", key: "aircraft_management", label: "Aircraft Management" },
+        { id: "00000000-0000-0000-0000-000000000013", key: "aircraft_sales_brokerage", label: "Aircraft Sales / Brokerage" },
+        { id: "00000000-0000-0000-0000-000000000014", key: "aviation_retail", label: "Aviation Retail" },
         { id: "00000000-0000-0000-0000-000000000008", key: "other", label: "Other" }
       ];
     } else {
