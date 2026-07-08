@@ -21,6 +21,22 @@ export default function LoginPage() {
     setIsLoading(true);
     setError(null);
 
+    if (!email) {
+      setError("Please fill out the email field.");
+      setIsLoading(false);
+      return;
+    }
+    if (!email.includes("@")) {
+      setError(`Please include an '@' in the email address. '${email}' is missing an '@'.`);
+      setIsLoading(false);
+      return;
+    }
+    if (!password) {
+      setError("Please fill out the password field.");
+      setIsLoading(false);
+      return;
+    }
+
     try {
       const { data, error: authError } = await supabase.auth.signInWithPassword({
         email,
@@ -86,7 +102,7 @@ export default function LoginPage() {
       </div>
 
       {/* Form */}
-      <form className="flex flex-col gap-4 flex-1" onSubmit={handleLogin}>
+      <form className="flex flex-col gap-4 flex-1" onSubmit={handleLogin} noValidate>
         
         {/* Email */}
         <div className="flex flex-col">
@@ -103,19 +119,6 @@ export default function LoginPage() {
               onChange={(e) => setEmail(e.target.value)}
               placeholder="email@example.com" 
               className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-full text-sm text-gray-900 focus:outline-none focus:border-[#2d73f5] focus:ring-1 focus:ring-[#2d73f5] bg-[#edf2f7] bg-opacity-40"
-              required
-              title="Please fill out this field."
-              onInvalid={(e) => {
-                const target = e.target as HTMLInputElement;
-                if (target.validity.valueMissing) {
-                  target.setCustomValidity('Please fill out this field.');
-                } else if (target.validity.typeMismatch) {
-                  target.setCustomValidity(`Please include an '@' in the email address. '${target.value}' is missing an '@'.`);
-                } else {
-                  target.setCustomValidity('Invalid email address.');
-                }
-              }}
-              onInput={(e) => (e.target as HTMLInputElement).setCustomValidity('')}
             />
           </div>
         </div>
@@ -133,10 +136,6 @@ export default function LoginPage() {
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••" 
               className="w-full pl-12 pr-12 py-3 border border-gray-300 rounded-full text-sm text-gray-900 focus:outline-none focus:border-[#2d73f5] focus:ring-1 focus:ring-[#2d73f5] bg-[#edf2f7] bg-opacity-40"
-              required
-              title="Please fill out this field."
-              onInvalid={(e) => (e.target as HTMLInputElement).setCustomValidity('Please fill out this field.')}
-              onInput={(e) => (e.target as HTMLInputElement).setCustomValidity('')}
             />
             <button 
               type="button"

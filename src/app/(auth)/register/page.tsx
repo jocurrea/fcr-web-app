@@ -21,6 +21,22 @@ export default function RegisterPage() {
     setIsLoading(true);
     setError(null);
 
+    if (!email) {
+      setError("Please fill out the email field.");
+      setIsLoading(false);
+      return;
+    }
+    if (!email.includes("@")) {
+      setError(`Please include an '@' in the email address. '${email}' is missing an '@'.`);
+      setIsLoading(false);
+      return;
+    }
+    if (!password) {
+      setError("Please fill out the password field.");
+      setIsLoading(false);
+      return;
+    }
+
     try {
       const { data, error: authError } = await supabase.auth.signUp({
         email,
@@ -70,7 +86,7 @@ export default function RegisterPage() {
       </div>
 
       {/* Form */}
-      <form className="flex flex-col gap-4 flex-1" onSubmit={handleRegister}>
+      <form className="flex flex-col gap-4 flex-1" onSubmit={handleRegister} noValidate>
         
         {/* Email */}
         <div className="flex flex-col">
@@ -87,19 +103,6 @@ export default function RegisterPage() {
               onChange={(e) => setEmail(e.target.value)}
               placeholder="email@example.com" 
               className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-full text-sm text-gray-900 focus:outline-none focus:border-[#2d73f5] focus:ring-1 focus:ring-[#2d73f5] bg-white"
-              required
-              title="Please fill out this field."
-              onInvalid={(e) => {
-                const target = e.target as HTMLInputElement;
-                if (target.validity.valueMissing) {
-                  target.setCustomValidity('Please fill out this field.');
-                } else if (target.validity.typeMismatch) {
-                  target.setCustomValidity(`Please include an '@' in the email address. '${target.value}' is missing an '@'.`);
-                } else {
-                  target.setCustomValidity('Invalid email address.');
-                }
-              }}
-              onInput={(e) => (e.target as HTMLInputElement).setCustomValidity('')}
             />
           </div>
         </div>
@@ -117,10 +120,6 @@ export default function RegisterPage() {
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••" 
               className="w-full pl-12 pr-12 py-3 border border-gray-300 rounded-full text-sm text-gray-900 focus:outline-none focus:border-[#2d73f5] focus:ring-1 focus:ring-[#2d73f5] bg-white"
-              required
-              title="Please fill out this field."
-              onInvalid={(e) => (e.target as HTMLInputElement).setCustomValidity('Please fill out this field.')}
-              onInput={(e) => (e.target as HTMLInputElement).setCustomValidity('')}
             />
             <button 
               type="button"
@@ -144,10 +143,6 @@ export default function RegisterPage() {
             checked={termsAccepted}
             onChange={(e) => setTermsAccepted(e.target.checked)}
             className="mt-1 w-4 h-4 rounded border-gray-300 text-[#2d73f5] focus:ring-[#2d73f5]" 
-            required
-            title="Please check this box if you want to proceed."
-            onInvalid={(e) => (e.target as HTMLInputElement).setCustomValidity('Please check this box if you want to proceed.')}
-            onInput={(e) => (e.target as HTMLInputElement).setCustomValidity('')}
           />
           <label htmlFor="terms" className="text-[10px] text-gray-600">
             I agree to the <Link href="#" className="text-[#2d73f5] hover:underline">Terms & Conditions</Link>, <Link href="#" className="text-[#2d73f5] hover:underline">Community Guidelines</Link> and <Link href="#" className="text-[#2d73f5] hover:underline">Privacy Policy</Link>
