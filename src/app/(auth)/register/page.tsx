@@ -89,7 +89,16 @@ export default function RegisterPage() {
               className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-full text-sm text-gray-900 focus:outline-none focus:border-[#2d73f5] focus:ring-1 focus:ring-[#2d73f5] bg-white"
               required
               title="Please fill out this field."
-              onInvalid={(e) => (e.target as HTMLInputElement).setCustomValidity('Please fill out this field.')}
+              onInvalid={(e) => {
+                const target = e.target as HTMLInputElement;
+                if (target.validity.valueMissing) {
+                  target.setCustomValidity('Please fill out this field.');
+                } else if (target.validity.typeMismatch) {
+                  target.setCustomValidity(`Please include an '@' in the email address. '${target.value}' is missing an '@'.`);
+                } else {
+                  target.setCustomValidity('Invalid email address.');
+                }
+              }}
               onInput={(e) => (e.target as HTMLInputElement).setCustomValidity('')}
             />
           </div>
