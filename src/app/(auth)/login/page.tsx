@@ -32,15 +32,18 @@ export default function LoginPage() {
       if (data.session) {
         localStorage.setItem("current_user_id", data.session.user.id);
         
-        // Check if user has completed onboarding (has a profile)
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('first_name')
+        const { data: userRecord } = await supabase
+          .from('users')
+          .select('onboarded, accountType')
           .eq('id', data.session.user.id)
           .single();
 
-        if (profile && profile.first_name) {
+        if (userRecord?.onboarded) {
           router.push("/home");
+        } else if (userRecord?.accountType === "business") {
+          router.push("/onboarding-business");
+        } else if (userRecord?.accountType === "flight_crew") {
+          router.push("/onboarding");
         } else {
           router.push("/role-selection");
         }

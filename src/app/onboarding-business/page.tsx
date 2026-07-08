@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ChevronLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Stepper } from "@/components/onboarding/stepper";
@@ -8,10 +8,74 @@ import { CompanyTypeStep } from "@/components/onboarding-business/company-type-s
 import { CompanyProfileStep } from "@/components/onboarding-business/company-profile-step";
 import { CommunityVisibilityStep } from "@/components/onboarding-business/community-visibility-step";
 import { ReviewFinishStep } from "@/components/onboarding-business/review-finish-step";
+import { BusinessOnboardingProvider } from "@/components/onboarding-business/business-onboarding-context";
+import { supabase } from "@/lib/supabase";
 
 export default function OnboardingBusinessPage() {
   const router = useRouter();
   const [step, setStep] = useState(1);
+  const [isCheckingAccess, setIsCheckingAccess] = useState(true);
+
+  useEffect(() => {
+    let isMounted = true;
+    const params = new URLSearchParams(window.location.search);
+    const isExplicitEdit = params.get("edit") === "company" || params.get("from") === "profile";
+
+    async function redirectCompletedUsers() {
+      const { data: { session } } = await supabase.auth.getSession();
+
+      if (!session) {
+        router.push("/login");
+        return;
+      }
+
+      const { data: userRecord } = await supabase
+        .from("users")
+        .select("onboarded, accountType")
+        .eq("id", session.user.id)
+        .single();
+
+      if (!isMounted) return;
+
+      if (!userRecord?.onboarded) {
+        if (userRecord?.accountType === "flight_crew") {
+          router.replace("/onboarding");
+          return;
+        }
+
+        if (!userRecord?.accountType) {
+          router.replace("/role-selection");
+          return;
+        }
+
+        setIsCheckingAccess(false);
+        return;
+      }
+
+      const { data: companies } = await supabase
+        .from("companies")
+        .select("status")
+        .eq("owner_user_id", session.user.id)
+        .order("created_at", { ascending: false })
+        .limit(1);
+
+      if (!isMounted) return;
+
+      const companyStatus = companies?.[0]?.status;
+      if (userRecord.accountType === "business" && companyStatus === "rejected" && isExplicitEdit) {
+        setIsCheckingAccess(false);
+        return;
+      }
+
+      router.replace("/home");
+    }
+
+    redirectCompletedUsers();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [router]);
 
   const handleNext = () => {
     window.scrollTo(0, 0);
@@ -42,8 +106,17 @@ export default function OnboardingBusinessPage() {
     }
   };
 
+  if (isCheckingAccess) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-white">
+    <BusinessOnboardingProvider>
+      <div className="min-h-screen bg-white">
       <div className="mx-auto max-w-xl min-h-[100dvh] flex flex-col px-4 sm:px-6">
         
         {/* Header */}
@@ -70,6 +143,7 @@ export default function OnboardingBusinessPage() {
         {step === 3 && <CommunityVisibilityStep onNext={handleNext} />}
         {step === 4 && <ReviewFinishStep onNext={handleNext} />}
       </div>
-    </div>
+      </div>
+    </BusinessOnboardingProvider>
   );
 }

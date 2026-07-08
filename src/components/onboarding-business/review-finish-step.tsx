@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { 
   Users, User, MapPin, Mail, Phone, Globe, Calendar, Briefcase, Eye, Plane, Loader2
 } from "lucide-react";
-import { registerBusinessAccount } from "@/lib/api/business";
+import { useBusinessOnboarding } from "@/components/onboarding-business/business-onboarding-context";
 
 interface ReviewFinishStepProps {
   onNext: () => void;
@@ -30,52 +30,39 @@ export function ReviewFinishStep({ onNext }: ReviewFinishStepProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const { onboarding, error: loadError, submit } = useBusinessOnboarding();
+
   useEffect(() => {
-    const COMPANY_TYPES_MAP: Record<string, string> = {
-      airline: "Airline / Operator",
-      charter: "Charter Company",
-      flight_school: "Flight School",
-      fbo: "FBO",
-      mro: "MRO / Maintenance",
-      ground: "Ground Handling",
-      recruitment: "Aviation Recruitment",
-      training: "Training Center",
-      technology: "Aviation Technology",
-      airport: "Airport Services",
-      management: "Aircraft Management",
-      sales: "Aircraft Sales / Brokerage",
-      retail: "Aviation Retail",
-      other: "Other"
-    };
+    if (!onboarding) return;
 
-    const typesStr = localStorage.getItem("business_company_types");
-    const types = typesStr ? JSON.parse(typesStr) : [];
-    const mappedTypes = types.map((t: string) => COMPANY_TYPES_MAP[t] || t);
-
-    const profileStr = localStorage.getItem("business_profile");
-    const profile = profileStr ? JSON.parse(profileStr) : {};
-
-    const visStr = localStorage.getItem("business_visibility");
-    const visibility = visStr ? JSON.parse(visStr) : {};
+    const { company, companyTypes, selectedCompanyTypeKeys, settings } = onboarding;
+    const labelsByKey = new Map(companyTypes.map((companyType) => [companyType.key, companyType.label]));
 
     setData({
-      companyTypes: mappedTypes,
+      companyTypes: selectedCompanyTypeKeys.map((typeKey) => labelsByKey.get(typeKey) || typeKey),
       profile: {
-        companyName: profile.companyName || "Not provided",
-        location: profile.location || "Not provided",
-        email: profile.email || "Not provided",
-        phone: profile.phone || "Not provided",
-        website: profile.website || "Not provided",
-        foundedYear: profile.foundedYear || "Not provided",
-        description: profile.description || "Not provided",
-        operatingAreas: profile.operatingAreas || [],
-        servicesOffered: profile.servicesOffered || [],
-        fleetTypes: profile.fleetTypes || [],
-        logo: profile.logo || null,
+        companyName: company.name || "Not provided",
+        location: company.location || "Not provided",
+        email: company.contact_email || "Not provided",
+        phone: company.phone || "Not provided",
+        website: company.website || "Not provided",
+        foundedYear: company.founded_year ? String(company.founded_year) : "Not provided",
+        description: company.description || "Not provided",
+        operatingAreas: company.operating_areas || [],
+        servicesOffered: company.services || [],
+        fleetTypes: company.fleet_types || [],
+        logo: company.logo_url || null,
       },
-      visibility
+      visibility: {
+        advertising: !!settings?.interested_in_advertising,
+        hiringPilots: !!settings?.interested_in_hiring_pilots,
+        hiringCabinCrew: !!settings?.interested_in_hiring_cabin_crew,
+        offerDiscounts: !!settings?.offers_crew_discounts,
+        joinFounding: !!settings?.join_founding_partners,
+        allowDMs: !!settings?.allow_crew_direct_messages,
+      },
     });
-  }, []);
+  }, [onboarding]);
 
   const renderPills = (items: string[]) => {
     if (!items || items.length === 0) return null;
@@ -106,38 +93,9 @@ export function ReviewFinishStep({ onNext }: ReviewFinishStepProps) {
   const handleCreateAccount = async () => {
     setIsSubmitting(true);
     setError(null);
-    
-    // Convert current state back into the API expected format
-    const typesStr = localStorage.getItem("business_company_types");
-    const rawTypes = typesStr ? JSON.parse(typesStr) : [];
-    
-    const payload = {
-      companyTypes: rawTypes,
-      profile: {
-        companyName: data.profile.companyName !== "Not provided" ? data.profile.companyName : "",
-        location: data.profile.location !== "Not provided" ? data.profile.location : "",
-        email: data.profile.email !== "Not provided" ? data.profile.email : "",
-        phone: data.profile.phone !== "Not provided" ? data.profile.phone : undefined,
-        website: data.profile.website !== "Not provided" ? data.profile.website : undefined,
-        foundedYear: data.profile.foundedYear !== "Not provided" ? data.profile.foundedYear : undefined,
-        description: data.profile.description !== "Not provided" ? data.profile.description : undefined,
-        operatingAreas: data.profile.operatingAreas,
-        servicesOffered: data.profile.servicesOffered,
-        fleetTypes: data.profile.fleetTypes,
-        logo: data.profile.logo,
-      },
-      visibility: {
-        advertising: !!data.visibility.advertising,
-        hiringPilots: !!data.visibility.hiringPilots,
-        hiringCabinCrew: !!data.visibility.hiringCabinCrew,
-        offerDiscounts: !!data.visibility.offerDiscounts,
-        joinFounding: !!data.visibility.joinFounding,
-        allowDMs: !!data.visibility.allowDMs,
-      }
-    };
 
-    const res = await registerBusinessAccount(payload);
-    
+    const res = await submit();
+
     setIsSubmitting(false);
 
     if (res.success) {
@@ -148,9 +106,6 @@ export function ReviewFinishStep({ onNext }: ReviewFinishStepProps) {
   };
 
   const handleModalOk = () => {
-    localStorage.removeItem("business_company_types");
-    localStorage.removeItem("business_profile");
-    localStorage.removeItem("business_visibility");
     onNext();
   };
 
@@ -284,9 +239,9 @@ export function ReviewFinishStep({ onNext }: ReviewFinishStepProps) {
       </div>
 
       {/* Error Message */}
-      {error && (
+      {(error || loadError) && (
         <div className="text-red-500 text-sm text-center mb-2 px-4">
-          {error}
+          {error || loadError}
         </div>
       )}
 
@@ -307,7 +262,7 @@ export function ReviewFinishStep({ onNext }: ReviewFinishStepProps) {
           <div className="bg-[#383838] rounded-lg p-6 w-full max-w-sm shadow-2xl">
             <h3 className="text-white font-semibold text-lg mb-3">Request Submitted</h3>
             <p className="text-gray-300 text-[15px] leading-snug mb-8">
-              Your company account request is ready to be sent for platform approval.
+              Your company account request has been submitted for platform approval.
             </p>
             <div className="flex justify-end">
               <button

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, ChangeEvent } from "react";
 import { Upload, X } from "lucide-react";
-import { supabase } from "@/lib/supabase";
+import { useBusinessOnboarding } from "@/components/onboarding-business/business-onboarding-context";
 
 interface CompanyProfileStepProps {
   onNext: () => void;
@@ -23,42 +23,35 @@ export function CompanyProfileStep({ onNext }: CompanyProfileStepProps) {
 
   const [fleetInput, setFleetInput] = useState("");
   const [fleetTypes, setFleetTypes] = useState<string[]>([]);
+  const [logo, setLogo] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const { onboarding, isLoading, error: loadError, saveProfile } = useBusinessOnboarding();
 
-  // Load existing data if any
   useEffect(() => {
-    let storedEmail = "";
-    const saved = localStorage.getItem("business_profile");
-    if (saved) {
-      try {
-        const data = JSON.parse(saved);
-        if (data.companyName) setCompanyName(data.companyName);
-        if (data.location) setLocation(data.location);
-        if (data.email) {
-          setEmail(data.email);
-          storedEmail = data.email;
-        }
-        if (data.phone) setPhone(data.phone);
-        if (data.website) setWebsite(data.website);
-        if (data.foundedYear) setFoundedYear(data.foundedYear);
-        if (data.description) setDescription(data.description);
-        if (data.operatingAreas) setOperatingAreas(data.operatingAreas);
-        if (data.servicesOffered) setServicesOffered(data.servicesOffered);
-        if (data.fleetTypes) setFleetTypes(data.fleetTypes);
-        if (data.logo) setLogo(data.logo);
-      } catch(e) {}
-    }
+    const company = onboarding?.company;
+    if (!company) return;
 
-    if (!storedEmail) {
-      supabase.auth.getUser().then(({ data: { user } }) => {
-        if (user?.email) {
-          setEmail(user.email);
-        }
-      });
-    }
-  }, []);
+    setCompanyName(company.name || "");
+    setLocation(company.location || "");
+    setEmail(company.contact_email || "");
+    setPhone(company.phone || "");
+    setWebsite(company.website || "");
+    setFoundedYear(company.founded_year ? String(company.founded_year) : "");
+    setDescription(company.description || "");
+    setOperatingAreas(company.operating_areas || []);
+    setServicesOffered(company.services || []);
+    setFleetTypes(company.fleet_types || []);
+    setLogo(company.logo_url || null);
+  }, [onboarding?.company]);
 
-  const handleNext = () => {
-    localStorage.setItem("business_profile", JSON.stringify({
+  const handleNext = async () => {
+    if (!isFormValid) return;
+
+    setIsSaving(true);
+    setError(null);
+
+    const response = await saveProfile({
       companyName,
       location,
       email,
@@ -69,13 +62,30 @@ export function CompanyProfileStep({ onNext }: CompanyProfileStepProps) {
       operatingAreas,
       servicesOffered,
       fleetTypes,
-      logo
-    }));
+      logo,
+    });
+
+    setIsSaving(false);
+
+    if (!response.success) {
+      setError(response.error);
+      return;
+    }
+
     onNext();
   };
 
   const isEmailValid = (val: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val);
-  const isFormValid = companyName.trim() !== "" && location.trim() !== "" && email.trim() !== "" && isEmailValid(email);
+  const isPhoneValid = (val: string) => !val || /^\+?\d+$/.test(val);
+  const isFormValid =
+    companyName.trim() !== "" &&
+    !!logo &&
+    location.trim() !== "" &&
+    email.trim() !== "" &&
+    isEmailValid(email) &&
+    isPhoneValid(phone) &&
+    !isLoading &&
+    !isSaving;
 
   const addPill = (
     input: string, 
@@ -109,7 +119,6 @@ export function CompanyProfileStep({ onNext }: CompanyProfileStepProps) {
     );
   };
 
-  const [logo, setLogo] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleLogoUpload = (e: ChangeEvent<HTMLInputElement>) => {
@@ -127,11 +136,20 @@ export function CompanyProfileStep({ onNext }: CompanyProfileStepProps) {
     }
   };
 
-  // ... (dentro del componente se usará setLogo en useEffect y handleNext)
 
   return (
     <div className="flex flex-col flex-1 h-full">
       <div className="flex-1 overflow-y-auto pb-6 custom-scrollbar p-1 -mx-1 px-1">
+        {(error || loadError) && (
+          <div className="mb-4 rounded-3xl border border-red-100 bg-red-50 p-4 text-sm text-red-600">
+            {error || loadError}
+          </div>
+        )}
+        {isLoading && (
+          <div className="mb-4 rounded-3xl border border-gray-100 bg-white p-4 text-sm text-gray-500 shadow-sm">
+            Loading company profile...
+          </div>
+        )}
         {/* Logo Section */}
         <div className="mb-8 mt-4">
           <h2 className="font-bold text-base text-gray-900 mb-3">Logo</h2>
@@ -209,13 +227,15 @@ export function CompanyProfileStep({ onNext }: CompanyProfileStepProps) {
                 value={phone}
                 onChange={(e) => {
                   const val = e.target.value;
-                  // Permitir solo números y opcionalmente el signo + al principio
-                  const onlyNums = val.replace(/[^\d+]/g, '');
-                  setPhone(onlyNums);
+                  const cleaned = val.replace(/[^\d+]/g, "").replace(/(?!^)\+/g, "");
+                  setPhone(cleaned);
                 }}
                 placeholder="+13055550198"
-                className="w-full px-5 py-[14px] bg-white border border-gray-300 rounded-[24px] text-[15px] placeholder-gray-400 focus:outline-none focus:border-[#2d73f5] focus:ring-1 focus:ring-[#2d73f5] transition-shadow"
+                className={`w-full px-5 py-[14px] bg-white border ${phone && !isPhoneValid(phone) ? "border-red-500 focus:border-red-500 focus:ring-red-500" : "border-gray-300 focus:border-[#2d73f5] focus:ring-[#2d73f5]"} rounded-[24px] text-[15px] placeholder-gray-400 focus:outline-none focus:ring-1 transition-shadow`}
               />
+              {phone && !isPhoneValid(phone) && (
+                <p className="text-red-500 text-sm mt-1 ml-2">Use digits and one leading + only</p>
+              )}
             </div>
 
             <div>
@@ -337,7 +357,7 @@ export function CompanyProfileStep({ onNext }: CompanyProfileStepProps) {
           disabled={!isFormValid}
           className="w-full py-4 rounded-full font-bold text-white transition-colors bg-[#2d73f5] hover:bg-[#2d73f5]/90 disabled:bg-[#85b0fa] disabled:cursor-not-allowed"
         >
-          Next
+          {isSaving ? "Saving..." : "Next"}
         </button>
       </div>
     </div>

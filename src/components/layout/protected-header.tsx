@@ -25,15 +25,32 @@ export function ProtectedHeader() {
           return;
         }
 
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('first_name, avatar_url')
+        const { data: userRecord } = await supabase
+          .from('users')
+          .select('onboarded, accountType, profileImage')
           .eq('id', session.user.id)
           .single();
 
-        if (profile && profile.first_name) {
-          if (profile.avatar_url) setProfilePhoto(profile.avatar_url);
-        } else if (pathname !== '/role-selection' && pathname !== '/onboarding' && !pathname.startsWith('/onboarding-business')) {
+        if (userRecord?.profileImage) {
+          setProfilePhoto(userRecord.profileImage);
+        }
+
+        const isOnboardingRoute =
+          pathname === '/role-selection' ||
+          pathname === '/onboarding' ||
+          pathname.startsWith('/onboarding-business');
+
+        if (!userRecord?.onboarded && !isOnboardingRoute) {
+          if (userRecord?.accountType === 'business') {
+            router.push("/onboarding-business");
+            return;
+          }
+
+          if (userRecord?.accountType === 'flight_crew') {
+            router.push("/onboarding");
+            return;
+          }
+
           router.push("/role-selection");
         }
       } catch (e) {

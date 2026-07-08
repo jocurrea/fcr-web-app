@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ChevronLeft, LogOut } from "lucide-react";
 import Link from "next/link";
 import { Stepper } from "@/components/onboarding/stepper";
@@ -15,6 +15,46 @@ import { supabase } from "@/lib/supabase";
 export default function OnboardingPage() {
   const router = useRouter();
   const [step, setStep] = useState(1);
+  const [isCheckingAccess, setIsCheckingAccess] = useState(true);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function redirectCompletedUsers() {
+      const { data: { session } } = await supabase.auth.getSession();
+
+      if (!session) {
+        router.push("/login");
+        return;
+      }
+
+      const { data: userRecord } = await supabase
+        .from("users")
+        .select("onboarded, accountType")
+        .eq("id", session.user.id)
+        .single();
+
+      if (!isMounted) return;
+
+      if (userRecord?.onboarded) {
+        router.replace("/home");
+        return;
+      }
+
+      if (userRecord?.accountType === "business") {
+        router.replace("/onboarding-business");
+        return;
+      }
+
+      setIsCheckingAccess(false);
+    }
+
+    redirectCompletedUsers();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [router]);
 
   const handleNext = () => {
     if (step < 5) {
@@ -43,6 +83,14 @@ export default function OnboardingPage() {
       default: return "Onboarding";
     }
   };
+
+  if (isCheckingAccess) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-white">
