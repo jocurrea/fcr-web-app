@@ -27,13 +27,9 @@ export function ProtectedHeader() {
 
         const { data: userRecord } = await supabase
           .from('users')
-          .select('onboarded, accounttype, profileImage')
+          .select('onboarded, accounttype')
           .eq('id', session.user.id)
           .single();
-
-        if (userRecord?.profileImage) {
-          setProfilePhoto(userRecord.profileImage);
-        }
 
         const isOnboardingRoute =
           pathname === '/role-selection' ||
