@@ -117,15 +117,23 @@ async function findEditableCompany(userId: string) {
 
 export async function fetchCompanyTypes(): Promise<ApiResult<CompanyType[]>> {
   try {
-    const { data, error } = await supabase
+    const { data: rawCompanyTypes, error: typesError } = await supabase
       .from("company_types")
-      .select("id, key, label, icon, sort_order")
-      .eq("is_active", true)
-      .order("sort_order", { ascending: true })
-      .order("label", { ascending: true });
+      .select("*");
 
-    if (error) throw new Error(error.message);
-    return { success: true, data: data ?? [] };
+    if (typesError) throw new Error(typesError.message);
+
+    // Safely map the raw types to our expected CompanyType interface
+    // handling potential schema renames like label -> name
+    const companyTypes: CompanyType[] = (rawCompanyTypes || []).map((t: any) => ({
+      id: t.id,
+      key: t.key || t.name, // fallback
+      label: t.label || t.name || t.key, // fallback if label is removed
+      icon: t.icon || null,
+      sort_order: t.sort_order || 0,
+    })).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+
+    return { success: true, data: companyTypes };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "Could not load company types." };
   }
@@ -187,10 +195,9 @@ export async function fetchBusinessOnboarding(): Promise<ApiResult<BusinessOnboa
       await Promise.all([
         supabase
           .from("company_types")
-          .select("id, key, label, icon, sort_order")
+          .select("*")
           .eq("is_active", true)
-          .order("sort_order", { ascending: true })
-          .order("label", { ascending: true }),
+          .order("sort_order", { ascending: true }),
         supabase
           .from("company_type_selections")
           .select("company_type_id")
@@ -207,7 +214,17 @@ export async function fetchBusinessOnboarding(): Promise<ApiResult<BusinessOnboa
     if (settingsError) throw new Error(settingsError.message);
 
     const selectedIds = new Set((selections ?? []).map((selection) => selection.company_type_id));
-    const selectedCompanyTypeKeys = (companyTypes ?? [])
+    
+    // Safely map the raw types to our expected CompanyType interface
+    const mappedCompanyTypes: CompanyType[] = (companyTypes || []).map((t: any) => ({
+      id: t.id,
+      key: t.key || t.name,
+      label: t.label || t.name || t.key,
+      icon: t.icon || null,
+      sort_order: t.sort_order || 0,
+    }));
+
+    const selectedCompanyTypeKeys = mappedCompanyTypes
       .filter((companyType) => selectedIds.has(companyType.id))
       .map((companyType) => companyType.key);
 
@@ -215,7 +232,7 @@ export async function fetchBusinessOnboarding(): Promise<ApiResult<BusinessOnboa
       success: true,
       data: {
         company,
-        companyTypes: companyTypes ?? [],
+        companyTypes: mappedCompanyTypes,
         selectedCompanyTypeKeys,
         settings: settings ?? null,
       },
