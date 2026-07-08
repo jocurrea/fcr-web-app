@@ -195,9 +195,7 @@ export async function fetchBusinessOnboarding(): Promise<ApiResult<BusinessOnboa
       await Promise.all([
         supabase
           .from("company_types")
-          .select("*")
-          .eq("is_active", true)
-          .order("sort_order", { ascending: true }),
+          .select("*"),
         supabase
           .from("company_type_selections")
           .select("company_type_id")
