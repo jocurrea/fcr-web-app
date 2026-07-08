@@ -414,7 +414,6 @@ export async function submitBusinessOnboarding(
       .from("companies")
       .update({
         status: "pending",
-        rejection_reason: null,
       })
       .eq("id", company.id)
       .select("*")
