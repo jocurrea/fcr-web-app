@@ -27,7 +27,7 @@ export function ProtectedHeader() {
 
         const { data: userRecord } = await supabase
           .from('users')
-          .select('onboarded, account_type, profileImage')
+          .select('onboarded, accounttype, profileImage')
           .eq('id', session.user.id)
           .single();
 
@@ -41,12 +41,12 @@ export function ProtectedHeader() {
           pathname.startsWith('/onboarding-business');
 
         if (!userRecord?.onboarded && !isOnboardingRoute) {
-          if (userRecord?.account_type === 'business') {
+          if (userRecord?.accounttype === 'business') {
             router.push("/onboarding-business");
             return;
           }
 
-          if (userRecord?.account_type === 'flight_crew') {
+          if (userRecord?.accounttype === 'flight_crew') {
             router.push("/onboarding");
             return;
           }

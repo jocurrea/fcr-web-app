@@ -4,7 +4,7 @@ const DEFAULT_AVATAR = 'https://api.dicebear.com/7.x/shapes/svg?seed=user';
 
 const USER_IDENTITY_SELECT = `
   id,
-  account_type,
+  accounttype,
   firstName,
   middleName,
   lastName,
@@ -23,14 +23,14 @@ function formatDate(value: string) {
 
 function getUserName(user: any) {
   const company = Array.isArray(user?.associateCompany) ? user.associateCompany[0] : user?.associateCompany;
-  if (user?.account_type === 'business' && company?.name) return company.name;
+  if (user?.accounttype === 'business' && company?.name) return company.name;
 
   return [user?.firstName, user?.middleName, user?.lastName].filter(Boolean).join(' ').trim() || 'User';
 }
 
 function getUserAvatar(user: any) {
   const company = Array.isArray(user?.associateCompany) ? user.associateCompany[0] : user?.associateCompany;
-  if (user?.account_type === 'business' && company?.logo_url) return company.logo_url;
+  if (user?.accounttype === 'business' && company?.logo_url) return company.logo_url;
 
   return user?.profileImage || DEFAULT_AVATAR;
 }

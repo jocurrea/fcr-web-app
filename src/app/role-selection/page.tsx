@@ -29,14 +29,14 @@ export default function RoleSelectionPage() {
 
       const { data: userRecord } = await supabase
         .from("users")
-        .select("onboarded, account_type")
+        .select("onboarded, accounttype")
         .eq("id", session.user.id)
         .single();
 
       if (!isMounted) return;
 
       if (!userRecord?.onboarded) {
-        if (userRecord?.account_type === "business") {
+        if (userRecord?.accounttype === "business") {
           const response = await ensureBusinessDraft();
           if (!isMounted) return;
 
@@ -50,7 +50,7 @@ export default function RoleSelectionPage() {
           return;
         }
 
-        if (userRecord?.account_type === "flight_crew") {
+        if (userRecord?.accounttype === "flight_crew") {
           router.replace("/onboarding");
           return;
         }
@@ -59,7 +59,7 @@ export default function RoleSelectionPage() {
         return;
       }
 
-      if (userRecord.account_type === "business") {
+      if (userRecord.accounttype === "business") {
         const { data: companies } = await supabase
           .from("companies")
           .select("status")
