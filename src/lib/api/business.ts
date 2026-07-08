@@ -143,7 +143,13 @@ export async function ensureBusinessDraft(): Promise<ApiResult<CompanyRow>> {
 
     const { data: company, error } = await supabase
       .from("companies")
-      .insert({ owner_user_id: userId, status: "draft", name: "" })
+      .insert({ 
+        owner_user_id: userId, 
+        status: "draft", 
+        name: "", 
+        location: "", 
+        contact_email: "" 
+      })
       .select("*")
       .single<CompanyRow>();
 
