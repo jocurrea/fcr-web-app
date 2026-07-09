@@ -15,19 +15,22 @@ function HomeContent() {
   const router = useRouter();
   const [showSuccessBanner, setShowSuccessBanner] = useState(false);
 
+  const [hasTriggered, setHasTriggered] = useState(false);
+
   useEffect(() => {
-    if (searchParams.get("registered") === "true") {
+    if (searchParams.get("registered") === "true" && !hasTriggered) {
+      setHasTriggered(true);
       setShowSuccessBanner(true);
-      // Remove query param without refreshing the page
-      window.history.replaceState(null, "", "/home");
       
-      const timer = setTimeout(() => {
+      // Clean up the URL
+      router.replace("/home", { scroll: false });
+      
+      // Auto-dismiss after 5 seconds
+      setTimeout(() => {
         setShowSuccessBanner(false);
       }, 5000);
-      
-      return () => clearTimeout(timer);
     }
-  }, [searchParams]);
+  }, [searchParams, router, hasTriggered]);
 
   useEffect(() => {
     // Ensure the page always starts at the top, fixing Next.js scroll restoration bugs
@@ -73,7 +76,7 @@ function HomeContent() {
         <div className="bg-white border border-gray-200 shadow-[0_8px_30px_rgba(0,0,0,0.06)] p-5 rounded-[20px] flex items-center justify-between gap-4 w-full max-w-lg mx-auto animate-in slide-in-from-top-4 fade-in duration-500 relative z-10">
           <div className="flex items-center gap-4">
             <div className="flex items-center justify-center shrink-0">
-              <CheckCircle2 className="w-7 h-7 text-[#16a34a]" strokeWidth={2.5} />
+              <CheckCircle2 color="#16a34a" className="w-7 h-7" strokeWidth={2.5} />
             </div>
             <h3 className="font-bold text-[16px] text-gray-900 leading-tight">
               Company details submitted<br />for approval
