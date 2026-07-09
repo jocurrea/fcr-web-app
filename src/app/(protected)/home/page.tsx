@@ -20,6 +20,12 @@ function HomeContent() {
       setShowSuccessBanner(true);
       // Remove query param without refreshing the page
       window.history.replaceState(null, "", "/home");
+      
+      const timer = setTimeout(() => {
+        setShowSuccessBanner(false);
+      }, 5000);
+      
+      return () => clearTimeout(timer);
     }
   }, [searchParams]);
 
@@ -66,8 +72,8 @@ function HomeContent() {
       {showSuccessBanner && (
         <div className="bg-white border border-gray-200 shadow-[0_8px_30px_rgba(0,0,0,0.06)] p-5 rounded-[20px] flex items-center justify-between gap-4 w-full max-w-lg mx-auto animate-in slide-in-from-top-4 fade-in duration-500 relative z-10">
           <div className="flex items-center gap-4">
-            <div className="w-10 h-10 bg-green-50 rounded-full flex items-center justify-center shrink-0">
-              <CheckCircle2 className="w-[22px] h-[22px] text-green-600" strokeWidth={2.5} />
+            <div className="flex items-center justify-center shrink-0">
+              <CheckCircle2 className="w-7 h-7 text-[#16a34a]" strokeWidth={2.5} />
             </div>
             <h3 className="font-bold text-[16px] text-gray-900 leading-tight">
               Company details submitted<br />for approval
