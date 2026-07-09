@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, ChangeEvent } from "react";
-import { Upload, X } from "lucide-react";
+import { Upload, X, AlertCircle } from "lucide-react";
 import { useBusinessOnboarding } from "@/components/onboarding-business/business-onboarding-context";
 
 interface CompanyProfileStepProps {
@@ -24,6 +24,10 @@ export function CompanyProfileStep({ onNext }: CompanyProfileStepProps) {
   const [fleetInput, setFleetInput] = useState("");
   const [fleetTypes, setFleetTypes] = useState<string[]>([]);
   const [logo, setLogo] = useState<string | null>(null);
+
+  const [showErrorModal, setShowErrorModal] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { onboarding, isLoading, error: loadError, saveProfile } = useBusinessOnboarding();
@@ -125,7 +129,8 @@ export function CompanyProfileStep({ onNext }: CompanyProfileStepProps) {
     const file = e.target.files?.[0];
     if (file) {
       if (file.size > 2 * 1024 * 1024) {
-        alert("File is too large. Maximum size is 2MB.");
+        setErrorMessage("File is too large. Maximum size is 2MB.");
+        setShowErrorModal(true);
         return;
       }
       const reader = new FileReader();
@@ -360,6 +365,27 @@ export function CompanyProfileStep({ onNext }: CompanyProfileStepProps) {
           {isSaving ? "Saving..." : "Next"}
         </button>
       </div>
+      {/* Error Modal */}
+      {showErrorModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-[#091124]/40 backdrop-blur-sm animate-in fade-in duration-200">
+          <div 
+            className="bg-white rounded-2xl p-6 w-full max-w-[400px] shadow-2xl flex flex-col items-center text-center animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mb-4">
+              <AlertCircle className="w-6 h-6" />
+            </div>
+            <h3 className="text-[18px] font-bold text-gray-900 mb-2">Upload Error</h3>
+            <p className="text-[14px] text-gray-500 mb-6">{errorMessage}</p>
+            <button
+              onClick={() => setShowErrorModal(false)}
+              className="w-full h-11 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-full transition-colors flex items-center justify-center text-[15px]"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
