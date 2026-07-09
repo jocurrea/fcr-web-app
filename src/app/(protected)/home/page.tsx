@@ -23,15 +23,17 @@ function HomeContent() {
       
       // Use history API to silently clean URL without triggering Next.js router/remounts
       window.history.replaceState(null, "", "/home");
-      
-      // Auto-dismiss after 3.5 seconds
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (showSuccessBanner) {
       const timer = setTimeout(() => {
         setShowSuccessBanner(false);
       }, 3500);
-      
       return () => clearTimeout(timer);
     }
-  }, [searchParams]);
+  }, [showSuccessBanner]);
 
   useEffect(() => {
     // Ensure the page always starts at the top, fixing Next.js scroll restoration bugs
