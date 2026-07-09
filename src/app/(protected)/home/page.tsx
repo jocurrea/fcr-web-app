@@ -27,13 +27,13 @@ function HomeContent() {
   }, [searchParams]);
 
   useEffect(() => {
-    if (showSuccessBanner) {
+    if (showSuccessBanner && !loading) {
       const timer = setTimeout(() => {
         setShowSuccessBanner(false);
       }, 3500);
       return () => clearTimeout(timer);
     }
-  }, [showSuccessBanner]);
+  }, [showSuccessBanner, loading]);
 
   useEffect(() => {
     // Ensure the page always starts at the top, fixing Next.js scroll restoration bugs
