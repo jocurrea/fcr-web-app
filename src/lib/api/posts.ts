@@ -85,7 +85,27 @@ export async function fetchPosts(frequencyId?: string): Promise<Post[]> {
   const { data: userData } = await supabase.auth.getUser();
   const currentUserId = userData?.user?.id;
 
+  // Fetch companies to get business logos and names since there is no FK
+  const authorIds = Array.from(new Set(data.map((p: any) => p.user_id)));
+  let companiesMap: Record<string, { name: string, logo_url: string }> = {};
+  if (authorIds.length > 0) {
+    const { data: companies } = await supabase
+      .from('companies')
+      .select('owner_user_id, name, logo_url')
+      .in('owner_user_id', authorIds);
+      
+    if (companies) {
+      companies.forEach(company => {
+        companiesMap[company.owner_user_id] = {
+          name: company.name,
+          logo_url: company.logo_url
+        };
+      });
+    }
+  }
+
   return data.map((post: any) => {
+    const company = companiesMap[post.user_id];
     return {
       id: post.id,
       created_at: formatDate(post.created_at),
@@ -94,8 +114,8 @@ export async function fetchPosts(frequencyId?: string): Promise<Post[]> {
       text: post.text || '',
       image: post.image || null,
       author: {
-        name: getUserName(post.user),
-        avatar: getUserAvatar(post.user),
+        name: company?.name || getUserName(post.user),
+        avatar: company?.logo_url || getUserAvatar(post.user),
       },
       likes: post.postLikes?.length || 0,
       comments: post.comments?.length || 0,
@@ -132,6 +152,20 @@ export async function fetchPostById(postId: string): Promise<Post | null> {
   const { data: userData } = await supabase.auth.getUser();
   const currentUserId = userData?.user?.id;
 
+  let companyName = null;
+  let companyLogo = null;
+  if (data.userId) {
+    const { data: companies } = await supabase
+      .from('companies')
+      .select('name, logo_url')
+      .eq('owner_user_id', data.userId)
+      .limit(1);
+    if (companies && companies.length > 0) {
+      companyName = companies[0].name;
+      companyLogo = companies[0].logo_url;
+    }
+  }
+
   return {
     id: data.id,
     created_at: formatDate(data.created_at),
@@ -140,12 +174,12 @@ export async function fetchPostById(postId: string): Promise<Post | null> {
     text: data.body || '',
     image: data.file || null,
     author: {
-      name: getUserName((data as any).user),
-      avatar: getUserAvatar((data as any).user),
+      name: companyName || getUserName((data as any).user),
+      avatar: companyLogo || getUserAvatar((data as any).user),
     },
     likes: (data as any).postLikes?.length || 0,
-    liked: currentUserId ? (data as any).postLikes?.some((like: any) => like.userId === currentUserId) : false,
     comments: (data as any).comments?.length || 0,
+    liked: currentUserId ? (data as any).postLikes?.some((like: any) => like.userId === currentUserId) : false,
   };
 }
 

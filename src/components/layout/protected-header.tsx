@@ -57,10 +57,12 @@ export function ProtectedHeader() {
         }
 
         // Fallback: If the database trigger failed to create the users row, check if they have a company
-        if (!onboarded) {
+        // Also use this query to fetch the logo_url if they are a business
+        let companyLogo = null;
+        if (!onboarded || accounttype === 'business') {
           const { data: companies } = await supabase
             .from('companies')
-            .select('status')
+            .select('status, logo_url')
             .eq('owner_user_id', session.user.id)
             .order('created_at', { ascending: false })
             .limit(1);
@@ -71,7 +73,14 @@ export function ProtectedHeader() {
             if (status === 'approved' || status === 'pending') {
               onboarded = true;
             }
+            if (companies[0].logo_url) {
+              companyLogo = companies[0].logo_url;
+            }
           }
+        }
+        
+        if (companyLogo) {
+          setProfilePhoto(companyLogo);
         }
 
         const isOnboardingRoute =
