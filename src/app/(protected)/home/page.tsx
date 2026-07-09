@@ -1,15 +1,27 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { PostCard } from "@/components/home/post-card";
 import { fetchPosts, Post } from "@/lib/api/posts";
 import { supabase } from "@/lib/supabase";
-import { Clock } from "lucide-react";
+import { Clock, CheckCircle2, X } from "lucide-react";
+import { useSearchParams, useRouter } from "next/navigation";
 
-export default function HomePage() {
+function HomeContent() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [isCompanyPending, setIsCompanyPending] = useState(false);
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const [showSuccessBanner, setShowSuccessBanner] = useState(false);
+
+  useEffect(() => {
+    if (searchParams.get("registered") === "true") {
+      setShowSuccessBanner(true);
+      // Remove query param without refreshing the page
+      window.history.replaceState(null, "", "/home");
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     // Ensure the page always starts at the top, fixing Next.js scroll restoration bugs
@@ -51,6 +63,25 @@ export default function HomePage() {
 
   return (
     <div className="max-w-2xl mx-auto py-8 px-4 flex flex-col gap-6 pb-20">
+      {showSuccessBanner && (
+        <div className="bg-white border border-gray-200 shadow-[0_8px_30px_rgba(0,0,0,0.06)] p-5 rounded-[20px] flex items-center justify-between gap-4 w-full max-w-lg mx-auto animate-in slide-in-from-top-4 fade-in duration-500 relative z-10">
+          <div className="flex items-center gap-4">
+            <div className="w-10 h-10 bg-green-50 rounded-full flex items-center justify-center shrink-0">
+              <CheckCircle2 className="w-[22px] h-[22px] text-green-600" strokeWidth={2.5} />
+            </div>
+            <h3 className="font-bold text-[16px] text-gray-900 leading-tight">
+              Company details submitted<br />for approval
+            </h3>
+          </div>
+          <button 
+            onClick={() => setShowSuccessBanner(false)}
+            className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-400 hover:text-gray-600"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+      )}
+
       {isCompanyPending && (
         <div className="bg-[#f0f6ff] border border-[#e0eaff] p-5 rounded-[16px] flex items-start gap-4 w-full max-w-lg mx-auto">
           <div className="w-11 h-11 bg-white rounded-full flex items-center justify-center shrink-0 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
@@ -86,5 +117,13 @@ export default function HomePage() {
         ))
       )}
     </div>
+  );
+}
+
+export default function HomePage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#f8f9fa]" />}>
+      <HomeContent />
+    </Suspense>
   );
 }

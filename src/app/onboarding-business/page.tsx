@@ -86,7 +86,7 @@ export default function OnboardingBusinessPage() {
     if (step < 4) {
       setStep(step + 1);
     } else {
-      router.push("/home");
+      router.push("/home?registered=true");
     }
   };
 
