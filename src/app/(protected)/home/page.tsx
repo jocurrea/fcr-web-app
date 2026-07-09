@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, Suspense, useRef } from "react";
 import { PostCard } from "@/components/home/post-card";
 import { fetchPosts, Post } from "@/lib/api/posts";
 import { supabase } from "@/lib/supabase";
@@ -14,11 +14,11 @@ function HomeContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [showSuccessBanner, setShowSuccessBanner] = useState(false);
-  const [hasTriggered, setHasTriggered] = useState(false);
+  const hasTriggeredRef = useRef(false);
 
   useEffect(() => {
-    if (searchParams.get("registered") === "true" && !hasTriggered) {
-      setHasTriggered(true);
+    if (searchParams.get("registered") === "true" && !hasTriggeredRef.current) {
+      hasTriggeredRef.current = true;
       setShowSuccessBanner(true);
       
       // Use history API to silently clean URL without triggering Next.js router/remounts
@@ -31,7 +31,7 @@ function HomeContent() {
       
       return () => clearTimeout(timer);
     }
-  }, [searchParams, hasTriggered]);
+  }, [searchParams]);
 
   useEffect(() => {
     // Ensure the page always starts at the top, fixing Next.js scroll restoration bugs
