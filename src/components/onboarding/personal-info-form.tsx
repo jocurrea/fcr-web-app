@@ -23,64 +23,64 @@ import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
 
 const COUNTRIES = [
-  { id: "ar", label: "🇦🇷 Argentina" },
-  { id: "au", label: "🇦🇺 Australia" },
-  { id: "at", label: "🇦🇹 Austria" },
-  { id: "bh", label: "🇧🇭 Bahrain" },
-  { id: "bd", label: "🇧🇩 Bangladesh" },
-  { id: "be", label: "🇧🇪 Belgium" },
-  { id: "br", label: "🇧🇷 Brazil" },
-  { id: "ca", label: "🇨🇦 Canada" },
-  { id: "cl", label: "🇨🇱 Chile" },
-  { id: "cn", label: "🇨🇳 China" },
-  { id: "co", label: "🇨🇴 Colombia" },
-  { id: "cz", label: "🇨🇿 Czech Republic" },
-  { id: "dk", label: "🇩🇰 Denmark" },
-  { id: "eg", label: "🇪🇬 Egypt" },
-  { id: "fi", label: "🇫🇮 Finland" },
-  { id: "fr", label: "🇫🇷 France" },
-  { id: "de", label: "🇩🇪 Germany" },
-  { id: "gr", label: "🇬🇷 Greece" },
-  { id: "hu", label: "🇭🇺 Hungary" },
-  { id: "in", label: "🇮🇳 India" },
-  { id: "id", label: "🇮🇩 Indonesia" },
-  { id: "ie", label: "🇮🇪 Ireland" },
-  { id: "il", label: "🇮🇱 Israel" },
-  { id: "it", label: "🇮🇹 Italy" },
-  { id: "jp", label: "🇯🇵 Japan" },
-  { id: "ke", label: "🇰🇪 Kenya" },
-  { id: "kw", label: "🇰🇼 Kuwait" },
-  { id: "my", label: "🇲🇾 Malaysia" },
-  { id: "mx", label: "🇲🇽 Mexico" },
-  { id: "np", label: "🇳🇵 Nepal" },
-  { id: "nl", label: "🇳🇱 Netherlands" },
-  { id: "nz", label: "🇳🇿 New Zealand" },
-  { id: "ng", label: "🇳🇬 Nigeria" },
-  { id: "no", label: "🇳🇴 Norway" },
-  { id: "om", label: "🇴🇲 Oman" },
-  { id: "pk", label: "🇵🇰 Pakistan" },
-  { id: "pe", label: "🇵🇪 Peru" },
-  { id: "ph", label: "🇵🇭 Philippines" },
-  { id: "pl", label: "🇵🇱 Poland" },
-  { id: "pt", label: "🇵🇹 Portugal" },
-  { id: "qa", label: "🇶🇦 Qatar" },
-  { id: "ro", label: "🇷🇴 Romania" },
-  { id: "ru", label: "🇷🇺 Russia" },
-  { id: "sa", label: "🇸🇦 Saudi Arabia" },
-  { id: "sg", label: "🇸🇬 Singapore" },
-  { id: "za", label: "🇿🇦 South Africa" },
-  { id: "kr", label: "🇰🇷 South Korea" },
-  { id: "es", label: "🇪🇸 Spain" },
-  { id: "lk", label: "🇱🇰 Sri Lanka" },
-  { id: "se", label: "🇸🇪 Sweden" },
-  { id: "ch", label: "🇨🇭 Switzerland" },
-  { id: "th", label: "🇹🇭 Thailand" },
-  { id: "tr", label: "🇹🇷 Turkey" },
-  { id: "ae", label: "🇦🇪 United Arab Emirates" },
-  { id: "gb", label: "🇬🇧 United Kingdom" },
-  { id: "us", label: "🇺🇸 United States" },
-  { id: "ve", label: "🇻🇪 Venezuela" },
-  { id: "vn", label: "🇻🇳 Vietnam" }
+  { id: "ar", label: "Argentina" },
+  { id: "au", label: "Australia" },
+  { id: "at", label: "Austria" },
+  { id: "bh", label: "Bahrain" },
+  { id: "bd", label: "Bangladesh" },
+  { id: "be", label: "Belgium" },
+  { id: "br", label: "Brazil" },
+  { id: "ca", label: "Canada" },
+  { id: "cl", label: "Chile" },
+  { id: "cn", label: "China" },
+  { id: "co", label: "Colombia" },
+  { id: "cz", label: "Czech Republic" },
+  { id: "dk", label: "Denmark" },
+  { id: "eg", label: "Egypt" },
+  { id: "fi", label: "Finland" },
+  { id: "fr", label: "France" },
+  { id: "de", label: "Germany" },
+  { id: "gr", label: "Greece" },
+  { id: "hu", label: "Hungary" },
+  { id: "in", label: "India" },
+  { id: "id", label: "Indonesia" },
+  { id: "ie", label: "Ireland" },
+  { id: "il", label: "Israel" },
+  { id: "it", label: "Italy" },
+  { id: "jp", label: "Japan" },
+  { id: "ke", label: "Kenya" },
+  { id: "kw", label: "Kuwait" },
+  { id: "my", label: "Malaysia" },
+  { id: "mx", label: "Mexico" },
+  { id: "np", label: "Nepal" },
+  { id: "nl", label: "Netherlands" },
+  { id: "nz", label: "New Zealand" },
+  { id: "ng", label: "Nigeria" },
+  { id: "no", label: "Norway" },
+  { id: "om", label: "Oman" },
+  { id: "pk", label: "Pakistan" },
+  { id: "pe", label: "Peru" },
+  { id: "ph", label: "Philippines" },
+  { id: "pl", label: "Poland" },
+  { id: "pt", label: "Portugal" },
+  { id: "qa", label: "Qatar" },
+  { id: "ro", label: "Romania" },
+  { id: "ru", label: "Russia" },
+  { id: "sa", label: "Saudi Arabia" },
+  { id: "sg", label: "Singapore" },
+  { id: "za", label: "South Africa" },
+  { id: "kr", label: "South Korea" },
+  { id: "es", label: "Spain" },
+  { id: "lk", label: "Sri Lanka" },
+  { id: "se", label: "Sweden" },
+  { id: "ch", label: "Switzerland" },
+  { id: "th", label: "Thailand" },
+  { id: "tr", label: "Turkey" },
+  { id: "ae", label: "United Arab Emirates" },
+  { id: "gb", label: "United Kingdom" },
+  { id: "us", label: "United States" },
+  { id: "ve", label: "Venezuela" },
+  { id: "vn", label: "Vietnam" }
 ];
 
 interface PersonalInfoFormProps {
@@ -240,8 +240,21 @@ export function PersonalInfoForm({ onNext }: PersonalInfoFormProps) {
               onClick={() => setIsCountryModalOpen(true)}
               className="w-full flex items-center justify-between border border-input rounded-2xl py-6 px-3 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2"
             >
-              <span className="text-gray-900">
-                {COUNTRIES.find(c => c.id === selectedCountry)?.label || "Select Nationality"}
+              <span className="text-gray-900 flex items-center gap-2">
+                {selectedCountry ? (
+                  <>
+                    <img 
+                      src={`https://flagcdn.com/w20/${selectedCountry}.png`} 
+                      srcSet={`https://flagcdn.com/w40/${selectedCountry}.png 2x`} 
+                      width="20" 
+                      alt="" 
+                      className="rounded-[2px] shadow-sm"
+                    />
+                    {COUNTRIES.find(c => c.id === selectedCountry)?.label}
+                  </>
+                ) : (
+                  "Select Nationality"
+                )}
               </span>
               <ChevronDown className="w-4 h-4 opacity-50" />
             </button>
@@ -343,7 +356,16 @@ export function PersonalInfoForm({ onNext }: PersonalInfoFormProps) {
                       }}
                       className="w-full flex items-center justify-between p-4 hover:bg-gray-50 rounded-xl transition-colors text-left"
                     >
-                      <span className="text-gray-900 text-sm font-medium">{country.label}</span>
+                      <span className="text-gray-900 text-sm font-medium flex items-center gap-3">
+                        <img 
+                          src={`https://flagcdn.com/w20/${country.id}.png`} 
+                          srcSet={`https://flagcdn.com/w40/${country.id}.png 2x`} 
+                          width="20" 
+                          alt="" 
+                          className="rounded-[2px] shadow-sm"
+                        />
+                        {country.label}
+                      </span>
                       {selectedCountry === country.id && (
                         <Check className="w-5 h-5 text-blue-600" />
                       )}
