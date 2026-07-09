@@ -190,7 +190,9 @@ export function CompanyProfileStep({ onNext }: CompanyProfileStepProps) {
           
           <div className="space-y-5">
             <div>
-              <label className="block text-[14px] font-semibold text-gray-800 mb-2 ml-1">Company Name</label>
+              <label className="block text-[14px] font-semibold text-gray-800 mb-2 ml-1">
+                Company Name <span className="text-red-500">*</span>
+              </label>
               <input
                 type="text"
                 value={companyName}
