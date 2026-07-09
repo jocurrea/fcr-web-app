@@ -119,26 +119,26 @@ export default function ProfilePage() {
   }
 
   const COUNTRIES = [
-    { id: "ar", label: "AR Argentina" }, { id: "au", label: "AU Australia" }, { id: "at", label: "AT Austria" },
-    { id: "bh", label: "BH Bahrain" }, { id: "bd", label: "BD Bangladesh" }, { id: "be", label: "BE Belgium" },
-    { id: "br", label: "BR Brazil" }, { id: "ca", label: "CA Canada" }, { id: "cl", label: "CL Chile" },
-    { id: "cn", label: "CN China" }, { id: "co", label: "CO Colombia" }, { id: "cz", label: "CZ Czech Republic" },
-    { id: "dk", label: "DK Denmark" }, { id: "eg", label: "EG Egypt" }, { id: "fi", label: "FI Finland" },
-    { id: "fr", label: "FR France" }, { id: "de", label: "DE Germany" }, { id: "gr", label: "GR Greece" },
-    { id: "hu", label: "HU Hungary" }, { id: "in", label: "IN India" }, { id: "id", label: "ID Indonesia" },
-    { id: "ie", label: "IE Ireland" }, { id: "il", label: "IL Israel" }, { id: "it", label: "IT Italy" },
-    { id: "jp", label: "JP Japan" }, { id: "ke", label: "KE Kenya" }, { id: "kw", label: "KW Kuwait" },
-    { id: "my", label: "MY Malaysia" }, { id: "mx", label: "MX Mexico" }, { id: "np", label: "NP Nepal" },
-    { id: "nl", label: "NL Netherlands" }, { id: "nz", label: "NZ New Zealand" }, { id: "ng", label: "NG Nigeria" },
-    { id: "no", label: "NO Norway" }, { id: "om", label: "OM Oman" }, { id: "pk", label: "PK Pakistan" },
-    { id: "pe", label: "PE Peru" }, { id: "ph", label: "PH Philippines" }, { id: "pl", label: "PL Poland" },
-    { id: "pt", label: "PT Portugal" }, { id: "qa", label: "QA Qatar" }, { id: "ro", label: "RO Romania" },
-    { id: "ru", label: "RU Russia" }, { id: "sa", label: "SA Saudi Arabia" }, { id: "sg", label: "SG Singapore" },
-    { id: "za", label: "ZA South Africa" }, { id: "kr", label: "KR South Korea" }, { id: "es", label: "ES Spain" },
-    { id: "lk", label: "LK Sri Lanka" }, { id: "se", label: "SE Sweden" }, { id: "ch", label: "CH Switzerland" },
-    { id: "th", label: "TH Thailand" }, { id: "tr", label: "TR Turkey" }, { id: "ae", label: "AE United Arab Emirates" },
-    { id: "gb", label: "GB United Kingdom" }, { id: "us", label: "US United States" }, { id: "ve", label: "VE Venezuela" },
-    { id: "vn", label: "VN Vietnam" }
+    { id: "ar", label: "🇦🇷 Argentina" }, { id: "au", label: "🇦🇺 Australia" }, { id: "at", label: "🇦🇹 Austria" },
+    { id: "bh", label: "🇧🇭 Bahrain" }, { id: "bd", label: "🇧🇩 Bangladesh" }, { id: "be", label: "🇧🇪 Belgium" },
+    { id: "br", label: "🇧🇷 Brazil" }, { id: "ca", label: "🇨🇦 Canada" }, { id: "cl", label: "🇨🇱 Chile" },
+    { id: "cn", label: "🇨🇳 China" }, { id: "co", label: "🇨🇴 Colombia" }, { id: "cz", label: "🇨🇿 Czech Republic" },
+    { id: "dk", label: "🇩🇰 Denmark" }, { id: "eg", label: "🇪🇬 Egypt" }, { id: "fi", label: "🇫🇮 Finland" },
+    { id: "fr", label: "🇫🇷 France" }, { id: "de", label: "🇩🇪 Germany" }, { id: "gr", label: "🇬🇷 Greece" },
+    { id: "hu", label: "🇭🇺 Hungary" }, { id: "in", label: "🇮🇳 India" }, { id: "id", label: "🇮🇩 Indonesia" },
+    { id: "ie", label: "🇮🇪 Ireland" }, { id: "il", label: "🇮🇱 Israel" }, { id: "it", label: "🇮🇹 Italy" },
+    { id: "jp", label: "🇯🇵 Japan" }, { id: "ke", label: "🇰🇪 Kenya" }, { id: "kw", label: "🇰🇼 Kuwait" },
+    { id: "my", label: "🇲🇾 Malaysia" }, { id: "mx", label: "🇲🇽 Mexico" }, { id: "np", label: "🇳🇵 Nepal" },
+    { id: "nl", label: "🇳🇱 Netherlands" }, { id: "nz", label: "🇳🇿 New Zealand" }, { id: "ng", label: "🇳🇬 Nigeria" },
+    { id: "no", label: "🇳🇴 Norway" }, { id: "om", label: "🇴🇲 Oman" }, { id: "pk", label: "🇵🇰 Pakistan" },
+    { id: "pe", label: "🇵🇪 Peru" }, { id: "ph", label: "🇵🇭 Philippines" }, { id: "pl", label: "🇵🇱 Poland" },
+    { id: "pt", label: "🇵🇹 Portugal" }, { id: "qa", label: "🇶🇦 Qatar" }, { id: "ro", label: "🇷🇴 Romania" },
+    { id: "ru", label: "🇷🇺 Russia" }, { id: "sa", label: "🇸🇦 Saudi Arabia" }, { id: "sg", label: "🇸🇬 Singapore" },
+    { id: "za", label: "🇿🇦 South Africa" }, { id: "kr", label: "🇰🇷 South Korea" }, { id: "es", label: "🇪🇸 Spain" },
+    { id: "lk", label: "🇱🇰 Sri Lanka" }, { id: "se", label: "🇸🇪 Sweden" }, { id: "ch", label: "🇨🇭 Switzerland" },
+    { id: "th", label: "🇹🇭 Thailand" }, { id: "tr", label: "🇹🇷 Turkey" }, { id: "ae", label: "🇦🇪 United Arab Emirates" },
+    { id: "gb", label: "🇬🇧 United Kingdom" }, { id: "us", label: "🇺🇸 United States" }, { id: "ve", label: "🇻🇪 Venezuela" },
+    { id: "vn", label: "🇻🇳 Vietnam" }
   ];
 
   const fullName = personal ? `${personal.firstName || ""} ${personal.middleName || ""} ${personal.lastName || ""}`.trim().replace(/\s+/g, ' ') : "asdasd asdasd asdasd";
