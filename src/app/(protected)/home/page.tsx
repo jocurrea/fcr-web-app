@@ -14,7 +14,6 @@ function HomeContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [showSuccessBanner, setShowSuccessBanner] = useState(false);
-
   const [hasTriggered, setHasTriggered] = useState(false);
 
   useEffect(() => {
@@ -22,15 +21,17 @@ function HomeContent() {
       setHasTriggered(true);
       setShowSuccessBanner(true);
       
-      // Clean up the URL
-      router.replace("/home", { scroll: false });
+      // Use history API to silently clean URL without triggering Next.js router/remounts
+      window.history.replaceState(null, "", "/home");
       
-      // Auto-dismiss after 5 seconds
-      setTimeout(() => {
+      // Auto-dismiss after 3.5 seconds
+      const timer = setTimeout(() => {
         setShowSuccessBanner(false);
-      }, 5000);
+      }, 3500);
+      
+      return () => clearTimeout(timer);
     }
-  }, [searchParams, router, hasTriggered]);
+  }, [searchParams, hasTriggered]);
 
   useEffect(() => {
     // Ensure the page always starts at the top, fixing Next.js scroll restoration bugs
