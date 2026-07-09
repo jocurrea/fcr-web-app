@@ -35,6 +35,7 @@ function NewPostContent() {
       const { supabase } = await import('@/lib/supabase');
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
+        let avatarFetched = false;
         const { data: profile } = await supabase
           .from('profiles')
           .select('first_name, last_name, avatar_url, crew_data')
@@ -51,7 +52,32 @@ function NewPostContent() {
             const fullName = `${profile.first_name || ""} ${profile.last_name || ""}`.trim();
             setUserName(fullName || "Pilot User");
           }
-          if (profile.avatar_url) setUserAvatar(profile.avatar_url);
+          if (profile.avatar_url) {
+            setUserAvatar(profile.avatar_url);
+            avatarFetched = true;
+          }
+        }
+        
+        // Fallback for business accounts since profiles might not be created or populated properly
+        const { data: companies } = await supabase
+          .from('companies')
+          .select('name, logo_url')
+          .eq('owner_user_id', session.user.id)
+          .limit(1);
+          
+        if (companies && companies.length > 0) {
+          if (companies[0].name) {
+            setUserName(companies[0].name);
+          }
+          if (companies[0].logo_url && !avatarFetched) {
+            setUserAvatar(companies[0].logo_url);
+            avatarFetched = true;
+          }
+        }
+        
+        if (!avatarFetched) {
+           const savedPhoto = localStorage.getItem("userProfilePhoto");
+           if (savedPhoto) setUserAvatar(savedPhoto);
         }
       }
     }

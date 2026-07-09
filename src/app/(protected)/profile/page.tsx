@@ -75,7 +75,7 @@ export default function ProfilePage() {
           // Check if user has a business company
           const { data: companies, error } = await supabase
             .from('companies')
-            .select('name, status')
+            .select('name, status, logo_url')
             .eq('owner_user_id', session.user.id)
             .order('created_at', { ascending: false })
             .limit(1);
@@ -86,11 +86,18 @@ export default function ProfilePage() {
 
           if (companies && companies.length > 0) {
             setIsBusiness(true);
+            const companyLogo = companies[0].logo_url || profileData?.avatar_url || localStorage.getItem("userProfilePhoto");
             setCompanyInfo({
               name: companies[0].name,
               status: companies[0].status,
-              logo: profileData?.avatar_url || localStorage.getItem("userProfilePhoto")
+              logo: companyLogo
             });
+            if (companyLogo) {
+              setProfilePhoto(companyLogo);
+            }
+          } else if (!profileData?.avatar_url) {
+            const savedPhoto = localStorage.getItem("userProfilePhoto");
+            if (savedPhoto) setProfilePhoto(savedPhoto);
           }
         }
       } catch (err) {
