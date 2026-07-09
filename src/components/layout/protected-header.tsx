@@ -48,6 +48,9 @@ export function ProtectedHeader() {
 
           if (profileRecord?.avatar_url) {
             setProfilePhoto(profileRecord.avatar_url);
+          } else {
+            const savedPhoto = localStorage.getItem("userProfilePhoto");
+            if (savedPhoto) setProfilePhoto(savedPhoto);
           }
         } catch (e) {
           console.error("Failed to fetch from users/profiles", e);

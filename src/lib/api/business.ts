@@ -429,6 +429,9 @@ export async function submitBusinessOnboarding(
     if (userError) throw new Error(userError.message);
 
     if (company.logo_url) {
+      if (typeof window !== "undefined") {
+        localStorage.setItem("userProfilePhoto", company.logo_url);
+      }
       await supabase
         .from("profiles")
         .update({ avatar_url: company.logo_url })
