@@ -207,6 +207,18 @@ export function ResumeStep({ onNext }: ResumeStepProps) {
           console.error("Error from Supabase:", error);
           alert("Error saving profile: " + JSON.stringify(error));
         }
+
+        const { error: userError } = await supabase
+          .from('users')
+          .update({
+            onboarded: true,
+            accounttype: 'flight_crew'
+          })
+          .eq('id', session.user.id);
+
+        if (userError) {
+          console.error("Error updating user status:", userError);
+        }
       }
     } catch (err) {
       console.error("Error finishing onboarding:", err);
