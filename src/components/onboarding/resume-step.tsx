@@ -236,6 +236,11 @@ export function ResumeStep({ onNext }: ResumeStepProps) {
           console.error("Auth metadata error:", authError);
         }
 
+        // Nuclear fallback: Set a browser cookie
+        if (typeof document !== 'undefined') {
+          document.cookie = "flightcrew_onboarded=true; path=/; max-age=31536000";
+        }
+
         setIsSaving(false);
         onNext();
       } else {

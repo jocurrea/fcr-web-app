@@ -74,6 +74,9 @@ export default function RoleSelectionPage() {
         } else if (typeof window !== 'undefined' && localStorage.getItem('onboarding_personal')) {
           accounttype = 'flight_crew';
           onboarded = true;
+        } else if (typeof document !== 'undefined' && document.cookie.includes('flightcrew_onboarded=true')) {
+          accounttype = 'flight_crew';
+          onboarded = true;
         }
       }
 
