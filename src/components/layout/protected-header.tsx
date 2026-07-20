@@ -35,10 +35,11 @@ export function ProtectedHeader() {
         const hasCookie = typeof document !== 'undefined' && document.cookie.includes('flightcrew_onboarded=true');
         const hasMetadata = session.user.user_metadata?.onboarded === true && session.user.user_metadata?.accounttype === 'flight_crew';
         const hasLocalStorage = typeof window !== 'undefined' && !!localStorage.getItem('onboarding_personal');
+        const hasSessionStorage = typeof window !== 'undefined' && sessionStorage.getItem('flightcrew_onboarded') === 'true';
 
-        console.log('[ProtectedHeader] Fast path checks:', { hasCookie, hasMetadata, hasLocalStorage, pathname });
+        console.log('[ProtectedHeader] Fast path checks:', { hasCookie, hasMetadata, hasLocalStorage, hasSessionStorage, pathname });
 
-        if (hasCookie || hasMetadata) {
+        if (hasCookie || hasMetadata || hasSessionStorage) {
           onboarded = true;
           accounttype = 'flight_crew';
           // Still load the profile photo in background

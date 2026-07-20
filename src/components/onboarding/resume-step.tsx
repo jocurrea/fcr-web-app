@@ -230,10 +230,12 @@ export function ResumeStep({ onNext }: ResumeStepProps) {
       // Log but DO NOT stop — always redirect to home
       console.error("[ResumeStep] DB save error (non-blocking):", err);
     } finally {
-      // ALWAYS set cookie and redirect — no DB error can stop this
+      // ALWAYS set cookie + sessionStorage and redirect — no DB error can stop this
       document.cookie = "flightcrew_onboarded=true; path=/; max-age=31536000";
+      sessionStorage.setItem("flightcrew_onboarded", "true");
       setIsSaving(false);
-      window.location.href = "/home";
+      // Go through /onboarding-complete which sets signals before /home loads
+      window.location.href = "/onboarding-complete";
     }
   };
 
