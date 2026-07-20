@@ -53,16 +53,12 @@ export default function OnboardingPage() {
         if (profileFallback?.crew_data) {
           accounttype = 'flight_crew';
           onboarded = true;
-        } else if (session.user.user_metadata?.onboarded && session.user.user_metadata?.accounttype === 'flight_crew') {
-          accounttype = 'flight_crew';
-          onboarded = true;
-        } else if (typeof window !== 'undefined' && localStorage.getItem('onboarding_personal')) {
-          accounttype = 'flight_crew';
-          onboarded = true;
-        } else if (typeof document !== 'undefined' && document.cookie.includes('flightcrew_onboarded=true')) {
+        } else if (session.user.user_metadata?.onboarded === true && session.user.user_metadata?.accounttype === 'flight_crew') {
           accounttype = 'flight_crew';
           onboarded = true;
         }
+        // NOTE: Do NOT check localStorage here — having onboarding_personal means
+        // the user is MID-FLOW, not done. They need to reach step 5 and click Finish.
       }
 
       if (!isMounted) return;

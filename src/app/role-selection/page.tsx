@@ -68,16 +68,11 @@ export default function RoleSelectionPage() {
         if (profileFallback?.crew_data) {
           accounttype = 'flight_crew';
           onboarded = true;
-        } else if (session.user.user_metadata?.onboarded && session.user.user_metadata?.accounttype === 'flight_crew') {
-          accounttype = 'flight_crew';
-          onboarded = true;
-        } else if (typeof window !== 'undefined' && localStorage.getItem('onboarding_personal')) {
-          accounttype = 'flight_crew';
-          onboarded = true;
-        } else if (typeof document !== 'undefined' && document.cookie.includes('flightcrew_onboarded=true')) {
+        } else if (session.user.user_metadata?.onboarded === true && session.user.user_metadata?.accounttype === 'flight_crew') {
           accounttype = 'flight_crew';
           onboarded = true;
         }
+        // Do NOT check localStorage/cookie here — they indicate mid-flow, not completed
       }
 
       if (!isMounted) return;
