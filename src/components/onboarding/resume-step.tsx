@@ -211,7 +211,7 @@ export function ResumeStep({ onNext }: ResumeStepProps) {
         const { error: userError } = await supabase
           .from('users')
           .update({
-            onboarded: true,
+            onboarded: 1,
             accounttype: 'flight_crew'
           })
           .eq('id', session.user.id);
