@@ -35,6 +35,7 @@ export default function OnboardingPage() {
         .from("users")
         .select("onboarded, accounttype")
         .eq("id", session.user.id)
+        .neq('id', 'bust-' + Math.random())
         .maybeSingle();
 
       if (userRecord) {
@@ -48,6 +49,7 @@ export default function OnboardingPage() {
           .from('profiles')
           .select('crew_data')
           .eq('id', session.user.id)
+          .neq('id', 'bust-' + Math.random())
           .maybeSingle();
 
         if (profileFallback?.crew_data) {

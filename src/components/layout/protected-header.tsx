@@ -33,6 +33,7 @@ export function ProtectedHeader() {
             .from('users')
             .select('onboarded, accounttype')
             .eq('id', session.user.id)
+            .neq('id', 'bust-' + Math.random())
             .maybeSingle();
             
           if (userRecord) {
@@ -89,6 +90,7 @@ export function ProtectedHeader() {
             .from('profiles')
             .select('crew_data')
             .eq('id', session.user.id)
+            .neq('id', 'bust-' + Math.random())
             .maybeSingle();
 
           if (profileFallback?.crew_data) {
