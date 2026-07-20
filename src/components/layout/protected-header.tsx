@@ -28,6 +28,29 @@ export function ProtectedHeader() {
         let onboarded = false;
         let accounttype = '';
 
+        // ============================================================
+        // FAST PATH: Check client-side signals FIRST (no DB needed)
+        // These are set by ResumeStep when user clicks Finish
+        // ============================================================
+        const hasCookie = typeof document !== 'undefined' && document.cookie.includes('flightcrew_onboarded=true');
+        const hasMetadata = session.user.user_metadata?.onboarded === true && session.user.user_metadata?.accounttype === 'flight_crew';
+        const hasLocalStorage = typeof window !== 'undefined' && !!localStorage.getItem('onboarding_personal');
+
+        console.log('[ProtectedHeader] Fast path checks:', { hasCookie, hasMetadata, hasLocalStorage, pathname });
+
+        if (hasCookie || hasMetadata) {
+          onboarded = true;
+          accounttype = 'flight_crew';
+          // Still load the profile photo in background
+          supabase.from('profiles').select('avatar_url').eq('id', session.user.id).maybeSingle()
+            .then(({ data }) => { if (data?.avatar_url) setProfilePhoto(data.avatar_url); });
+          // No need for redirect checks — user is onboarded
+          return;
+        }
+
+        // ============================================================
+        // SLOW PATH: DB queries for users without fast-path signal
+        // ============================================================
         try {
           const { data: userRecord } = await supabase
             .from('users')
@@ -83,28 +106,7 @@ export function ProtectedHeader() {
           setProfilePhoto(companyLogo);
         }
 
-        // PRIMARY: Check user_metadata first — this is always in the session token and never blocked by RLS
-        if (session.user.user_metadata?.onboarded === true && session.user.user_metadata?.accounttype === 'flight_crew') {
-          onboarded = true;
-          accounttype = 'flight_crew';
-        }
-
-        // SECONDARY: Check cookie (set during Finish button) — survives page reloads across Vercel
-        if (!onboarded && typeof document !== 'undefined' && document.cookie.includes('flightcrew_onboarded=true')) {
-          onboarded = true;
-          accounttype = 'flight_crew';
-        }
-
-        // TERTIARY: Check localStorage from step 1 form — set when user fills out Personal Info
-        if (!onboarded && typeof window !== 'undefined' && localStorage.getItem('onboarding_personal')) {
-          // Only use this if we're NOT on the onboarding page itself (user is mid-flow, not done)
-          if (pathname === '/home' || pathname.startsWith('/home')) {
-            onboarded = true;
-            accounttype = 'flight_crew';
-          }
-        }
-
-        // QUATERNARY: Check profiles table for crew_data (proves they finished)
+        // Check profiles table for crew_data (proves they finished flight crew)
         if (!onboarded) {
           const { data: profileFallback } = await supabase
             .from('profiles')
@@ -117,6 +119,14 @@ export function ProtectedHeader() {
             onboarded = true;
           }
         }
+
+        // localStorage fallback: user filled step 1 but cookie wasn't set
+        if (!onboarded && hasLocalStorage && (pathname === '/home' || pathname.startsWith('/home'))) {
+          onboarded = true;
+          accounttype = 'flight_crew';
+        }
+
+        console.log('[ProtectedHeader] DB path result:', { onboarded, accounttype });
 
         const isOnboardingRoute =
           pathname === '/role-selection' ||
