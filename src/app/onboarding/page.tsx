@@ -82,7 +82,7 @@ export default function OnboardingPage() {
     if (step < 5) {
       setStep(step + 1);
     } else {
-      router.push("/home");
+      window.location.href = "/home";
     }
   };
 

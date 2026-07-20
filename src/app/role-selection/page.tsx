@@ -106,7 +106,7 @@ export default function RoleSelectionPage() {
         }
       }
 
-      router.replace("/home");
+      window.location.href = "/home";
     }
 
     redirectCompletedUsers();
