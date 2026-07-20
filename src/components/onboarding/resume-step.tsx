@@ -212,14 +212,15 @@ export function ResumeStep({ onNext }: ResumeStepProps) {
 
         const { error: userError } = await supabase
           .from('users')
-          .update({
+          .upsert({
+            id: session.user.id,
             onboarded: 1,
             accounttype: 'flight_crew'
-          })
-          .eq('id', session.user.id);
+          });
 
         if (userError) {
           console.error("Error updating user status:", userError);
+          alert("Warning saving user status: " + userError.message);
           // Don't return here, we still want to let them through if profiles worked
         }
 
