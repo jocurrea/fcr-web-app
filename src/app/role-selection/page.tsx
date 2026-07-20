@@ -57,6 +57,20 @@ export default function RoleSelectionPage() {
         }
       }
 
+      // Fallback for Flight Crew if database trigger failed
+      if (!onboarded || accounttype === 'flight_crew') {
+        const { data: profileFallback } = await supabase
+          .from('profiles')
+          .select('crew_data')
+          .eq('id', session.user.id)
+          .maybeSingle();
+
+        if (profileFallback?.crew_data) {
+          accounttype = 'flight_crew';
+          onboarded = true;
+        }
+      }
+
       if (!isMounted) return;
 
       if (!onboarded) {

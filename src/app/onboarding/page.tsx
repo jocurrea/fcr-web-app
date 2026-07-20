@@ -28,20 +28,42 @@ export default function OnboardingPage() {
         return;
       }
 
+      let onboarded = false;
+      let accounttype = '';
+
       const { data: userRecord } = await supabase
         .from("users")
         .select("onboarded, accounttype")
         .eq("id", session.user.id)
-        .single();
+        .maybeSingle();
+
+      if (userRecord) {
+        onboarded = !!userRecord.onboarded;
+        accounttype = userRecord.accounttype || '';
+      }
+
+      // Fallback for Flight Crew if database trigger failed
+      if (!onboarded || accounttype === 'flight_crew') {
+        const { data: profileFallback } = await supabase
+          .from('profiles')
+          .select('crew_data')
+          .eq('id', session.user.id)
+          .maybeSingle();
+
+        if (profileFallback?.crew_data) {
+          accounttype = 'flight_crew';
+          onboarded = true;
+        }
+      }
 
       if (!isMounted) return;
 
-      if (userRecord?.onboarded) {
+      if (onboarded) {
         router.replace("/home");
         return;
       }
 
-      if (userRecord?.accounttype === "business") {
+      if (accounttype === "business") {
         router.replace("/onboarding-business");
         return;
       }
