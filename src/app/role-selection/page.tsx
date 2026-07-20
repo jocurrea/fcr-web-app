@@ -68,6 +68,9 @@ export default function RoleSelectionPage() {
         if (profileFallback?.crew_data) {
           accounttype = 'flight_crew';
           onboarded = true;
+        } else if (typeof window !== 'undefined' && localStorage.getItem('onboarding_personal')) {
+          accounttype = 'flight_crew';
+          onboarded = true;
         }
       }
 
