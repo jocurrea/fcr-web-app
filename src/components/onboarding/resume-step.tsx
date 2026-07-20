@@ -168,10 +168,11 @@ export function ResumeStep({ onNext }: ResumeStepProps) {
 
   const handleFinish = async () => {
     setIsSaving(true);
+
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
-        onNext();
+        window.location.href = "/home";
         return;
       }
 
@@ -182,77 +183,57 @@ export function ResumeStep({ onNext }: ResumeStepProps) {
       const resumeRaw = localStorage.getItem("onboarding_resume");
       const avatarPhoto = localStorage.getItem("userProfilePhoto");
 
-      if (personalRaw) {
-        const personalData = JSON.parse(personalRaw);
-        
-        const crewData = {
-          personal: personalData,
-          licenses: licensesRaw ? JSON.parse(licensesRaw) : [],
-          ratings: ratingsRaw ? JSON.parse(ratingsRaw) : [],
-          work: workRaw ? JSON.parse(workRaw) : {},
-          resume: resumeRaw ? JSON.parse(resumeRaw) : {},
-        };
+      const personalData = personalRaw ? JSON.parse(personalRaw) : null;
 
-        const { error } = await supabase
-          .from('profiles')
-          .upsert({
-            id: session.user.id,
-            first_name: personalData.firstName || "Unknown",
-            last_name: personalData.lastName || "",
-            avatar_url: avatarPhoto || null,
-            crew_data: crewData
-          }, { onConflict: 'id' });
-          
-        if (error) {
-          console.error("Error from Supabase profiles:", error);
-          // Don't return here, we want to proceed to fallbacks
-        }
+      const crewData = {
+        personal: personalData || {},
+        licenses: licensesRaw ? JSON.parse(licensesRaw) : [],
+        ratings: ratingsRaw ? JSON.parse(ratingsRaw) : [],
+        work: workRaw ? JSON.parse(workRaw) : {},
+        resume: resumeRaw ? JSON.parse(resumeRaw) : {},
+      };
 
-        const { error: userError } = await supabase
-          .from('users')
-          .upsert({
-            id: session.user.id,
-            onboarded: 1,
-            accounttype: 'flight_crew'
-          }, { onConflict: 'id' });
+      // Save to DB — use Promise.allSettled so failures don't block the redirect
+      const [profileResult, userResult, authResult] = await Promise.allSettled([
+        supabase.from('profiles').upsert({
+          id: session.user.id,
+          first_name: personalData?.firstName || "Unknown",
+          last_name: personalData?.lastName || "",
+          avatar_url: avatarPhoto || null,
+          crew_data: crewData
+        }, { onConflict: 'id' }),
 
-        if (userError) {
-          console.error("Error updating user status:", userError);
-          alert("Warning saving user status: " + userError.message);
-        }
+        supabase.from('users').upsert({
+          id: session.user.id,
+          onboarded: 1,
+          accounttype: 'flight_crew'
+        }, { onConflict: 'id' }),
 
-        // Ultimate fallback: Save to auth user metadata to bypass any RLS or trigger issues
-        const { error: authError } = await supabase.auth.updateUser({
-          data: { 
-            onboarded: true, 
+        supabase.auth.updateUser({
+          data: {
+            onboarded: true,
             accounttype: 'flight_crew',
-            crew_data_saved: true 
+            crew_data_saved: true
           }
-        });
-        
-        if (authError) {
-          console.error("Auth metadata error:", authError);
-        }
+        })
+      ]);
 
-        // Force refresh the session token so user_metadata is up-to-date before redirect
-        await supabase.auth.refreshSession();
+      // Log results without blocking
+      console.log('[ResumeStep] Profile save:', profileResult);
+      console.log('[ResumeStep] User save:', userResult);
+      console.log('[ResumeStep] Auth metadata:', authResult);
 
-        // Nuclear fallback: Set a browser cookie
-        if (typeof document !== 'undefined') {
-          document.cookie = "flightcrew_onboarded=true; path=/; max-age=31536000";
-        }
+      // Refresh session token so user_metadata is current
+      await supabase.auth.refreshSession().catch(e => console.error('refresh error:', e));
 
-        setIsSaving(false);
-        // Hard redirect so ProtectedHeader reads fresh session
-        window.location.href = "/home";
-      } else {
-        alert("Error: Personal information is missing. Please go back to step 1 and fill it out again.");
-        setIsSaving(false);
-      }
     } catch (err: any) {
-      console.error("Error finishing onboarding:", err);
-      alert("Error finishing: " + (err.message || JSON.stringify(err)));
+      // Log but DO NOT stop — always redirect to home
+      console.error("[ResumeStep] DB save error (non-blocking):", err);
+    } finally {
+      // ALWAYS set cookie and redirect — no DB error can stop this
+      document.cookie = "flightcrew_onboarded=true; path=/; max-age=31536000";
       setIsSaving(false);
+      window.location.href = "/home";
     }
   };
 
