@@ -234,13 +234,17 @@ export function ResumeStep({ onNext }: ResumeStepProps) {
           console.error("Auth metadata error:", authError);
         }
 
+        // Force refresh the session token so user_metadata is up-to-date before redirect
+        await supabase.auth.refreshSession();
+
         // Nuclear fallback: Set a browser cookie
         if (typeof document !== 'undefined') {
           document.cookie = "flightcrew_onboarded=true; path=/; max-age=31536000";
         }
 
         setIsSaving(false);
-        onNext();
+        // Hard redirect so ProtectedHeader reads fresh session
+        window.location.href = "/home";
       } else {
         alert("Error: Personal information is missing. Please go back to step 1 and fill it out again.");
         setIsSaving(false);

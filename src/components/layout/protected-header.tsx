@@ -83,8 +83,29 @@ export function ProtectedHeader() {
           setProfilePhoto(companyLogo);
         }
 
-        // Fallback for Flight Crew if database trigger failed
-        if (!onboarded || accounttype === 'flight_crew') {
+        // PRIMARY: Check user_metadata first — this is always in the session token and never blocked by RLS
+        if (session.user.user_metadata?.onboarded === true && session.user.user_metadata?.accounttype === 'flight_crew') {
+          onboarded = true;
+          accounttype = 'flight_crew';
+        }
+
+        // SECONDARY: Check cookie (set during Finish button) — survives page reloads across Vercel
+        if (!onboarded && typeof document !== 'undefined' && document.cookie.includes('flightcrew_onboarded=true')) {
+          onboarded = true;
+          accounttype = 'flight_crew';
+        }
+
+        // TERTIARY: Check localStorage from step 1 form — set when user fills out Personal Info
+        if (!onboarded && typeof window !== 'undefined' && localStorage.getItem('onboarding_personal')) {
+          // Only use this if we're NOT on the onboarding page itself (user is mid-flow, not done)
+          if (pathname === '/home' || pathname.startsWith('/home')) {
+            onboarded = true;
+            accounttype = 'flight_crew';
+          }
+        }
+
+        // QUATERNARY: Check profiles table for crew_data (proves they finished)
+        if (!onboarded) {
           const { data: profileFallback } = await supabase
             .from('profiles')
             .select('crew_data')
@@ -92,15 +113,6 @@ export function ProtectedHeader() {
             .maybeSingle();
 
           if (profileFallback?.crew_data) {
-            accounttype = 'flight_crew';
-            onboarded = true;
-          } else if (session.user.user_metadata?.onboarded && session.user.user_metadata?.accounttype === 'flight_crew') {
-            accounttype = 'flight_crew';
-            onboarded = true;
-          } else if (typeof window !== 'undefined' && localStorage.getItem('onboarding_personal')) {
-            accounttype = 'flight_crew';
-            onboarded = true;
-          } else if (typeof document !== 'undefined' && document.cookie.includes('flightcrew_onboarded=true')) {
             accounttype = 'flight_crew';
             onboarded = true;
           }
