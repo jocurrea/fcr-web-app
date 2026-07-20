@@ -204,8 +204,10 @@ export function ResumeStep({ onNext }: ResumeStepProps) {
           });
           
         if (error) {
-          console.error("Error from Supabase:", error);
-          alert("Error saving profile: " + JSON.stringify(error));
+          console.error("Error from Supabase profiles:", error);
+          alert("Error saving profile: " + error.message);
+          setIsSaving(false);
+          return;
         }
 
         const { error: userError } = await supabase
@@ -218,14 +220,19 @@ export function ResumeStep({ onNext }: ResumeStepProps) {
 
         if (userError) {
           console.error("Error updating user status:", userError);
+          // Don't return here, we still want to let them through if profiles worked
         }
+
+        setIsSaving(false);
+        onNext();
+      } else {
+        alert("Error: Personal information is missing. Please go back to step 1 and fill it out again.");
+        setIsSaving(false);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error finishing onboarding:", err);
-      alert("Error finishing: " + JSON.stringify(err));
-    } finally {
+      alert("Error finishing: " + (err.message || JSON.stringify(err)));
       setIsSaving(false);
-      onNext();
     }
   };
 
