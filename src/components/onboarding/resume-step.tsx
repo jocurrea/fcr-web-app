@@ -195,13 +195,13 @@ export function ResumeStep({ onNext }: ResumeStepProps) {
 
         const { error } = await supabase
           .from('profiles')
-          .upsert({
-            id: session.user.id,
+          .update({
             first_name: personalData.firstName || "Unknown",
             last_name: personalData.lastName || "",
             avatar_url: avatarPhoto || null,
             crew_data: crewData
-          });
+          })
+          .eq('id', session.user.id);
           
         if (error) {
           console.error("Error from Supabase profiles:", error);
@@ -212,11 +212,11 @@ export function ResumeStep({ onNext }: ResumeStepProps) {
 
         const { error: userError } = await supabase
           .from('users')
-          .upsert({
-            id: session.user.id,
+          .update({
             onboarded: 1,
             accounttype: 'flight_crew'
-          });
+          })
+          .eq('id', session.user.id);
 
         if (userError) {
           console.error("Error updating user status:", userError);
