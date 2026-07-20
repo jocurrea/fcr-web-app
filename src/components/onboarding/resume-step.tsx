@@ -205,9 +205,7 @@ export function ResumeStep({ onNext }: ResumeStepProps) {
           
         if (error) {
           console.error("Error from Supabase profiles:", error);
-          alert("Error saving profile: " + error.message);
-          setIsSaving(false);
-          return;
+          // Don't return here, we want to proceed to fallbacks
         }
 
         const { error: userError } = await supabase
