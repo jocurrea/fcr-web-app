@@ -172,7 +172,7 @@ export function ResumeStep({ onNext }: ResumeStepProps) {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
-        router.push("/home");
+        window.location.assign("/home");
         return;
       }
 
@@ -238,7 +238,7 @@ export function ResumeStep({ onNext }: ResumeStepProps) {
       }
       
       setIsSaving(false);
-      router.push("/onboarding-complete");
+      window.location.assign("/onboarding-complete");
     }
   };
 

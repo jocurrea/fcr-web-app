@@ -73,7 +73,7 @@ export function RatingsStep({ onNext }: RatingsStepProps) {
           onClick={onNext}
           className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-full py-6 text-lg font-semibold"
         >
-          Next
+          {ratings.length === 0 ? "Next / Skip" : "Next"}
         </Button>
       </div>
 

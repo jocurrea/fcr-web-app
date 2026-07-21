@@ -67,26 +67,6 @@ export function WorkStep({ onNext }: WorkStepProps) {
     return "administration";
   });
 
-  const [flightHours, setFlightHours] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem("onboarding_work");
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed.flightHours) return parsed.flightHours;
-      }
-    }
-    return "";
-  });
-  const [employer, setEmployer] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem("onboarding_work");
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed.employer) return parsed.employer;
-      }
-    }
-    return "";
-  });
   const [employmentStatus, setEmploymentStatus] = useState(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem("onboarding_work");
@@ -120,9 +100,9 @@ export function WorkStep({ onNext }: WorkStepProps) {
 
   useEffect(() => {
     localStorage.setItem("onboarding_work", JSON.stringify({
-      medicalClass, commandType, crossedOcean, adminExp, adminRole, flightHours, employer, employmentStatus, workCountry, adminDescription
+      medicalClass, commandType, crossedOcean, adminExp, adminRole, employmentStatus, workCountry, adminDescription
     }));
-  }, [medicalClass, commandType, crossedOcean, adminExp, adminRole, flightHours, employer, employmentStatus, workCountry, adminDescription]);
+  }, [medicalClass, commandType, crossedOcean, adminExp, adminRole, employmentStatus, workCountry, adminDescription]);
 
   return (
     <div className="flex-1 flex flex-col mt-4">
@@ -148,22 +128,6 @@ export function WorkStep({ onNext }: WorkStepProps) {
           </div>
         </div>
 
-        <div className="space-y-2">
-          <Label className="text-gray-700">Total flight hours</Label>
-          <Input 
-            className="rounded-2xl py-6" 
-            value={flightHours}
-            onChange={(e) => setFlightHours(e.target.value)}
-            onInput={(e) => {
-              e.currentTarget.value = e.currentTarget.value.replace(/\D/g, "");
-            }}
-          />
-        </div>
-
-        <div className="space-y-2">
-          <Label className="text-gray-700">Employer</Label>
-          <Input className="rounded-2xl py-6" value={employer} onChange={(e) => setEmployer(e.target.value)} />
-        </div>
 
         <div className="space-y-2">
           <Label className="text-gray-700">Employement Status</Label>
@@ -364,7 +328,7 @@ export function WorkStep({ onNext }: WorkStepProps) {
           onClick={onNext}
           className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-full py-6 text-lg font-semibold"
         >
-          Next
+          Next / Skip
         </Button>
       </div>
     </div>

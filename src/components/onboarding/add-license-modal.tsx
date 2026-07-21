@@ -24,6 +24,7 @@ export interface LicenseData {
   licenseName: string;
   licenseNumber: string;
   expiryDate: string;
+  expiryDateRaw?: string;
 }
 
 interface AddLicenseModalProps {
@@ -72,34 +73,40 @@ export function AddLicenseModal({ open, onOpenChange, onAddLicense }: AddLicense
     }
   };
 
+  const [isPermanent, setIsPermanent] = useState(false);
+
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsLoading(true);
 
     const formData = new FormData(e.currentTarget);
     const licenseNumber = formData.get("licenseNumber") as string || "N/A";
-    const expiryDate = formData.get("expiryDate") as string || "N/A";
+    const expiryDate = isPermanent ? "Permanent" : (formData.get("expiryDate") as string || "N/A");
     const licenseVal = formData.get("licenseVal") as string || "Unknown";
 
-    // Format expiry date simply for the UI (e.g., "2026-06-11" -> "Jun 26")
-    const dateObj = new Date(expiryDate);
-    const formattedExpiry = isNaN(dateObj.getTime()) 
-      ? expiryDate 
-      : dateObj.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+    // Format expiry date simply for the UI
+    let formattedExpiry = expiryDate;
+    if (expiryDate !== "Permanent") {
+      const dateObj = new Date(expiryDate);
+      formattedExpiry = isNaN(dateObj.getTime()) 
+        ? expiryDate 
+        : dateObj.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+    }
 
     // Mock API call
     setTimeout(() => {
       setIsLoading(false);
       onAddLicense({
         id: Math.random().toString(36).substring(7),
-        licenseName: licenseVal.toUpperCase() + " - License", // Simplification
+        licenseName: licenseVal.toUpperCase() + " - License",
         licenseNumber,
-        expiryDate: formattedExpiry
+        expiryDate: formattedExpiry,
+        expiryDateRaw: expiryDate
       });
       onOpenChange(false);
-      // Reset form images
       setFrontImagePreview(null);
       setBackImagePreview(null);
+      setIsPermanent(false);
     }, 1500);
   };
 
@@ -161,15 +168,34 @@ export function AddLicenseModal({ open, onOpenChange, onAddLicense }: AddLicense
                 className="rounded-2xl py-6" 
                 required 
                 onInput={(e) => {
-                  e.currentTarget.value = e.currentTarget.value.replace(/\D/g, "");
+                  e.currentTarget.value = e.currentTarget.value.replace(/[^a-zA-Z0-9\-\.]/g, "");
                 }}
               />
             </div>
 
-            <div className="space-y-2">
-              <Label>Expiry Date</Label>
-              {/* Native date input for mobile-friendly picker */}
-              <Input name="expiryDate" type="date" className="rounded-2xl py-6" required />
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Expiry Date</Label>
+                <Input 
+                  name="expiryDate" 
+                  type="date" 
+                  className="rounded-2xl py-6 disabled:opacity-50" 
+                  required={!isPermanent}
+                  disabled={isPermanent}
+                />
+              </div>
+              <div className="flex items-start space-x-2">
+                <input 
+                  type="checkbox" 
+                  id="isPermanent"
+                  className="mt-1 w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-600"
+                  checked={isPermanent}
+                  onChange={(e) => setIsPermanent(e.target.checked)}
+                />
+                <Label htmlFor="isPermanent" className="text-sm text-gray-600 leading-tight cursor-pointer">
+                  This license is Permanent / FAA Medical Exception (No Expiry)
+                </Label>
+              </div>
             </div>
 
             <div className="space-y-2">

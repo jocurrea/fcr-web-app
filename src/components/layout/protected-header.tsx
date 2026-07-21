@@ -123,7 +123,7 @@ export function ProtectedHeader() {
         }
 
         // localStorage fallback: user filled step 1 but cookie wasn't set
-        if (!onboarded && hasLocalStorage && (pathname === '/home' || pathname.startsWith('/home'))) {
+        if (!onboarded && hasLocalStorageLegacy && (pathname === '/home' || pathname.startsWith('/home'))) {
           onboarded = true;
           accounttype = 'flight_crew';
         }

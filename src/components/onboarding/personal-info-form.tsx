@@ -123,6 +123,8 @@ export function PersonalInfoForm({ onNext }: PersonalInfoFormProps) {
   const [middleName, setMiddleName] = useState("");
   const [lastName, setLastName] = useState("");
   const [description, setDescription] = useState("");
+  const [currentEmployer, setCurrentEmployer] = useState("");
+  const [totalFlightHours, setTotalFlightHours] = useState("");
 
   // Load draft from localStorage after hydration
   useEffect(() => {
@@ -137,6 +139,8 @@ export function PersonalInfoForm({ onNext }: PersonalInfoFormProps) {
           if (parsed.middleName) setMiddleName(parsed.middleName);
           if (parsed.lastName) setLastName(parsed.lastName);
           if (parsed.description) setDescription(parsed.description);
+          if (parsed.currentEmployer) setCurrentEmployer(parsed.currentEmployer);
+          if (parsed.totalFlightHours) setTotalFlightHours(parsed.totalFlightHours);
         } catch (e) {
           console.error("Error parsing localStorage", e);
         }
@@ -173,9 +177,9 @@ export function PersonalInfoForm({ onNext }: PersonalInfoFormProps) {
 
   useEffect(() => {
     localStorage.setItem("onboarding_personal", JSON.stringify({
-      role, selectedCountry, firstName, middleName, lastName, description
+      role, selectedCountry, firstName, middleName, lastName, description, currentEmployer, totalFlightHours
     }));
-  }, [role, selectedCountry, firstName, middleName, lastName, description]);
+  }, [role, selectedCountry, firstName, middleName, lastName, description, currentEmployer, totalFlightHours]);
 
   const filteredCountries = COUNTRIES.filter(country => 
     country.label.toLowerCase().includes(searchQuery.toLowerCase())
@@ -218,19 +222,42 @@ export function PersonalInfoForm({ onNext }: PersonalInfoFormProps) {
 
           <div className="space-y-2">
             <Label htmlFor="firstName">First Name</Label>
-            <Input id="firstName" value={firstName} onChange={(e) => setFirstName(e.target.value)} className="rounded-2xl py-6" />
+            <Input 
+              id="firstName" 
+              value={firstName} 
+              onChange={(e) => {
+                const val = e.target.value.replace(/[^a-zA-ZÀ-ÿ\s]/g, '');
+                setFirstName(val);
+              }} 
+              className="rounded-2xl py-6" 
+              required 
+            />
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="middleName">
               Middle Name <span className="text-gray-400 font-normal">(optional)</span>
             </Label>
-            <Input id="middleName" value={middleName} onChange={(e) => setMiddleName(e.target.value)} className="rounded-2xl py-6" />
+            <Input 
+              id="middleName" 
+              value={middleName} 
+              onChange={(e) => setMiddleName(e.target.value)} 
+              className="rounded-2xl py-6" 
+            />
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="lastName">Last Name</Label>
-            <Input id="lastName" value={lastName} onChange={(e) => setLastName(e.target.value)} className="rounded-2xl py-6" />
+            <Input 
+              id="lastName" 
+              value={lastName} 
+              onChange={(e) => {
+                const val = e.target.value.replace(/[^a-zA-ZÀ-ÿ\s]/g, '');
+                setLastName(val);
+              }} 
+              className="rounded-2xl py-6" 
+              required 
+            />
           </div>
 
           <div className="space-y-2">
@@ -261,14 +288,43 @@ export function PersonalInfoForm({ onNext }: PersonalInfoFormProps) {
           </div>
 
           <div className="space-y-2">
+            <Label htmlFor="currentEmployer">Current Employer</Label>
+            <Input 
+              id="currentEmployer" 
+              value={currentEmployer} 
+              onChange={(e) => setCurrentEmployer(e.target.value)} 
+              className="rounded-2xl py-6" 
+              placeholder="E.g. Delta Airlines"
+              required 
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="totalFlightHours">Total Flight Hours</Label>
+            <Input 
+              id="totalFlightHours" 
+              type="number"
+              min="0"
+              value={totalFlightHours} 
+              onChange={(e) => setTotalFlightHours(e.target.value)} 
+              className="rounded-2xl py-6" 
+              placeholder="E.g. 1500"
+              required 
+            />
+          </div>
+
+          <div className="space-y-2">
             <Label htmlFor="description">
-              Personal Description <span className="text-gray-400 font-normal">(optional)</span>
+              Personal Description
             </Label>
             <Textarea
               id="description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               className="min-h-[120px] rounded-2xl resize-none"
+              placeholder="Brief profile description (max 2000 chars)"
+              maxLength={2000}
+              required
             />
           </div>
 
@@ -313,7 +369,8 @@ export function PersonalInfoForm({ onNext }: PersonalInfoFormProps) {
         <Button 
           type="button" 
           onClick={handleSave}
-          className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-full py-6 text-lg font-semibold"
+          disabled={!firstName || !lastName || !currentEmployer || !totalFlightHours || !description || !photoPreview}
+          className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-full py-6 text-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
         >
           Next
         </Button>
