@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { AddLicenseModal, type LicenseData } from "./add-license-modal";
-import { Trash2, AlertTriangle } from "lucide-react";
+import { Trash2, AlertTriangle, Pencil } from "lucide-react";
 
 interface LicensesStepProps {
   onNext: () => void;
@@ -23,8 +23,16 @@ export function LicensesStep({ onNext }: LicensesStepProps) {
     localStorage.setItem("onboarding_licenses", JSON.stringify(licenses));
   }, [licenses]);
 
-  const handleAddLicense = (newLicense: LicenseData) => {
-    setLicenses((prev) => [...prev, newLicense]);
+  const [editingLicense, setEditingLicense] = useState<LicenseData | null>(null);
+
+  const handleSaveLicense = (newLicense: LicenseData) => {
+    setLicenses((prev) => {
+      if (editingLicense) {
+        return prev.map(l => l.id === newLicense.id ? newLicense : l);
+      }
+      return [...prev, newLicense];
+    });
+    setEditingLicense(null);
   };
 
   const handleDeleteLicense = (id: string) => {
@@ -48,7 +56,7 @@ export function LicensesStep({ onNext }: LicensesStepProps) {
           <Button 
             variant="outline" 
             className="text-blue-500 border-blue-500 hover:bg-blue-50 hover:text-blue-600 rounded-full px-6"
-            onClick={() => setIsModalOpen(true)}
+            onClick={() => { setEditingLicense(null); setIsModalOpen(true); }}
           >
             New License
           </Button>
@@ -82,12 +90,20 @@ export function LicensesStep({ onNext }: LicensesStepProps) {
                   )}
                   <div className="flex justify-between items-end mt-1">
                     <span className="text-xs text-gray-500 pr-8">{license.licenseName}</span>
-                    <button 
-                      onClick={() => handleDeleteLicense(license.id)}
-                      className="text-red-500 hover:text-red-700 transition-colors"
-                    >
-                      <Trash2 className="w-5 h-5" />
-                    </button>
+                    <div className="flex gap-2">
+                      <button 
+                        onClick={() => { setEditingLicense(license); setIsModalOpen(true); }}
+                        className="text-blue-500 hover:text-blue-700 transition-colors"
+                      >
+                        <Pencil className="w-5 h-5" />
+                      </button>
+                      <button 
+                        onClick={() => handleDeleteLicense(license.id)}
+                        className="text-red-500 hover:text-red-700 transition-colors"
+                      >
+                        <Trash2 className="w-5 h-5" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               );
@@ -107,9 +123,11 @@ export function LicensesStep({ onNext }: LicensesStepProps) {
       </div>
 
       <AddLicenseModal 
+        key={editingLicense?.id || 'new'}
         open={isModalOpen} 
-        onOpenChange={setIsModalOpen}
-        onAddLicense={handleAddLicense}
+        onOpenChange={(open) => { setIsModalOpen(open); if (!open) setEditingLicense(null); }}
+        onAddLicense={handleSaveLicense}
+        editingLicense={editingLicense}
       />
     </div>
   );

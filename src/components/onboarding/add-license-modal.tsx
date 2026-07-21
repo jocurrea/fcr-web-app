@@ -31,9 +31,10 @@ interface AddLicenseModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onAddLicense: (license: LicenseData) => void;
+  editingLicense?: LicenseData | null;
 }
 
-export function AddLicenseModal({ open, onOpenChange, onAddLicense }: AddLicenseModalProps) {
+export function AddLicenseModal({ open, onOpenChange, onAddLicense, editingLicense }: AddLicenseModalProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [frontImagePreview, setFrontImagePreview] = useState<string | null>(null);
   const frontFileInputRef = useRef<HTMLInputElement>(null);
@@ -75,6 +76,13 @@ export function AddLicenseModal({ open, onOpenChange, onAddLicense }: AddLicense
 
   const [isPermanent, setIsPermanent] = useState(false);
 
+  // Derive initial values
+  const defaultLicenseVal = editingLicense ? editingLicense.licenseName.split(' - ')[0].toLowerCase() : "";
+  const defaultLicenseNumber = editingLicense ? editingLicense.licenseNumber : "";
+  const defaultExpiryDateRaw = editingLicense && editingLicense.expiryDateRaw !== "Permanent" && editingLicense.expiryDateRaw !== "N/A" 
+    ? editingLicense.expiryDateRaw 
+    : "";
+
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsLoading(true);
@@ -97,7 +105,7 @@ export function AddLicenseModal({ open, onOpenChange, onAddLicense }: AddLicense
     setTimeout(() => {
       setIsLoading(false);
       onAddLicense({
-        id: Math.random().toString(36).substring(7),
+        id: editingLicense ? editingLicense.id : Math.random().toString(36).substring(7),
         licenseName: licenseVal.toUpperCase() + " - License",
         licenseNumber,
         expiryDate: formattedExpiry,
@@ -115,16 +123,16 @@ export function AddLicenseModal({ open, onOpenChange, onAddLicense }: AddLicense
       <DialogContent className="sm:max-w-[425px] p-0 overflow-hidden bg-white">
         <DialogHeader className="px-4 py-4 border-b flex flex-row items-center justify-center relative">
           <DialogTitle className="text-xl font-bold text-center w-full">
-            New license
+            {editingLicense ? "Edit license" : "New license"}
           </DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="flex flex-col max-h-[80vh]">
+        <form key={editingLicense?.id || 'new'} onSubmit={handleSubmit} className="flex flex-col max-h-[80vh]">
           <div className="p-4 overflow-y-auto flex-1 space-y-6">
             
             <div className="space-y-2">
               <Label>License</Label>
-              <Select name="licenseVal">
+              <Select name="licenseVal" defaultValue={defaultLicenseVal || undefined}>
                 <SelectTrigger className="w-full rounded-2xl py-6">
                   <SelectValue placeholder="Select an Item" />
                 </SelectTrigger>
@@ -165,6 +173,7 @@ export function AddLicenseModal({ open, onOpenChange, onAddLicense }: AddLicense
               <Input 
                 name="licenseNumber" 
                 placeholder="1202193010" 
+                defaultValue={defaultLicenseNumber}
                 className="rounded-2xl py-6" 
                 required 
                 onInput={(e) => {
@@ -179,6 +188,7 @@ export function AddLicenseModal({ open, onOpenChange, onAddLicense }: AddLicense
                 <Input 
                   name="expiryDate" 
                   type="date" 
+                  defaultValue={defaultExpiryDateRaw}
                   className="rounded-2xl py-6 disabled:opacity-50" 
                   required={!isPermanent}
                   disabled={isPermanent}
@@ -189,7 +199,7 @@ export function AddLicenseModal({ open, onOpenChange, onAddLicense }: AddLicense
                   type="checkbox" 
                   id="isPermanent"
                   className="mt-1 w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-600"
-                  checked={isPermanent}
+                  defaultChecked={editingLicense?.expiryDateRaw === "Permanent"}
                   onChange={(e) => setIsPermanent(e.target.checked)}
                 />
                 <Label htmlFor="isPermanent" className="text-sm text-gray-600 leading-tight cursor-pointer">
@@ -281,13 +291,8 @@ export function AddLicenseModal({ open, onOpenChange, onAddLicense }: AddLicense
               disabled={isLoading}
               className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-full py-6 text-lg font-semibold flex items-center justify-center gap-2"
             >
-              {isLoading ? (
-                <>
-                  <Loader2 className="h-6 w-6 animate-spin text-blue-200" />
-                </>
-              ) : (
-                "Add License"
-              )}
+              {isLoading && <Loader2 className="h-6 w-6 animate-spin text-blue-200" />}
+              {editingLicense ? "Save Changes" : "Add License"}
             </Button>
           </div>
         </form>
