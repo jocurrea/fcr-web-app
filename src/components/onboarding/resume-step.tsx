@@ -172,7 +172,7 @@ export function ResumeStep({ onNext }: ResumeStepProps) {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
-        window.location.href = "/home";
+        window.location.assign("/home");
         return;
       }
 
@@ -218,24 +218,26 @@ export function ResumeStep({ onNext }: ResumeStepProps) {
         })
       ]);
 
-      // Log results without blocking
       console.log('[ResumeStep] Profile save:', profileResult);
       console.log('[ResumeStep] User save:', userResult);
       console.log('[ResumeStep] Auth metadata:', authResult);
 
-      // Refresh session token so user_metadata is current
-      await supabase.auth.refreshSession().catch(e => console.error('refresh error:', e));
+      // DO NOT AWAIT THIS. If it hangs, we still want to redirect.
+      supabase.auth.refreshSession().catch(e => console.error('refresh error:', e));
 
     } catch (err: any) {
-      // Log but DO NOT stop — always redirect to home
       console.error("[ResumeStep] DB save error (non-blocking):", err);
     } finally {
-      // ALWAYS set cookie + sessionStorage and redirect — no DB error can stop this
-      document.cookie = "flightcrew_onboarded=true; path=/; max-age=31536000";
-      sessionStorage.setItem("flightcrew_onboarded", "true");
+      // Wrap in try-catch in case private mode throws on storage
+      try {
+        document.cookie = "flightcrew_onboarded=true; path=/; max-age=31536000";
+        sessionStorage.setItem("flightcrew_onboarded", "true");
+      } catch (e) {
+        console.error("Storage error:", e);
+      }
+      
       setIsSaving(false);
-      // Go through /onboarding-complete which sets signals before /home loads
-      window.location.href = "/onboarding-complete";
+      window.location.assign("/onboarding-complete");
     }
   };
 
