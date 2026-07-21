@@ -63,7 +63,7 @@ export default function OnboardingPage() {
 
       if (!isMounted) return;
 
-      if (onboarded) {
+      if (onboarded && !window.location.search.includes("edit=true")) {
         router.replace("/home");
         return;
       }

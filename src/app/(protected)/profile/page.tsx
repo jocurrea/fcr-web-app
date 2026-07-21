@@ -258,7 +258,7 @@ export default function ProfilePage() {
             )}
           </div>
           {/* Edit Icon */}
-          <Link href="/onboarding" className="absolute bottom-1 right-1 w-9 h-9 bg-white border border-gray-200 rounded-full flex items-center justify-center shadow-md text-blue-600 hover:bg-gray-50 transition-colors cursor-pointer z-20">
+          <Link href="/onboarding?edit=true" className="absolute bottom-1 right-1 w-9 h-9 bg-white border border-gray-200 rounded-full flex items-center justify-center shadow-md text-blue-600 hover:bg-gray-50 transition-colors cursor-pointer z-20">
             <Pencil className="w-[16px] h-[16px]" />
           </Link>
         </div>
