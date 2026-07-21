@@ -172,7 +172,7 @@ export function ResumeStep({ onNext }: ResumeStepProps) {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
-        window.location.assign("/home");
+        router.push("/home");
         return;
       }
 
@@ -193,8 +193,8 @@ export function ResumeStep({ onNext }: ResumeStepProps) {
         resume: resumeRaw ? JSON.parse(resumeRaw) : {},
       };
 
-      // Save to DB — use Promise.allSettled so failures don't block the redirect
-      const [profileResult, userResult, authResult] = await Promise.allSettled([
+      // Fire and forget DB saves — DO NOT AWAIT so we never hang the UI
+      Promise.allSettled([
         supabase.from('profiles').upsert({
           id: session.user.id,
           first_name: personalData?.firstName || "Unknown",
@@ -216,28 +216,29 @@ export function ResumeStep({ onNext }: ResumeStepProps) {
             crew_data_saved: true
           }
         })
-      ]);
+      ]).then(([profileResult, userResult, authResult]) => {
+        console.log('[ResumeStep] Profile save:', profileResult);
+        console.log('[ResumeStep] User save:', userResult);
+        console.log('[ResumeStep] Auth metadata:', authResult);
+      });
 
-      console.log('[ResumeStep] Profile save:', profileResult);
-      console.log('[ResumeStep] User save:', userResult);
-      console.log('[ResumeStep] Auth metadata:', authResult);
-
-      // DO NOT AWAIT THIS. If it hangs, we still want to redirect.
+      // DO NOT AWAIT THIS.
       supabase.auth.refreshSession().catch(e => console.error('refresh error:', e));
 
     } catch (err: any) {
-      console.error("[ResumeStep] DB save error (non-blocking):", err);
+      console.error("[ResumeStep] Sync error:", err);
     } finally {
       // Wrap in try-catch in case private mode throws on storage
       try {
         document.cookie = "flightcrew_onboarded=true; path=/; max-age=31536000";
         sessionStorage.setItem("flightcrew_onboarded", "true");
+        localStorage.setItem("flightcrew_onboarded", "true"); // add local storage too!
       } catch (e) {
         console.error("Storage error:", e);
       }
       
       setIsSaving(false);
-      window.location.assign("/onboarding-complete");
+      router.push("/onboarding-complete");
     }
   };
 

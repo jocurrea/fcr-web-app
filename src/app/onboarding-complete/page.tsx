@@ -12,11 +12,15 @@ export default function OnboardingCompletePage() {
   const router = useRouter();
 
   useEffect(() => {
-    // Set the cookie on this page as well (belt and suspenders)
-    document.cookie = "flightcrew_onboarded=true; path=/; max-age=31536000";
-    
-    // Also set in sessionStorage as another fallback
-    sessionStorage.setItem("flightcrew_onboarded", "true");
+    try {
+      // Set the cookie on this page as well (belt and suspenders)
+      document.cookie = "flightcrew_onboarded=true; path=/; max-age=31536000";
+      
+      // Also set in sessionStorage as another fallback
+      sessionStorage.setItem("flightcrew_onboarded", "true");
+    } catch (e) {
+      console.error("Storage error in onboarding-complete:", e);
+    }
     
     // Use replace so they can't go back to this page
     router.replace("/home");
