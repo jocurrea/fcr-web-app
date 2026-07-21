@@ -194,15 +194,15 @@ export function AddLicenseModal({ open, onOpenChange, onAddLicense, editingLicen
                   disabled={isPermanent}
                 />
               </div>
-              <div className="flex items-start space-x-2">
+              <div className="flex items-center gap-3 bg-gray-50 p-4 rounded-xl border border-gray-100">
                 <input 
                   type="checkbox" 
                   id="isPermanent"
-                  className="mt-1 w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-600"
+                  className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-600 cursor-pointer flex-shrink-0"
                   defaultChecked={editingLicense?.expiryDateRaw === "Permanent"}
                   onChange={(e) => setIsPermanent(e.target.checked)}
                 />
-                <Label htmlFor="isPermanent" className="text-sm text-gray-600 leading-tight cursor-pointer">
+                <Label htmlFor="isPermanent" className="text-sm text-gray-700 leading-snug cursor-pointer font-medium select-none">
                   This license is Permanent / FAA Medical Exception (No Expiry)
                 </Label>
               </div>
