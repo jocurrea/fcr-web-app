@@ -45,7 +45,14 @@ export function ProtectedHeader() {
           accounttype = 'flight_crew';
           // Still load the profile photo in background
           supabase.from('profiles').select('avatar_url').eq('id', session.user.id).maybeSingle()
-            .then(({ data }) => { if (data?.avatar_url) setProfilePhoto(data.avatar_url); });
+            .then(({ data }) => { 
+              if (data?.avatar_url) {
+                setProfilePhoto(data.avatar_url); 
+              } else {
+                const savedPhoto = localStorage.getItem("userProfilePhoto");
+                if (savedPhoto) setProfilePhoto(savedPhoto);
+              }
+            });
           // No need for redirect checks — user is onboarded
           return;
         }
