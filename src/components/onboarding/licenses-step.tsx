@@ -67,17 +67,17 @@ export function LicensesStep({ onNext }: LicensesStepProps) {
                 <div key={license.id} className="border rounded-2xl p-4 flex flex-col relative bg-white shadow-sm">
                   <div className="flex justify-between items-start mb-2">
                     <span className="font-semibold text-gray-900">{license.licenseNumber}</span>
-                    <span className={`text-sm font-medium ${expired ? 'text-amber-500 flex items-center gap-1' : 'text-gray-700'}`}>
-                      {expired && <AlertTriangle className="w-3 h-3" />}
+                    <span className={`text-sm font-medium ${expired ? 'text-yellow-500 flex items-center gap-1' : 'text-gray-700'}`}>
+                      {expired && <AlertTriangle className="w-4 h-4 text-yellow-500" />}
                       {license.expiryDate}
                     </span>
                   </div>
                   {expired && (
-                    <div className="text-[10px] text-amber-600 font-medium mb-1">
+                    <div className="text-xs text-yellow-600 font-medium mb-1 mt-1">
                       Warning: License has expired. Please update it soon.
                     </div>
                   )}
-                  <div className="flex justify-between items-end">
+                  <div className="flex justify-between items-end mt-1">
                     <span className="text-xs text-gray-500 pr-8">{license.licenseName}</span>
                     <button 
                       onClick={() => handleDeleteLicense(license.id)}
