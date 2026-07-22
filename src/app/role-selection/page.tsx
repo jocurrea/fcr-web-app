@@ -92,10 +92,10 @@ export default function RoleSelectionPage() {
           return;
         }
 
-        if (accountType === "flight_crew") {
-          router.replace("/onboarding");
-          return;
-        }
+        // We DO NOT auto-redirect to /onboarding for flight_crew here, 
+        // because the database trigger might set accountType = 'flight_crew' by default, 
+        // which causes the role-selection page to be completely skipped for new users.
+        // Let the user click it themselves.
 
         setIsCheckingAccess(false);
         return;
