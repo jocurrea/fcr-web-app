@@ -42,8 +42,6 @@ export default function LoginPage() {
           router.push("/home");
         } else if (userRecord?.accountType === "business") {
           router.push("/onboarding-business");
-        } else if (userRecord?.accountType === "flight_crew") {
-          router.push("/onboarding");
         } else {
           router.push("/role-selection");
         }

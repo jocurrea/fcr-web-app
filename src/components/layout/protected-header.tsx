@@ -141,11 +141,7 @@ export function ProtectedHeader() {
             return;
           }
 
-          if (accountType === 'flight_crew') {
-            router.push("/onboarding");
-            return;
-          }
-
+          // Let the user choose if not onboarded, even if DB says flight_crew by default
           router.push("/role-selection");
         }
       } catch (e) {
