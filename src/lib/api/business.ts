@@ -310,6 +310,7 @@ export async function saveCompanyProfile(profile: CompanyProfileInput): Promise<
       .from("companies")
       .update({
         name: profile.companyName.trim(),
+        slug: profile.companyName.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, ''),
         description: normalizeOptionalText(profile.description),
         contact_email: profile.email.trim(),
         phone: normalizeOptionalText(profile.phone),
