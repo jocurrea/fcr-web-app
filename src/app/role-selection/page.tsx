@@ -116,6 +116,13 @@ export default function RoleSelectionPage() {
     setError(null);
 
     if (selectedType === "flight_crew") {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        // Reset accountType to flight_crew just in case they previously clicked Business
+        await supabase.auth.updateUser({ data: { accountType: "flight_crew" } });
+        await supabase.from("users").update({ accountType: "flight_crew" }).eq("id", user.id);
+      }
+      
       router.push("/onboarding");
       return;
     }
