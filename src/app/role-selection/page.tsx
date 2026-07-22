@@ -78,19 +78,8 @@ export default function RoleSelectionPage() {
       if (!isMounted) return;
 
       if (!onboarded) {
-        if (accountType === "business") {
-          const response = await ensureBusinessDraft();
-          if (!isMounted) return;
-
-          if (!response.success) {
-            setError(response.error);
-            setIsCheckingAccess(false);
-            return;
-          }
-
-          router.replace("/onboarding-business");
-          return;
-        }
+        // We DO NOT auto-redirect to /onboarding-business or /onboarding here.
+        // Let the user click it themselves so they can go back if they want.
 
         // We DO NOT auto-redirect to /onboarding for flight_crew here, 
         // because the database trigger might set accountType = 'flight_crew' by default, 
