@@ -44,10 +44,10 @@ export function ProtectedHeader() {
           onboarded = true;
           accountType = 'flight_crew';
           // Still load the profile photo in background
-          supabase.from('profiles').select('avatar_url').eq('id', session.user.id).maybeSingle()
+          supabase.from('users').select('profileImage').eq('id', session.user.id).maybeSingle()
             .then(({ data }) => { 
-              if (data?.avatar_url) {
-                setProfilePhoto(data.avatar_url); 
+              if (data?.profileImage) {
+                setProfilePhoto(data.profileImage); 
               } else {
                 const savedPhoto = localStorage.getItem("userProfilePhoto");
                 if (savedPhoto) setProfilePhoto(savedPhoto);
@@ -63,29 +63,22 @@ export function ProtectedHeader() {
         try {
           const { data: userRecord } = await supabase
             .from('users')
-            .select('onboarded, accountType')
+            .select('onboarded, accountType, profileImage')
             .eq('id', session.user.id)
             .maybeSingle();
             
           if (userRecord) {
             onboarded = !!userRecord.onboarded;
             accountType = userRecord.accountType || '';
-          }
-
-          const { data: profileRecord } = await supabase
-            .from('profiles')
-            .select('avatar_url')
-            .eq('id', session.user.id)
-            .maybeSingle();
-
-          if (profileRecord?.avatar_url) {
-            setProfilePhoto(profileRecord.avatar_url);
-          } else {
-            const savedPhoto = localStorage.getItem("userProfilePhoto");
-            if (savedPhoto) setProfilePhoto(savedPhoto);
+            if (userRecord.profileImage) {
+              setProfilePhoto(userRecord.profileImage);
+            } else {
+              const savedPhoto = localStorage.getItem("userProfilePhoto");
+              if (savedPhoto) setProfilePhoto(savedPhoto);
+            }
           }
         } catch (e) {
-          console.error("Failed to fetch from users/profiles", e);
+          console.error("Failed to fetch from users", e);
         }
 
         // Fallback: If the database trigger failed to create the users row, check if they have a company
@@ -115,15 +108,15 @@ export function ProtectedHeader() {
           setProfilePhoto(companyLogo);
         }
 
-        // Check profiles table for crew_data (proves they finished flight crew)
+        // Check resumes table for data (proves they finished flight crew)
         if (!onboarded) {
-          const { data: profileFallback } = await supabase
-            .from('profiles')
-            .select('crew_data')
-            .eq('id', session.user.id)
+          const { data: resumeFallback } = await supabase
+            .from('resumes')
+            .select('data')
+            .eq('userId', session.user.id)
             .maybeSingle();
 
-          if (profileFallback?.crew_data) {
+          if (resumeFallback?.data) {
             accountType = 'flight_crew';
             onboarded = true;
           }

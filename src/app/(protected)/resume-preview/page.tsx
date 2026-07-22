@@ -17,20 +17,20 @@ export default function ResumePreviewPage() {
       let loadedFromDb = false;
 
       if (session?.user) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('avatar_url, crew_data')
-          .eq('id', session.user.id)
-          .single();
+        const [userRes, resumeRes] = await Promise.all([
+          supabase.from('users').select('profileImage').eq('id', session.user.id).single(),
+          supabase.from('resumes').select('data').eq('userId', session.user.id).single()
+        ]);
 
-        if (profile) {
-          if (profile.avatar_url) setProfilePhoto(profile.avatar_url);
-          if (profile.crew_data) {
-            loadedFromDb = true;
-            const crewData = profile.crew_data as any;
-            if (crewData.personal) setPersonal(crewData.personal);
-            if (crewData.resume) setResume(crewData.resume);
-          }
+        const profileImage = userRes.data?.profileImage || null;
+        const crewData = resumeRes.data?.data || null;
+
+        if (profileImage) setProfilePhoto(profileImage);
+        
+        if (crewData) {
+          loadedFromDb = true;
+          if (crewData.personal) setPersonal(crewData.personal);
+          if (crewData.resume) setResume(crewData.resume);
         }
       }
 

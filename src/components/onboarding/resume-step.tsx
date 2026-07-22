@@ -195,16 +195,16 @@ export function ResumeStep({ onNext }: ResumeStepProps) {
 
       // Fire and forget DB saves — DO NOT AWAIT so we never hang the UI
       Promise.allSettled([
-        supabase.from('profiles').upsert({
-          id: session.user.id,
-          first_name: personalData?.firstName || "Unknown",
-          last_name: personalData?.lastName || "",
-          avatar_url: avatarPhoto || null,
-          crew_data: crewData
-        }, { onConflict: 'id' }),
+        supabase.from('resumes').upsert({
+          userId: session.user.id,
+          data: crewData
+        }, { onConflict: 'userId' }),
 
         supabase.from('users').upsert({
           id: session.user.id,
+          firstName: personalData?.firstName || "Unknown",
+          lastName: personalData?.lastName || "",
+          profileImage: avatarPhoto || null,
           onboarded: 1,
           accountType: 'flight_crew'
         }, { onConflict: 'id' }),

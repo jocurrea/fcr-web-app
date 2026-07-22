@@ -153,17 +153,17 @@ export function PersonalInfoForm({ onNext }: PersonalInfoFormProps) {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
 
-      const { data: profile } = await supabase
-        .from('profiles')
+      const { data: userRecord } = await supabase
+        .from('users')
         .select('*')
         .eq('id', session.user.id)
         .single();
 
-      if (profile) {
-        if (profile.first_name) setFirstName(profile.first_name);
-        if (profile.middle_name) setMiddleName(profile.middle_name);
-        if (profile.last_name) setLastName(profile.last_name);
-        if (profile.avatar_url) setPhotoPreview(profile.avatar_url);
+      if (userRecord) {
+        if (userRecord.firstName) setFirstName(userRecord.firstName);
+        if (userRecord.middleName) setMiddleName(userRecord.middleName);
+        if (userRecord.lastName) setLastName(userRecord.lastName);
+        if (userRecord.profileImage) setPhotoPreview(userRecord.profileImage);
         // Add more mapping if needed
       }
     }

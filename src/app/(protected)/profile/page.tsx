@@ -33,42 +33,41 @@ export default function ProfilePage() {
         if (session?.user) {
           setUserPosts(allPosts.filter(p => p.user_id === session.user.id));
 
-          // Fetch user profile data (crew_data)
-          const { data: profileData, error: profileError } = await supabase
-            .from('profiles')
-            .select('avatar_url, crew_data')
-            .eq('id', session.user.id)
-            .single();
+          // Fetch user profile data (crew_data) from resumes and users
+          const [userRes, resumeRes] = await Promise.all([
+            supabase.from('users').select('profileImage').eq('id', session.user.id).single(),
+            supabase.from('resumes').select('data').eq('userId', session.user.id).single()
+          ]);
 
-          if (profileData) {
-            setProfilePhoto(profileData.avatar_url || localStorage.getItem("userProfilePhoto"));
-            
-            if (profileData.crew_data) {
-              const crewData = profileData.crew_data as any;
-              if (crewData.personal) setPersonal(crewData.personal);
-              if (crewData.licenses) setLicenses(crewData.licenses);
-              if (crewData.ratings) setRatings(crewData.ratings);
-              if (crewData.work) setWork(crewData.work);
-              if (crewData.resume) {
-                setResume(crewData.resume);
-                if (crewData.resume.languages) setLanguages(crewData.resume.languages);
-              }
-            } else {
-              // Fallback for older sessions that didn't save to Supabase yet
-              const savedPersonal = localStorage.getItem("onboarding_personal");
-              if (savedPersonal) setPersonal(JSON.parse(savedPersonal));
-              const savedLicenses = localStorage.getItem("onboarding_licenses");
-              if (savedLicenses) setLicenses(JSON.parse(savedLicenses));
-              const savedRatings = localStorage.getItem("onboarding_ratings");
-              if (savedRatings) setRatings(JSON.parse(savedRatings));
-              const savedWork = localStorage.getItem("onboarding_work");
-              if (savedWork) setWork(JSON.parse(savedWork));
-              const savedResume = localStorage.getItem("onboarding_resume");
-              if (savedResume) {
-                const parsedResume = JSON.parse(savedResume);
-                setResume(parsedResume);
-                if (parsedResume.languages) setLanguages(parsedResume.languages);
-              }
+          const profileImage = userRes.data?.profileImage || null;
+          const crewData = resumeRes.data?.data || null;
+
+          setProfilePhoto(profileImage || localStorage.getItem("userProfilePhoto"));
+          
+          if (crewData) {
+            if (crewData.personal) setPersonal(crewData.personal);
+            if (crewData.licenses) setLicenses(crewData.licenses);
+            if (crewData.ratings) setRatings(crewData.ratings);
+            if (crewData.work) setWork(crewData.work);
+            if (crewData.resume) {
+              setResume(crewData.resume);
+              if (crewData.resume.languages) setLanguages(crewData.resume.languages);
+            }
+          } else {
+            // Fallback for older sessions that didn't save to Supabase yet
+            const savedPersonal = localStorage.getItem("onboarding_personal");
+            if (savedPersonal) setPersonal(JSON.parse(savedPersonal));
+            const savedLicenses = localStorage.getItem("onboarding_licenses");
+            if (savedLicenses) setLicenses(JSON.parse(savedLicenses));
+            const savedRatings = localStorage.getItem("onboarding_ratings");
+            if (savedRatings) setRatings(JSON.parse(savedRatings));
+            const savedWork = localStorage.getItem("onboarding_work");
+            if (savedWork) setWork(JSON.parse(savedWork));
+            const savedResume = localStorage.getItem("onboarding_resume");
+            if (savedResume) {
+              const parsedResume = JSON.parse(savedResume);
+              setResume(parsedResume);
+              if (parsedResume.languages) setLanguages(parsedResume.languages);
             }
           }
 
@@ -86,7 +85,7 @@ export default function ProfilePage() {
 
           if (companies && companies.length > 0) {
             setIsBusiness(true);
-            const companyLogo = companies[0].logo_url || profileData?.avatar_url || localStorage.getItem("userProfilePhoto");
+            const companyLogo = companies[0].logo_url || profileImage || localStorage.getItem("userProfilePhoto");
             setCompanyInfo({
               name: companies[0].name,
               status: companies[0].status,
@@ -95,7 +94,7 @@ export default function ProfilePage() {
             if (companyLogo) {
               setProfilePhoto(companyLogo);
             }
-          } else if (!profileData?.avatar_url) {
+          } else if (!profileImage) {
             const savedPhoto = localStorage.getItem("userProfilePhoto");
             if (savedPhoto) setProfilePhoto(savedPhoto);
           }

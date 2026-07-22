@@ -44,13 +44,13 @@ export default function OnboardingPage() {
 
       // Fallback for Flight Crew if database trigger failed
       if (!onboarded || accountType === 'flight_crew') {
-        const { data: profileFallback } = await supabase
-          .from('profiles')
-          .select('crew_data')
-          .eq('id', session.user.id)
+        const { data: resumeFallback } = await supabase
+          .from('resumes')
+          .select('data')
+          .eq('userId', session.user.id)
           .maybeSingle();
 
-        if (profileFallback?.crew_data) {
+        if (resumeFallback?.data) {
           accountType = 'flight_crew';
           onboarded = true;
         } else if (session.user.user_metadata?.onboarded === true && session.user.user_metadata?.accountType === 'flight_crew') {

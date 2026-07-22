@@ -36,24 +36,17 @@ function NewPostContent() {
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
         let avatarFetched = false;
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('first_name, last_name, avatar_url, crew_data')
+        const { data: userRecord } = await supabase
+          .from('users')
+          .select('firstName, middleName, lastName, profileImage')
           .eq('id', session.user.id)
           .single();
           
-        if (profile) {
-          const crewData = profile.crew_data as any;
-          if (crewData?.personal) {
-            const p = crewData.personal;
-            const fullName = `${p.firstName || ""} ${p.middleName || ""} ${p.lastName || ""}`.trim().replace(/\s+/g, ' ');
-            setUserName(fullName || "Pilot User");
-          } else {
-            const fullName = `${profile.first_name || ""} ${profile.last_name || ""}`.trim();
-            setUserName(fullName || "Pilot User");
-          }
-          if (profile.avatar_url) {
-            setUserAvatar(profile.avatar_url);
+        if (userRecord) {
+          const fullName = `${userRecord.firstName || ""} ${userRecord.middleName || ""} ${userRecord.lastName || ""}`.trim().replace(/\s+/g, ' ');
+          setUserName(fullName || "Pilot User");
+          if (userRecord.profileImage) {
+            setUserAvatar(userRecord.profileImage);
             avatarFetched = true;
           }
         }
