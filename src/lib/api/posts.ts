@@ -4,10 +4,10 @@ const DEFAULT_AVATAR = 'https://api.dicebear.com/7.x/shapes/svg?seed=user';
 
 const USER_IDENTITY_SELECT = `
   id,
-  first_name,
-  middle_name,
-  last_name,
-  avatar_url
+  firstName,
+  middleName,
+  lastName,
+  profileImage
 `;
 
 function formatDate(value: string) {
@@ -15,11 +15,11 @@ function formatDate(value: string) {
 }
 
 function getUserName(user: any) {
-  return [user?.first_name, user?.middle_name, user?.last_name].filter(Boolean).join(' ').trim() || 'User';
+  return [user?.firstName, user?.middleName, user?.lastName].filter(Boolean).join(' ').trim() || 'User';
 }
 
 function getUserAvatar(user: any) {
-  return user?.avatar_url || DEFAULT_AVATAR;
+  return user?.profileImage || DEFAULT_AVATAR;
 }
 
 // Types
@@ -59,20 +59,20 @@ export async function fetchPosts(frequencyId?: string): Promise<Post[]> {
     .select(`
       id,
       created_at,
-      user_id,
-      frequency_id,
-      text,
-      image,
-      user:user_id ( ${USER_IDENTITY_SELECT} ),
-      postLikes:post_likes ( id, user_id ),
-      comments:post_comments ( id )
+      userId,
+      groupId,
+      body,
+      file,
+      user:users ( ${USER_IDENTITY_SELECT} ),
+      postLikes ( id, userId ),
+      comments ( id )
     `)
     .order('created_at', { ascending: false });
 
   if (frequencyId) {
-    query = query.eq('frequency_id', frequencyId);
+    query = query.eq('groupId', frequencyId);
   } else {
-    query = query.is('frequency_id', null);
+    query = query.is('groupId', null);
   }
 
   const { data, error } = await query;
@@ -86,7 +86,7 @@ export async function fetchPosts(frequencyId?: string): Promise<Post[]> {
   const currentUserId = userData?.user?.id;
 
   // Fetch companies to get business logos and names since there is no FK
-  const authorIds = Array.from(new Set(data.map((p: any) => p.user_id)));
+  const authorIds = Array.from(new Set(data.map((p: any) => p.userId)));
   let companiesMap: Record<string, { name: string, logo_url: string }> = {};
   if (authorIds.length > 0) {
     const { data: companies } = await supabase
@@ -97,29 +97,29 @@ export async function fetchPosts(frequencyId?: string): Promise<Post[]> {
     if (companies) {
       companies.forEach(company => {
         companiesMap[company.owner_user_id] = {
-          name: company.name,
-          logo_url: company.logo_url
+          name: company.name || '',
+          logo_url: company.logo_url || ''
         };
       });
     }
   }
 
   return data.map((post: any) => {
-    const company = companiesMap[post.user_id];
+    const company = companiesMap[post.userId];
     return {
       id: post.id,
       created_at: formatDate(post.created_at),
-      user_id: post.user_id,
-      frequency_id: post.frequency_id,
-      text: post.text || '',
-      image: post.image || null,
+      user_id: post.userId,
+      frequency_id: post.groupId,
+      text: post.body || '',
+      image: post.file || null,
       author: {
         name: company?.name || getUserName(post.user),
         avatar: company?.logo_url || getUserAvatar(post.user),
       },
       likes: post.postLikes?.length || 0,
       comments: post.comments?.length || 0,
-      liked: post.postLikes?.some((like: any) => like.user_id === currentUserId) || false,
+      liked: post.postLikes?.some((like: any) => like.userId === currentUserId) || false,
     };
   });
 }

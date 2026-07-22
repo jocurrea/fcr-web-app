@@ -29,21 +29,21 @@ export default function OnboardingPage() {
       }
 
       let onboarded = false;
-      let accounttype = '';
+      let accountType = '';
 
       const { data: userRecord } = await supabase
         .from("users")
-        .select("onboarded, accounttype")
+        .select("onboarded, accountType")
         .eq("id", session.user.id)
         .maybeSingle();
 
       if (userRecord) {
         onboarded = !!userRecord.onboarded;
-        accounttype = userRecord.accounttype || '';
+        accountType = userRecord.accountType || '';
       }
 
       // Fallback for Flight Crew if database trigger failed
-      if (!onboarded || accounttype === 'flight_crew') {
+      if (!onboarded || accountType === 'flight_crew') {
         const { data: profileFallback } = await supabase
           .from('profiles')
           .select('crew_data')
@@ -51,10 +51,10 @@ export default function OnboardingPage() {
           .maybeSingle();
 
         if (profileFallback?.crew_data) {
-          accounttype = 'flight_crew';
+          accountType = 'flight_crew';
           onboarded = true;
-        } else if (session.user.user_metadata?.onboarded === true && session.user.user_metadata?.accounttype === 'flight_crew') {
-          accounttype = 'flight_crew';
+        } else if (session.user.user_metadata?.onboarded === true && session.user.user_metadata?.accountType === 'flight_crew') {
+          accountType = 'flight_crew';
           onboarded = true;
         }
         // NOTE: Do NOT check localStorage here — having onboarding_personal means
@@ -68,7 +68,7 @@ export default function OnboardingPage() {
         return;
       }
 
-      if (accounttype === "business") {
+      if (accountType === "business") {
         router.replace("/onboarding-business");
         return;
       }

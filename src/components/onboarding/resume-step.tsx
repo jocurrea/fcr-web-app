@@ -206,13 +206,13 @@ export function ResumeStep({ onNext }: ResumeStepProps) {
         supabase.from('users').upsert({
           id: session.user.id,
           onboarded: 1,
-          accounttype: 'flight_crew'
+          accountType: 'flight_crew'
         }, { onConflict: 'id' }),
 
         supabase.auth.updateUser({
           data: {
             onboarded: true,
-            accounttype: 'flight_crew',
+            accountType: 'flight_crew',
             crew_data_saved: true
           }
         })

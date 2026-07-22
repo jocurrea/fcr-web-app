@@ -28,17 +28,17 @@ export default function RoleSelectionPage() {
       }
 
       let onboarded = false;
-      let accounttype = '';
+      let accountType = '';
 
       const { data: userRecord } = await supabase
         .from("users")
-        .select("onboarded, accounttype")
+        .select("onboarded, accountType")
         .eq("id", session.user.id)
         .maybeSingle();
 
       if (userRecord) {
         onboarded = !!userRecord.onboarded;
-        accounttype = userRecord.accounttype || '';
+        accountType = userRecord.accountType || '';
       }
 
       // Fallback: If the database trigger failed to create the users row, check if they have a company
@@ -50,7 +50,7 @@ export default function RoleSelectionPage() {
         .limit(1);
 
       if (companies && companies.length > 0) {
-        accounttype = "business";
+        accountType = "business";
         const status = companies[0].status;
         if (status === "approved" || status === "pending") {
           onboarded = true;
@@ -58,7 +58,7 @@ export default function RoleSelectionPage() {
       }
 
       // Fallback for Flight Crew if database trigger failed
-      if (!onboarded || accounttype === 'flight_crew') {
+      if (!onboarded || accountType === 'flight_crew') {
         const { data: profileFallback } = await supabase
           .from('profiles')
           .select('crew_data')
@@ -66,10 +66,10 @@ export default function RoleSelectionPage() {
           .maybeSingle();
 
         if (profileFallback?.crew_data) {
-          accounttype = 'flight_crew';
+          accountType = 'flight_crew';
           onboarded = true;
-        } else if (session.user.user_metadata?.onboarded === true && session.user.user_metadata?.accounttype === 'flight_crew') {
-          accounttype = 'flight_crew';
+        } else if (session.user.user_metadata?.onboarded === true && session.user.user_metadata?.accountType === 'flight_crew') {
+          accountType = 'flight_crew';
           onboarded = true;
         }
         // Do NOT check localStorage/cookie here — they indicate mid-flow, not completed
@@ -78,7 +78,7 @@ export default function RoleSelectionPage() {
       if (!isMounted) return;
 
       if (!onboarded) {
-        if (accounttype === "business") {
+        if (accountType === "business") {
           const response = await ensureBusinessDraft();
           if (!isMounted) return;
 
@@ -92,7 +92,7 @@ export default function RoleSelectionPage() {
           return;
         }
 
-        if (accounttype === "flight_crew") {
+        if (accountType === "flight_crew") {
           router.replace("/onboarding");
           return;
         }
@@ -101,7 +101,7 @@ export default function RoleSelectionPage() {
         return;
       }
 
-      if (accounttype === "business") {
+      if (accountType === "business") {
         if (!isMounted) return;
 
         if (companies?.[0]?.status === "rejected" && isExplicitEdit) {

@@ -34,15 +34,15 @@ export default function LoginPage() {
         
         const { data: userRecord } = await supabase
           .from('users')
-          .select('onboarded, accounttype')
+          .select('onboarded, accountType')
           .eq('id', data.session.user.id)
           .single();
 
         if (userRecord?.onboarded) {
           router.push("/home");
-        } else if (userRecord?.accounttype === "business") {
+        } else if (userRecord?.accountType === "business") {
           router.push("/onboarding-business");
-        } else if (userRecord?.accounttype === "flight_crew") {
+        } else if (userRecord?.accountType === "flight_crew") {
           router.push("/onboarding");
         } else {
           router.push("/role-selection");

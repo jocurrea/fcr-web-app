@@ -26,14 +26,14 @@ export function ProtectedHeader() {
         }
 
         let onboarded = false;
-        let accounttype = '';
+        let accountType = '';
 
         // ============================================================
         // FAST PATH: Check client-side signals FIRST (no DB needed)
         // These are set by ResumeStep when user clicks Finish
         // ============================================================
         const hasCookie = typeof document !== 'undefined' && document.cookie.includes('flightcrew_onboarded=true');
-        const hasMetadata = session.user.user_metadata?.onboarded === true && session.user.user_metadata?.accounttype === 'flight_crew';
+        const hasMetadata = session.user.user_metadata?.onboarded === true && session.user.user_metadata?.accountType === 'flight_crew';
         const hasLocalStorageLegacy = typeof window !== 'undefined' && !!localStorage.getItem('onboarding_personal');
         const hasSessionStorage = typeof window !== 'undefined' && sessionStorage.getItem('flightcrew_onboarded') === 'true';
         const hasLocalStorageNew = typeof window !== 'undefined' && localStorage.getItem('flightcrew_onboarded') === 'true';
@@ -42,7 +42,7 @@ export function ProtectedHeader() {
 
         if (hasCookie || hasMetadata || hasSessionStorage || hasLocalStorageNew) {
           onboarded = true;
-          accounttype = 'flight_crew';
+          accountType = 'flight_crew';
           // Still load the profile photo in background
           supabase.from('profiles').select('avatar_url').eq('id', session.user.id).maybeSingle()
             .then(({ data }) => { 
@@ -63,13 +63,13 @@ export function ProtectedHeader() {
         try {
           const { data: userRecord } = await supabase
             .from('users')
-            .select('onboarded, accounttype')
+            .select('onboarded, accountType')
             .eq('id', session.user.id)
             .maybeSingle();
             
           if (userRecord) {
             onboarded = !!userRecord.onboarded;
-            accounttype = userRecord.accounttype || '';
+            accountType = userRecord.accountType || '';
           }
 
           const { data: profileRecord } = await supabase
@@ -91,7 +91,7 @@ export function ProtectedHeader() {
         // Fallback: If the database trigger failed to create the users row, check if they have a company
         // Also use this query to fetch the logo_url if they are a business
         let companyLogo = null;
-        if (!onboarded || accounttype === 'business') {
+        if (!onboarded || accountType === 'business') {
           const { data: companies } = await supabase
             .from('companies')
             .select('status, logo_url')
@@ -100,7 +100,7 @@ export function ProtectedHeader() {
             .limit(1);
 
           if (companies && companies.length > 0) {
-            accounttype = 'business';
+            accountType = 'business';
             const status = companies[0].status;
             if (status === 'approved' || status === 'pending') {
               onboarded = true;
@@ -124,7 +124,7 @@ export function ProtectedHeader() {
             .maybeSingle();
 
           if (profileFallback?.crew_data) {
-            accounttype = 'flight_crew';
+            accountType = 'flight_crew';
             onboarded = true;
           }
         }
@@ -132,10 +132,10 @@ export function ProtectedHeader() {
         // localStorage fallback: user filled step 1 but cookie wasn't set
         if (!onboarded && hasLocalStorageLegacy && (pathname === '/home' || pathname.startsWith('/home'))) {
           onboarded = true;
-          accounttype = 'flight_crew';
+          accountType = 'flight_crew';
         }
 
-        console.log('[ProtectedHeader] DB path result:', { onboarded, accounttype });
+        console.log('[ProtectedHeader] DB path result:', { onboarded, accountType });
 
         const isOnboardingRoute =
           pathname === '/role-selection' ||
@@ -143,12 +143,12 @@ export function ProtectedHeader() {
           pathname.startsWith('/onboarding-business');
 
         if (!onboarded && !isOnboardingRoute) {
-          if (accounttype === 'business') {
+          if (accountType === 'business') {
             router.push("/onboarding-business");
             return;
           }
 
-          if (accounttype === 'flight_crew') {
+          if (accountType === 'flight_crew') {
             router.push("/onboarding");
             return;
           }
