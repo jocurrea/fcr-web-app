@@ -143,7 +143,7 @@ export default function ProfilePage() {
   const fullName = personal ? `${personal.firstName || ""} ${personal.middleName || ""} ${personal.lastName || ""}`.trim().replace(/\s+/g, ' ') : "asdasd asdasd asdasd";
   const description = personal?.description || "Testasdasd";
   const rawCountry = personal?.selectedCountry || "br";
-  const country = COUNTRIES.find(c => c.id === rawCountry)?.label.split(" ")[1] || "Brazil";
+  const country = COUNTRIES.find(c => c.id === rawCountry)?.label || "Brazil";
   
   const commandTypeLabel = work?.commandType === "sic" ? "Second in Command" : "Pilot in Command";
   const flightHours = work?.flightHours || "0";
