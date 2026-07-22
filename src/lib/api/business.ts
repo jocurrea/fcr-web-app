@@ -167,7 +167,10 @@ export async function ensureBusinessDraft(): Promise<ApiResult<CompanyRow>> {
     const existingCompany = await findEditableCompany(userId);
 
     if (existingCompany) {
+      // Update auth metadata
       await supabase.auth.updateUser({ data: { accountType: "business" } });
+      // Update users table because Syed's trigger defaults to flight_crew
+      await supabase.from("users").update({ accountType: "business" }).eq("id", userId);
       return { success: true, data: existingCompany };
     }
 
@@ -193,8 +196,12 @@ export async function ensureBusinessDraft(): Promise<ApiResult<CompanyRow>> {
 
 
 
+    // Update auth metadata
     const { error: userError } = await supabase.auth.updateUser({ data: { accountType: "business" } });
     if (userError) throw new Error(userError.message);
+
+    // Update users table because Syed's trigger defaults to flight_crew
+    await supabase.from("users").update({ accountType: "business" }).eq("id", userId);
 
     return { success: true, data: company };
   } catch (error) {
