@@ -338,7 +338,7 @@ export async function saveCompanySettings(visibility: CommunityVisibilityInput):
     const company = companyResponse.data;
     const { data: existingSettings, error: fetchError } = await supabase
       .from("company_settings")
-      .select("id")
+      .select("company_id")
       .eq("company_id", company.id)
       .maybeSingle();
 
