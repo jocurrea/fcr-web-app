@@ -4,50 +4,50 @@ export interface Frequency {
   id: string;
   name: string;
   description: string | null;
-  icon: string | null;
-  is_public: boolean;
-  created_by: string;
+  image: string | null;
+  isPublic: boolean;
+  userId: string;
   created_at: string;
 }
 
 /**
- * Fetch frequencies the current user is a member of
+ * Fetch groups the current user is a member of
  */
 export async function fetchJoinedFrequencies(): Promise<Frequency[]> {
   const { data: userData } = await supabase.auth.getUser();
   if (!userData?.user) return [];
 
-  // Query frequency_members and join with frequencies
+  // Query groupMembers and join with groups
   const { data, error } = await supabase
-    .from('frequency_members')
+    .from('groupMembers')
     .select(`
-      frequency_id,
-      frequencies (
+      groupId,
+      groups (
         id,
         name,
         description,
-        icon,
-        is_public,
-        created_by,
+        image,
+        isPublic,
+        userId,
         created_at
       )
     `)
-    .eq('user_id', userData.user.id);
+    .eq('userId', userData.user.id);
 
   if (error || !data) {
-    console.error('Error fetching joined frequencies:', error);
+    console.error('Error fetching joined groups:', error);
     return [];
   }
 
   // Extract the inner frequency objects
   return data
-    .map((item: any) => item.frequencies as Frequency)
+    .map((item: any) => item.groups as Frequency)
     .filter(Boolean)
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
 /**
- * Fetch public frequencies the current user has NOT joined yet
+ * Fetch public groups the current user has NOT joined yet
  */
 export async function fetchAvailableFrequencies(): Promise<Frequency[]> {
   const { data: userData } = await supabase.auth.getUser();
@@ -56,33 +56,33 @@ export async function fetchAvailableFrequencies(): Promise<Frequency[]> {
   const userId = userData.user.id;
 
   // Since Supabase RPC or complex NOT IN joins can be tricky over the JS client,
-  // we can fetch all public frequencies and all joined frequency IDs, then filter locally.
+  // we can fetch all public groups and all joined frequency IDs, then filter locally.
   // This is fine for small/medium scale.
   
-  // 1. Fetch all public frequencies
+  // 1. Fetch all public groups
   const { data: allFrequencies, error: freqError } = await supabase
-    .from('frequencies')
+    .from('groups')
     .select('*')
-    .eq('is_public', true)
+    .eq('isPublic', true)
     .order('name');
 
   if (freqError || !allFrequencies) {
-    console.error('Error fetching all frequencies:', freqError);
+    console.error('Error fetching all groups:', freqError);
     return [];
   }
 
   // 2. Fetch user's joined frequency IDs
   const { data: joined, error: joinedError } = await supabase
-    .from('frequency_members')
-    .select('frequency_id')
-    .eq('user_id', userId);
+    .from('groupMembers')
+    .select('groupId')
+    .eq('userId', userId);
 
   if (joinedError) {
     console.error('Error fetching joined frequency IDs:', joinedError);
     return [];
   }
 
-  const joinedIds = new Set(joined?.map(j => j.frequency_id) || []);
+  const joinedIds = new Set(joined?.map(j => j.groupId) || []);
 
   // 3. Filter out joined
   return allFrequencies.filter(f => !joinedIds.has(f.id));
@@ -108,7 +108,7 @@ export async function createFrequency(name: string, description: string | null, 
       .upload(filePath, iconFile);
 
     if (uploadError) {
-      console.error('Error uploading icon:', uploadError);
+      console.error('Error uploading image:', uploadError);
       return false;
     }
 
@@ -121,13 +121,13 @@ export async function createFrequency(name: string, description: string | null, 
 
   // Insert frequency
   const { data: newFreq, error: createError } = await supabase
-    .from('frequencies')
+    .from('groups')
     .insert({
       name: name,
       description: description,
-      icon: iconUrl,
-      is_public: isPublic,
-      created_by: userData.user.id
+      image: iconUrl,
+      isPublic: isPublic,
+      userId: userData.user.id
     })
     .select('id')
     .single();
@@ -139,10 +139,10 @@ export async function createFrequency(name: string, description: string | null, 
 
   // Add creator as member
   const { error: memberError } = await supabase
-    .from('frequency_members')
+    .from('groupMembers')
     .insert({
-      frequency_id: newFreq.id,
-      user_id: userData.user.id
+      groupId: newFreq.id,
+      userId: userData.user.id
     });
 
   if (memberError) {
@@ -162,10 +162,10 @@ export async function joinFrequency(frequencyId: string): Promise<boolean> {
   if (!userData?.user) return false;
 
   const { error } = await supabase
-    .from('frequency_members')
+    .from('groupMembers')
     .insert({
-      frequency_id: frequencyId,
-      user_id: userData.user.id
+      groupId: frequencyId,
+      userId: userData.user.id
     });
 
   if (error) {
@@ -184,7 +184,7 @@ export async function joinFrequency(frequencyId: string): Promise<boolean> {
  */
 export async function fetchFrequencyById(frequencyId: string): Promise<Frequency | null> {
   const { data, error } = await supabase
-    .from('frequencies')
+    .from('groups')
     .select('*')
     .eq('id', frequencyId)
     .single();
@@ -204,11 +204,11 @@ export async function leaveFrequency(frequencyId: string): Promise<boolean> {
   if (!userData?.user) return false;
 
   const { error } = await supabase
-    .from('frequency_members')
+    .from('groupMembers')
     .delete()
     .match({
-      frequency_id: frequencyId,
-      user_id: userData.user.id
+      groupId: frequencyId,
+      userId: userData.user.id
     });
 
   if (error) {

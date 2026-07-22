@@ -56,8 +56,8 @@ export default function AvailableFrequenciesPage() {
           frequencies.map((freq) => (
             <div key={freq.id} className="flex items-center justify-between w-full relative">
               <div className="flex items-center gap-4 flex-1">
-                {freq.icon ? (
-                  <img src={freq.icon} alt={freq.name} className="w-[52px] h-[52px] rounded-full object-cover border border-gray-200" />
+                {freq.image ? (
+                  <img src={freq.image} alt={freq.name} className="w-[52px] h-[52px] rounded-full object-cover border border-gray-200" />
                 ) : (
                   <div className="w-[52px] h-[52px] rounded-full bg-[#cbd5e1] overflow-hidden flex items-center justify-center opacity-80" style={{ backgroundImage: 'radial-gradient(#94a3b8 1px, transparent 1px)', backgroundSize: '4px 4px' }} />
                 )}

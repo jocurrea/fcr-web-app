@@ -23,7 +23,7 @@ export default function FrequencyFeedPage() {
       
       if (freq) {
         setFrequencyName(freq.name);
-        if (freq.icon) setFrequencyBanner(freq.icon);
+        if (freq.image) setFrequencyBanner(freq.image);
       }
 
       // Load posts for this frequency
