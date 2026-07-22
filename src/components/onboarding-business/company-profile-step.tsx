@@ -371,9 +371,15 @@ export function CompanyProfileStep({ onNext }: CompanyProfileStepProps) {
       {showErrorModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-[#091124]/40 backdrop-blur-sm animate-in fade-in duration-200">
           <div 
-            className="bg-white rounded-2xl p-6 w-full max-w-[400px] shadow-2xl flex flex-col items-center text-center animate-in zoom-in-95 duration-200"
+            className="bg-white rounded-2xl p-6 w-full max-w-[400px] shadow-2xl flex flex-col items-center text-center animate-in zoom-in-95 duration-200 relative"
             onClick={(e) => e.stopPropagation()}
           >
+            <button 
+              onClick={() => setShowErrorModal(false)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 p-1"
+            >
+              <X className="w-5 h-5" />
+            </button>
             <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mb-4">
               <AlertCircle className="w-6 h-6" />
             </div>
@@ -381,7 +387,7 @@ export function CompanyProfileStep({ onNext }: CompanyProfileStepProps) {
             <p className="text-[14px] text-gray-500 mb-6">{errorMessage}</p>
             <button
               onClick={() => setShowErrorModal(false)}
-              className="w-full h-11 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-full transition-colors flex items-center justify-center text-[15px]"
+              className="w-full h-11 bg-gray-900 hover:bg-gray-800 text-white font-semibold rounded-full transition-colors flex items-center justify-center text-[15px]"
             >
               Close
             </button>
