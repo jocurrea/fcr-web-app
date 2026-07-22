@@ -421,6 +421,11 @@ export async function submitBusinessOnboarding(
     const { error: userError } = await supabase.auth.updateUser({ data: { accountType: "business", onboarded: true } });
     if (userError) throw new Error(userError.message);
 
+    await supabase.from("users").update({ 
+      accountType: "business",
+      onboarded: 1
+    }).eq("id", userId);
+
     if (company.logo_url) {
       if (typeof window !== "undefined") {
         localStorage.setItem("userProfilePhoto", company.logo_url);
