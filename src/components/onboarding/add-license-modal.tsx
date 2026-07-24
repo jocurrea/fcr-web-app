@@ -203,7 +203,7 @@ export function AddLicenseModal({ open, onOpenChange, onAddLicense, editingLicen
                   onChange={(e) => setIsPermanent(e.target.checked)}
                 />
                 <Label htmlFor="isPermanent" className="text-sm text-gray-700 leading-snug cursor-pointer font-medium select-none">
-                  This license is Permanent / FAA Medical Exception (No Expiry)
+                  This license is Permanent (No Expiry)
                 </Label>
               </div>
             </div>
