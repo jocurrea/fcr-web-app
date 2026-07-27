@@ -22,6 +22,7 @@ export default function PostDetailPage() {
   const [showDeletePostModal, setShowDeletePostModal] = useState(false);
 
   // Edit comment state
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
   const [editingCommentText, setEditingCommentText] = useState("");
   const [isCompanyPending, setIsCompanyPending] = useState(false);
 
