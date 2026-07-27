@@ -67,6 +67,12 @@ export default function OnboardingPage() {
             if (crewData.ratings) localStorage.setItem("onboarding_ratings", JSON.stringify(crewData.ratings));
             if (crewData.work) localStorage.setItem("onboarding_work", JSON.stringify(crewData.work));
             if (crewData.resume) localStorage.setItem("onboarding_resume", JSON.stringify(crewData.resume));
+
+            // Fetch profileImage to show in the form
+            const { data: uRecord } = await supabase.from('users').select('profileImage').eq('id', session.user.id).maybeSingle();
+            if (uRecord?.profileImage) {
+              localStorage.setItem("userProfilePhoto", uRecord.profileImage);
+            }
           }
         } else if (session.user.user_metadata?.onboarded === true && session.user.user_metadata?.accountType === 'flight_crew') {
           accountType = 'flight_crew';
@@ -132,7 +138,7 @@ export default function OnboardingPage() {
         resume: resumeRaw ? JSON.parse(resumeRaw) : {},
       };
 
-      await Promise.allSettled([
+      const results = await Promise.allSettled([
         supabase.from('resumes').upsert({
           userId: session.user.id,
           data: crewData
@@ -142,7 +148,7 @@ export default function OnboardingPage() {
           id: session.user.id,
           firstName: personalData?.firstName || "Unknown",
           lastName: personalData?.lastName || "",
-          profileImage: avatarPhoto || null,
+          ...(avatarPhoto ? { profileImage: avatarPhoto } : {}),
           onboarded: 1,
           accountType: 'flight_crew'
         }, { onConflict: 'id' }),
@@ -155,6 +161,14 @@ export default function OnboardingPage() {
           }
         })
       ]);
+
+      const failed = results.filter(r => r.status === 'rejected' || (r.status === 'fulfilled' && r.value?.error));
+      if (failed.length > 0) {
+        console.error("Save failed:", failed);
+        alert("There was an error saving your profile. Please check your connection and try again.");
+        setIsSaving(false);
+        return;
+      }
 
       supabase.auth.refreshSession().catch(e => console.error('refresh error:', e));
 
