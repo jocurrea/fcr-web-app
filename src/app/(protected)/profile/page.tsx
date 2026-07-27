@@ -44,31 +44,31 @@ export default function ProfilePage() {
 
           setProfilePhoto(profileImage || localStorage.getItem("userProfilePhoto"));
           
-          if (crewData) {
-            if (crewData.personal) setPersonal(crewData.personal);
-            if (crewData.licenses) setLicenses(crewData.licenses);
-            if (crewData.ratings) setRatings(crewData.ratings);
-            if (crewData.work) setWork(crewData.work);
-            if (crewData.resume) {
-              setResume(crewData.resume);
-              if (crewData.resume.languages) setLanguages(crewData.resume.languages);
-            }
-          } else {
-            // Fallback for older sessions that didn't save to Supabase yet
-            const savedPersonal = localStorage.getItem("onboarding_personal");
-            if (savedPersonal) setPersonal(JSON.parse(savedPersonal));
-            const savedLicenses = localStorage.getItem("onboarding_licenses");
-            if (savedLicenses) setLicenses(JSON.parse(savedLicenses));
-            const savedRatings = localStorage.getItem("onboarding_ratings");
-            if (savedRatings) setRatings(JSON.parse(savedRatings));
-            const savedWork = localStorage.getItem("onboarding_work");
-            if (savedWork) setWork(JSON.parse(savedWork));
-            const savedResume = localStorage.getItem("onboarding_resume");
-            if (savedResume) {
-              const parsedResume = JSON.parse(savedResume);
-              setResume(parsedResume);
-              if (parsedResume.languages) setLanguages(parsedResume.languages);
-            }
+          const savedPersonal = localStorage.getItem("onboarding_personal");
+          const savedLicenses = localStorage.getItem("onboarding_licenses");
+          const savedRatings = localStorage.getItem("onboarding_ratings");
+          const savedWork = localStorage.getItem("onboarding_work");
+          const savedResume = localStorage.getItem("onboarding_resume");
+
+          const localPersonal = savedPersonal ? JSON.parse(savedPersonal) : null;
+          const localLicenses = savedLicenses ? JSON.parse(savedLicenses) : null;
+          const localRatings = savedRatings ? JSON.parse(savedRatings) : null;
+          const localWork = savedWork ? JSON.parse(savedWork) : null;
+          const localResume = savedResume ? JSON.parse(savedResume) : null;
+
+          const finalPersonal = crewData?.personal || localPersonal;
+          const finalLicenses = (crewData?.licenses && crewData.licenses.length > 0) ? crewData.licenses : (localLicenses || []);
+          const finalRatings = (crewData?.ratings && crewData.ratings.length > 0) ? crewData.ratings : (localRatings || []);
+          const finalWork = crewData?.work || localWork;
+          const finalResume = crewData?.resume || localResume;
+
+          if (finalPersonal) setPersonal(finalPersonal);
+          if (finalLicenses) setLicenses(finalLicenses);
+          if (finalRatings) setRatings(finalRatings);
+          if (finalWork) setWork(finalWork);
+          if (finalResume) {
+            setResume(finalResume);
+            if (finalResume.languages) setLanguages(finalResume.languages);
           }
 
           // Check if user has a business company

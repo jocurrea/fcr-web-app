@@ -46,6 +46,16 @@ export function ProtectedHeader() {
         if (lastName) userPayload.lastName = lastName;
         if (profilePhoto) userPayload.profileImage = profilePhoto;
 
+        const savedLicenses = localStorage.getItem("onboarding_licenses");
+        const savedRatings = localStorage.getItem("onboarding_ratings");
+        const savedWork = localStorage.getItem("onboarding_work");
+        const savedResume = localStorage.getItem("onboarding_resume");
+
+        const localLicenses = savedLicenses ? JSON.parse(savedLicenses) : null;
+        const localRatings = savedRatings ? JSON.parse(savedRatings) : null;
+        const localWork = savedWork ? JSON.parse(savedWork) : null;
+        const localResume = savedResume ? JSON.parse(savedResume) : null;
+
         // Step 4: Safely merge resumes data so we NEVER wipe out licenses, ratings, work, etc.
         const { data: existingResume } = await supabase
           .from('resumes')
@@ -63,7 +73,11 @@ export function ProtectedHeader() {
             middleName: middleName || currentData.personal?.middleName,
             lastName: lastName || currentData.personal?.lastName,
             profilePhoto: profilePhoto || currentData.personal?.profilePhoto
-          }
+          },
+          licenses: (localLicenses && localLicenses.length > 0) ? localLicenses : (currentData.licenses || []),
+          ratings: (localRatings && localRatings.length > 0) ? localRatings : (currentData.ratings || []),
+          work: localWork || currentData.work || {},
+          resume: localResume || currentData.resume || {}
         };
 
         await Promise.allSettled([
