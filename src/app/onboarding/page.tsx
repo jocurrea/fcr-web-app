@@ -117,18 +117,22 @@ export default function OnboardingPage() {
 
       const personalRaw = localStorage.getItem("onboarding_personal");
       const licensesRaw = localStorage.getItem("onboarding_licenses");
+      const ratingsRaw = localStorage.getItem("onboarding_ratings");
+      const workRaw = localStorage.getItem("onboarding_work");
+      const resumeRaw = localStorage.getItem("onboarding_resume");
       const avatarPhoto = localStorage.getItem("userProfilePhoto");
+      
       const personalData = personalRaw ? JSON.parse(personalRaw) : null;
 
       const crewData = {
         personal: personalData || {},
         licenses: licensesRaw ? JSON.parse(licensesRaw) : [],
-        ratings: [],
-        work: {},
-        resume: {},
+        ratings: ratingsRaw ? JSON.parse(ratingsRaw) : [],
+        work: workRaw ? JSON.parse(workRaw) : {},
+        resume: resumeRaw ? JSON.parse(resumeRaw) : {},
       };
 
-      Promise.allSettled([
+      await Promise.allSettled([
         supabase.from('resumes').upsert({
           userId: session.user.id,
           data: crewData
