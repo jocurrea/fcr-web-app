@@ -146,7 +146,7 @@ export default function ProfilePage() {
   const country = COUNTRIES.find(c => c.id === rawCountry)?.label || "Brazil";
   
   const commandTypeLabel = work?.commandType === "sic" ? "Second in Command" : "Pilot in Command";
-  const flightHours = work?.flightHours || "0";
+  const flightHours = personal?.totalFlightHours || "0";
   const medicalClass = work?.medicalClass || "1st";
   
   const website = resume?.websites?.[0] || "";

@@ -518,7 +518,7 @@ export function ResumeStep({ onNext }: ResumeStepProps) {
           onClick={handleFinishLocal}
           className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-full py-6 text-lg font-semibold"
         >
-          Finish
+          Save Profile
         </Button>
       </div>
 
