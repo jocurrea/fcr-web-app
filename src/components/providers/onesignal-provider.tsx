@@ -21,7 +21,7 @@ export function OneSignalProvider({ children }: { children: React.ReactNode }) {
           allowLocalhostAsSecureOrigin: true, // Useful for testing on localhost
           notifyButton: {
             enable: true,
-            displayPredicate: () => OneSignal.isPushNotificationsEnabled().then(enabled => !enabled),
+            displayPredicate: () => (OneSignal as any).isPushNotificationsEnabled ? (OneSignal as any).isPushNotificationsEnabled().then((enabled: boolean) => !enabled) : Promise.resolve(true),
           } as any,
         });
         setInitialized(true);
