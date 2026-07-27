@@ -461,10 +461,10 @@ export async function createPost(text: string, frequencyId?: string, imageFile?:
   if (imageFile) {
     const fileExt = imageFile.name.split('.').pop();
     const fileName = `${Math.random()}.${fileExt}`;
-    const filePath = `${userData.user.id}/${fileName}`;
+    const filePath = `posts/${userData.user.id}-${fileName}`;
 
     const { error: uploadError } = await supabase.storage
-      .from('post-images')
+      .from('uploads')
       .upload(filePath, imageFile);
 
     if (uploadError) {
@@ -473,7 +473,7 @@ export async function createPost(text: string, frequencyId?: string, imageFile?:
     }
 
     const { data: publicUrlData } = supabase.storage
-      .from('post-images')
+      .from('uploads')
       .getPublicUrl(filePath);
       
     imageUrl = publicUrlData.publicUrl;
@@ -544,10 +544,10 @@ export async function updatePost(postId: string, text: string, frequencyId?: str
   if (imageFile) {
     const fileExt = imageFile.name.split('.').pop();
     const fileName = `${Math.random()}.${fileExt}`;
-    const filePath = `${userData.user.id}/${fileName}`;
+    const filePath = `posts/${userData.user.id}-${fileName}`;
 
     const { error: uploadError } = await supabase.storage
-      .from('post-images')
+      .from('uploads')
       .upload(filePath, imageFile);
 
     if (uploadError) {
@@ -556,7 +556,7 @@ export async function updatePost(postId: string, text: string, frequencyId?: str
     }
 
     const { data: publicUrlData } = supabase.storage
-      .from('post-images')
+      .from('uploads')
       .getPublicUrl(filePath);
       
     imageUrl = publicUrlData.publicUrl;

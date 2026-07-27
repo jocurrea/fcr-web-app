@@ -101,10 +101,10 @@ export async function createFrequency(name: string, description: string | null, 
   if (iconFile) {
     const fileExt = iconFile.name.split('.').pop();
     const fileName = `${Math.random()}.${fileExt}`;
-    const filePath = `icons/${userData.user.id}/${fileName}`;
+    const filePath = `groups/${userData.user.id}-${fileName}`;
 
     const { error: uploadError } = await supabase.storage
-      .from('post-images') // Reusing the existing bucket for simplicity
+      .from('uploads') // Reusing the existing bucket for simplicity
       .upload(filePath, iconFile);
 
     if (uploadError) {
@@ -113,7 +113,7 @@ export async function createFrequency(name: string, description: string | null, 
     }
 
     const { data: publicUrlData } = supabase.storage
-      .from('post-images')
+      .from('uploads')
       .getPublicUrl(filePath);
       
     iconUrl = publicUrlData.publicUrl;
