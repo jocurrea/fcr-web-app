@@ -44,8 +44,12 @@ export default function OnboardingPage() {
         accountType = userRecord.accountType || '';
       }
 
+      // Check edit mode early
+      const editMode = window.location.search.includes("edit=true");
+      setIsEditMode(editMode);
+
       // Fallback for Flight Crew if database trigger failed
-      if (!onboarded || accountType === 'flight_crew') {
+      if (!onboarded || accountType === 'flight_crew' || editMode) {
         const { data: resumeFallback } = await supabase
           .from('resumes')
           .select('data')
@@ -55,6 +59,15 @@ export default function OnboardingPage() {
         if (resumeFallback?.data) {
           accountType = 'flight_crew';
           onboarded = true;
+          
+          if (editMode) {
+            const crewData = resumeFallback.data as any;
+            if (crewData.personal) localStorage.setItem("onboarding_personal", JSON.stringify(crewData.personal));
+            if (crewData.licenses) localStorage.setItem("onboarding_licenses", JSON.stringify(crewData.licenses));
+            if (crewData.ratings) localStorage.setItem("onboarding_ratings", JSON.stringify(crewData.ratings));
+            if (crewData.work) localStorage.setItem("onboarding_work", JSON.stringify(crewData.work));
+            if (crewData.resume) localStorage.setItem("onboarding_resume", JSON.stringify(crewData.resume));
+          }
         } else if (session.user.user_metadata?.onboarded === true && session.user.user_metadata?.accountType === 'flight_crew') {
           accountType = 'flight_crew';
           onboarded = true;
@@ -64,9 +77,6 @@ export default function OnboardingPage() {
       }
 
       if (!isMounted) return;
-
-      const editMode = window.location.search.includes("edit=true");
-      setIsEditMode(editMode);
 
       if (onboarded && !editMode) {
         router.replace("/home");

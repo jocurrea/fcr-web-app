@@ -153,18 +153,25 @@ export function PersonalInfoForm({ onNext }: PersonalInfoFormProps) {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
 
-      const { data: userRecord } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', session.user.id)
-        .single();
+      const [userRecord, resumeRecord] = await Promise.all([
+        supabase.from('users').select('*').eq('id', session.user.id).single(),
+        supabase.from('resumes').select('data').eq('userId', session.user.id).single()
+      ]);
 
-      if (userRecord) {
-        if (userRecord.firstName) setFirstName(userRecord.firstName);
-        if (userRecord.middleName) setMiddleName(userRecord.middleName);
-        if (userRecord.lastName) setLastName(userRecord.lastName);
-        if (userRecord.profileImage) setPhotoPreview(userRecord.profileImage);
-        // Add more mapping if needed
+      if (userRecord.data) {
+        if (userRecord.data.firstName) setFirstName(userRecord.data.firstName);
+        if (userRecord.data.middleName) setMiddleName(userRecord.data.middleName);
+        if (userRecord.data.lastName) setLastName(userRecord.data.lastName);
+        if (userRecord.data.profileImage) setPhotoPreview(userRecord.data.profileImage);
+      }
+      
+      if (resumeRecord.data && resumeRecord.data.data && resumeRecord.data.data.personal) {
+        const personalData = resumeRecord.data.data.personal;
+        if (personalData.selectedCountry) setSelectedCountry(personalData.selectedCountry);
+        if (personalData.description) setDescription(personalData.description);
+        if (personalData.currentEmployer) setCurrentEmployer(personalData.currentEmployer);
+        if (personalData.totalFlightHours) setTotalFlightHours(personalData.totalFlightHours);
+        if (personalData.role) setRole(personalData.role);
       }
     }
     loadProfile();
