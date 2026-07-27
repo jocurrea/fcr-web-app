@@ -22,7 +22,7 @@ export function OneSignalProvider({ children }: { children: React.ReactNode }) {
           notifyButton: {
             enable: true,
             displayPredicate: () => OneSignal.isPushNotificationsEnabled().then(enabled => !enabled),
-          },
+          } as any,
         });
         setInitialized(true);
       } catch (error) {
