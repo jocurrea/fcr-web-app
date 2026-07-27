@@ -167,7 +167,7 @@ function NewPostContent() {
     
     try {
       const { createPost, updatePost } = await import('@/lib/api/posts');
-      let result = { success: false, error: 'Unknown error' };
+      let result: { success: boolean; error?: string } = { success: false, error: 'Unknown error' };
       
       if (editId) {
         // Only pass attachedImage if there's no new imageFile, to keep existing image
