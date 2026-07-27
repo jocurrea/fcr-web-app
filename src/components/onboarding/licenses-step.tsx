@@ -7,9 +7,11 @@ import { Trash2, AlertTriangle, Pencil } from "lucide-react";
 
 interface LicensesStepProps {
   onNext: () => void;
+  isSaving?: boolean;
+  buttonLabel?: string;
 }
 
-export function LicensesStep({ onNext }: LicensesStepProps) {
+export function LicensesStep({ onNext, isSaving, buttonLabel }: LicensesStepProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [licenses, setLicenses] = useState<LicenseData[]>(() => {
     if (typeof window !== 'undefined') {
@@ -115,10 +117,10 @@ export function LicensesStep({ onNext }: LicensesStepProps) {
       <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/80 backdrop-blur-sm border-t sm:static sm:bg-transparent sm:border-0 sm:p-0 sm:mt-6 sm:backdrop-blur-none">
         <Button 
           onClick={onNext}
-          disabled={licenses.length === 0}
+          disabled={licenses.length === 0 || isSaving}
           className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-full py-6 text-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          Next
+          {isSaving ? "Saving..." : (buttonLabel || "Finish")}
         </Button>
       </div>
 

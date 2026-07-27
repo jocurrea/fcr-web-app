@@ -16,6 +16,8 @@ export default function OnboardingPage() {
   const router = useRouter();
   const [step, setStep] = useState(1);
   const [isCheckingAccess, setIsCheckingAccess] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -63,7 +65,10 @@ export default function OnboardingPage() {
 
       if (!isMounted) return;
 
-      if (onboarded && !window.location.search.includes("edit=true")) {
+      const editMode = window.location.search.includes("edit=true");
+      setIsEditMode(editMode);
+
+      if (onboarded && !editMode) {
         router.replace("/home");
         return;
       }
@@ -83,11 +88,75 @@ export default function OnboardingPage() {
     };
   }, [router]);
 
+  const totalSteps = isEditMode ? 5 : 2;
+
   const handleNext = () => {
-    if (step < 5) {
+    if (step < totalSteps) {
       setStep(step + 1);
-    } else {
-      window.location.href = "/home";
+    }
+  };
+
+  const handleFinish = async () => {
+    setIsSaving(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        window.location.assign("/home");
+        return;
+      }
+
+      const personalRaw = localStorage.getItem("onboarding_personal");
+      const licensesRaw = localStorage.getItem("onboarding_licenses");
+      const avatarPhoto = localStorage.getItem("userProfilePhoto");
+      const personalData = personalRaw ? JSON.parse(personalRaw) : null;
+
+      const crewData = {
+        personal: personalData || {},
+        licenses: licensesRaw ? JSON.parse(licensesRaw) : [],
+        ratings: [],
+        work: {},
+        resume: {},
+      };
+
+      Promise.allSettled([
+        supabase.from('resumes').upsert({
+          userId: session.user.id,
+          data: crewData
+        }, { onConflict: 'userId' }),
+
+        supabase.from('users').upsert({
+          id: session.user.id,
+          firstName: personalData?.firstName || "Unknown",
+          lastName: personalData?.lastName || "",
+          profileImage: avatarPhoto || null,
+          onboarded: 1,
+          accountType: 'flight_crew'
+        }, { onConflict: 'id' }),
+
+        supabase.auth.updateUser({
+          data: {
+            onboarded: true,
+            accountType: 'flight_crew',
+            crew_data_saved: true
+          }
+        })
+      ]);
+
+      supabase.auth.refreshSession().catch(e => console.error('refresh error:', e));
+
+    } catch (err: any) {
+      console.error("[Onboarding] Sync error:", err);
+    } finally {
+      try {
+        document.cookie = "flightcrew_onboarded=true; path=/; max-age=31536000";
+        sessionStorage.setItem("flightcrew_onboarded", "true");
+        localStorage.setItem("flightcrew_onboarded", "true");
+      } catch (e) {
+        console.error("Storage error:", e);
+      }
+      
+      setIsSaving(false);
+      window.location.assign("/onboarding-complete");
     }
   };
 
@@ -103,7 +172,7 @@ export default function OnboardingPage() {
   const getTitle = () => {
     switch (step) {
       case 1: return "Personal";
-      case 2: return "Licenses";
+      case 2: return "License";
       case 3: return "Ratings";
       case 4: return "Work";
       case 5: return "Resume";
@@ -150,15 +219,15 @@ export default function OnboardingPage() {
 
         {/* Stepper */}
         <div className="mt-2 mb-4 px-2">
-          <Stepper steps={5} currentStep={step} />
+          <Stepper steps={isEditMode ? 5 : 2} currentStep={step} />
         </div>
 
         {/* Form Content based on Step */}
         {step === 1 && <PersonalInfoForm onNext={handleNext} />}
-        {step === 2 && <LicensesStep onNext={handleNext} />}
-        {step === 3 && <RatingsStep onNext={handleNext} />}
-        {step === 4 && <WorkStep onNext={handleNext} />}
-        {step === 5 && <ResumeStep onNext={handleNext} />}
+        {step === 2 && <LicensesStep onNext={isEditMode ? handleNext : handleFinish} isSaving={!isEditMode && isSaving} buttonLabel={isEditMode ? "Next" : "Finish"} />}
+        {isEditMode && step === 3 && <RatingsStep onNext={handleNext} />}
+        {isEditMode && step === 4 && <WorkStep onNext={handleNext} />}
+        {isEditMode && step === 5 && <ResumeStep onNext={handleFinish} />}
       </div>
     </div>
   );

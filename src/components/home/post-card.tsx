@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { MoreHorizontal, Heart, MessageCircle } from "lucide-react";
+import { MoreHorizontal, Heart, MessageCircle, Flag, Forward } from "lucide-react";
 
 interface PostCardProps {
   id?: string;
@@ -21,6 +21,11 @@ export function PostCard({ id, user, date, content, image, likes, liked, comment
   const router = useRouter();
   const [isLiked, setIsLiked] = useState(liked || false);
   const [likeCount, setLikeCount] = useState(likes || 0);
+
+  useEffect(() => {
+    setIsLiked(liked || false);
+    setLikeCount(likes || 0);
+  }, [liked, likes]);
 
   const toggleLike = async () => {
     if (!id) return; // For mock posts without id
@@ -91,20 +96,26 @@ export function PostCard({ id, user, date, content, image, likes, liked, comment
       )}
 
       {/* Footer / Actions */}
-      <div className="p-4 flex items-center gap-5">
+      <div className="p-4 flex items-center gap-6 border-t border-gray-50/50 text-gray-500">
         <button 
           onClick={toggleLike}
-          className="flex items-center gap-1.5 text-gray-500 hover:text-red-500 transition-colors group"
+          className="flex items-center gap-1.5 hover:text-red-500 transition-colors group"
         >
-          <Heart className={`w-5 h-5 ${isLiked ? "fill-red-500 text-red-500" : "group-hover:fill-red-500"}`} />
+          <Heart className={`w-[22px] h-[22px] ${isLiked ? "fill-red-500 text-red-500" : "group-hover:fill-red-500"}`} />
           {likeCount > 0 && <span className="text-sm font-medium">{likeCount}</span>}
         </button>
         <button 
           onClick={handleCommentClick}
-          className="flex items-center gap-1.5 text-gray-500 hover:text-blue-500 transition-colors"
+          className="flex items-center gap-1.5 hover:text-blue-500 transition-colors"
         >
-          <MessageCircle className="w-5 h-5" />
+          <MessageCircle className="w-[22px] h-[22px]" />
           {(comments || 0) > 0 && <span className="text-sm font-medium">{comments}</span>}
+        </button>
+        <button onClick={() => alert("Share functionality coming soon")} className="hover:text-blue-500 transition-colors" title="Share">
+          <Forward className="w-[22px] h-[22px]" />
+        </button>
+        <button onClick={() => alert("Report content functionality coming soon")} className="hover:text-red-500 transition-colors" title="Report">
+          <Flag className="w-[20px] h-[20px]" />
         </button>
       </div>
     </div>

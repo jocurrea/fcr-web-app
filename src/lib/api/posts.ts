@@ -1,25 +1,16 @@
 import { supabase } from '@/lib/supabase';
 
-const DEFAULT_AVATAR = 'https://api.dicebear.com/7.x/shapes/svg?seed=user';
-
 const USER_IDENTITY_SELECT = `
   id,
   firstName,
   middleName,
   lastName,
+  username,
   profileImage
 `;
 
 function formatDate(value: string) {
   return new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-}
-
-function getUserName(user: any) {
-  return [user?.firstName, user?.middleName, user?.lastName].filter(Boolean).join(' ').trim() || 'User';
-}
-
-function getUserAvatar(user: any) {
-  return user?.profileImage || DEFAULT_AVATAR;
 }
 
 // Types
@@ -54,58 +45,197 @@ export interface Comment {
  * Fetch posts (either global or for a specific frequency)
  */
 export async function fetchPosts(frequencyId?: string): Promise<Post[]> {
-  let query = supabase
-    .from('posts')
-    .select(`
-      id,
-      created_at,
-      userId,
-      groupId,
-      body,
-      file,
-      user:users ( ${USER_IDENTITY_SELECT} ),
-      postLikes ( id, userId ),
-      comments ( id )
-    `)
-    .order('created_at', { ascending: false });
+  try {
+    let query = supabase
+      .from('posts')
+      .select(`
+        id,
+        created_at,
+        userId,
+        groupId,
+        body,
+        file,
+        user:users ( id, firstName, middleName, lastName, username, profileImage ),
+        postLikes ( id, userId ),
+        comments ( id )
+      `)
+      .order('created_at', { ascending: false });
 
-  if (frequencyId) {
-    query = query.eq('groupId', frequencyId);
-  } else {
-    query = query.is('groupId', null);
-  }
+    if (frequencyId) {
+      query = query.eq('groupId', frequencyId);
+    }
 
-  const { data, error } = await query;
+    const { data, error } = await query;
 
-  if (error) {
-    console.error('Error fetching posts:', error);
+    if (error) {
+      console.warn('[fetchPosts] join error, retrying without join:', error.message);
+      // Fallback: fetch posts without join
+      let fallback = supabase
+        .from('posts')
+        .select('id, created_at, userId, groupId, body, file')
+        .order('created_at', { ascending: false });
+      if (frequencyId) fallback = fallback.eq('groupId', frequencyId);
+      const { data: fallbackData, error: fallbackError } = await fallback;
+      if (fallbackError || !fallbackData) return [];
+      return buildPostsWithResumes(fallbackData, undefined);
+    }
+
+    if (!data || data.length === 0) return [];
+
+    return buildPostsWithResumes(data, 'withUser');
+  } catch (err) {
+    console.error('[fetchPosts] Exception:', err);
     return [];
   }
+}
 
-  const { data: userData } = await supabase.auth.getUser();
-  const currentUserId = userData?.user?.id;
+async function buildPostsWithResumes(data: any[], mode?: string): Promise<Post[]> {
+  const { data: authData } = await supabase.auth.getUser();
+  const currentUserId = authData?.user?.id;
+  const currentUserEmail = authData?.user?.email || '';
+  const currentUserMeta = authData?.user?.user_metadata || {};
 
-  // Fetch companies to get business logos and names since there is no FK
-  const authorIds = Array.from(new Set(data.map((p: any) => p.userId)));
-  let companiesMap: Record<string, { name: string, logo_url: string }> = {};
-  if (authorIds.length > 0) {
-    const { data: companies } = await supabase
-      .from('companies')
-      .select('owner_user_id, name, logo_url')
-      .in('owner_user_id', authorIds);
-      
-    if (companies) {
-      companies.forEach(company => {
-        companiesMap[company.owner_user_id] = {
-          name: company.name || '',
-          logo_url: company.logo_url || ''
-        };
-      });
+  const postIds = data.map((p: any) => p.id);
+  const authorIds = Array.from(new Set(data.map((p: any) => p.userId).filter(Boolean))) as string[];
+
+  // Fetch resumes, users, companies, likes, comments in parallel
+  const [resumesRes, usersRes, companiesRes, postLikesRes, commentsRes] = await Promise.allSettled([
+    authorIds.length > 0
+      ? supabase.from('resumes').select('userId, data').in('userId', authorIds)
+      : Promise.resolve({ data: [] }),
+    authorIds.length > 0
+      ? supabase.from('users').select('id, firstName, middleName, lastName, username, profileImage').in('id', authorIds)
+      : Promise.resolve({ data: [] }),
+    authorIds.length > 0
+      ? supabase.from('companies').select('owner_user_id, name, logo_url').in('owner_user_id', authorIds)
+      : Promise.resolve({ data: [] }),
+    postIds.length > 0 && mode !== 'withUser'
+      ? supabase.from('postLikes').select('postId, userId').in('postId', postIds)
+      : Promise.resolve({ data: [] }),
+    postIds.length > 0 && mode !== 'withUser'
+      ? supabase.from('comments').select('postId').in('postId', postIds)
+      : Promise.resolve({ data: [] }),
+  ]);
+
+  const resumesMap: Record<string, { name: string; avatar: string }> = {};
+  if (resumesRes.status === 'fulfilled' && resumesRes.value?.data) {
+    for (const r of resumesRes.value.data as any[]) {
+      const p = r.data?.personal;
+      if (!p) continue;
+      const name = [p.firstName, p.middleName, p.lastName].filter(Boolean).join(' ').trim();
+      const avatar = p.profilePhoto || p.profileImage || '';
+      if (name || avatar) resumesMap[r.userId] = { name, avatar };
+    }
+  }
+
+  const usersMap: Record<string, any> = {};
+  if (usersRes.status === 'fulfilled' && usersRes.value?.data) {
+    for (const u of usersRes.value.data as any[]) {
+      usersMap[u.id] = u;
+    }
+  }
+
+  const companiesMap: Record<string, { name: string; avatar: string }> = {};
+  if (companiesRes.status === 'fulfilled' && companiesRes.value?.data) {
+    for (const c of companiesRes.value.data as any[]) {
+      companiesMap[c.owner_user_id] = { name: c.name || '', avatar: c.logo_url || '' };
+    }
+  }
+
+  const likesMap: Record<string, { count: number; userLiked: boolean }> = {};
+  const commentsMap: Record<string, number> = {};
+
+  if (postLikesRes.status === 'fulfilled' && (postLikesRes.value as any)?.data) {
+    for (const like of (postLikesRes.value as any).data) {
+      if (!likesMap[like.postId]) likesMap[like.postId] = { count: 0, userLiked: false };
+      likesMap[like.postId].count++;
+      if (currentUserId && like.userId === currentUserId) likesMap[like.postId].userLiked = true;
+    }
+  }
+
+  if (commentsRes.status === 'fulfilled' && (commentsRes.value as any)?.data) {
+    for (const c of (commentsRes.value as any).data) {
+      commentsMap[c.postId] = (commentsMap[c.postId] || 0) + 1;
     }
   }
 
   return data.map((post: any) => {
+    // u from nested join (mode=withUser), or from direct users query
+    const uFromJoin = post.user;
+    const uFromDirect = usersMap[post.userId];
+    const u = uFromJoin || uFromDirect;
+    const resume = resumesMap[post.userId];
     const company = companiesMap[post.userId];
+
+    // Name priority:
+    // 1. Company Name (if business account)
+    // 2. Resume (most reliable — filled during onboarding)
+    // 3. users table firstName+lastName (from nested join or direct query)
+    // 4. localStorage (if it's the current user's post)
+    // 5. Auth user_metadata name (if it's the current user)
+    // 6. Username from users table (anything is better than "User")
+    // 7. Email prefix (last resort for current user)
+    const dbFirstLast = [u?.firstName, u?.middleName, u?.lastName].filter(Boolean).join(' ').trim();
+    let authorName = company?.name || resume?.name || dbFirstLast;
+
+    if (!authorName && post.userId === currentUserId) {
+      // Try localStorage onboarding data
+      try {
+        const saved = localStorage.getItem('onboarding_personal');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          const localName = [parsed.firstName, parsed.middleName, parsed.lastName].filter(Boolean).join(' ').trim();
+          if (localName) authorName = localName;
+        }
+      } catch {}
+
+      // Try Supabase auth user_metadata
+      if (!authorName) {
+        const metaName = [currentUserMeta.firstName, currentUserMeta.lastName].filter(Boolean).join(' ').trim()
+          || currentUserMeta.full_name
+          || currentUserMeta.name
+          || '';
+        if (metaName) authorName = metaName;
+      }
+
+      // Try email prefix as last resort for current user
+      if (!authorName && currentUserEmail) {
+        const prefix = currentUserEmail.split('@')[0];
+        if (prefix) authorName = prefix.charAt(0).toUpperCase() + prefix.slice(1);
+      }
+    }
+
+    // For any user: show username if we still have no name (better than "User")
+    if (!authorName && u?.username) {
+      // Show any non-empty username
+      authorName = u.username;
+    }
+
+    // Avatar priority:
+    // 1. Company Logo
+    // 2. Resume profilePhoto
+    // 3. users table profileImage (nested join or direct)
+    // 4. localStorage photo (current user only)
+    // 5. Dicebear shape
+    let authorAvatar = company?.avatar || resume?.avatar || u?.profileImage;
+
+    if (!authorAvatar && post.userId === currentUserId) {
+      try {
+        const savedPhoto = localStorage.getItem('userProfilePhoto');
+        if (savedPhoto) authorAvatar = savedPhoto;
+      } catch {}
+    }
+
+    if (!authorAvatar) {
+      authorAvatar = `https://api.dicebear.com/7.x/shapes/svg?seed=${encodeURIComponent(post.userId || 'user')}`;
+    }
+
+    const likes = post.postLikes ? post.postLikes.length : (likesMap[post.id]?.count || 0);
+    const comments = post.comments ? post.comments.length : (commentsMap[post.id] || 0);
+    const liked = post.postLikes
+      ? (currentUserId ? post.postLikes.some((l: any) => l.userId === currentUserId) : false)
+      : (likesMap[post.id]?.userLiked || false);
+
     return {
       id: post.id,
       created_at: formatDate(post.created_at),
@@ -114,12 +244,12 @@ export async function fetchPosts(frequencyId?: string): Promise<Post[]> {
       text: post.body || '',
       image: post.file || null,
       author: {
-        name: company?.name || getUserName(post.user),
-        avatar: company?.logo_url || getUserAvatar(post.user),
+        name: authorName || 'User',
+        avatar: authorAvatar,
       },
-      likes: post.postLikes?.length || 0,
-      comments: post.comments?.length || 0,
-      liked: post.postLikes?.some((like: any) => like.userId === currentUserId) || false,
+      likes,
+      comments,
+      liked,
     };
   });
 }
@@ -154,16 +284,62 @@ export async function fetchPostById(postId: string): Promise<Post | null> {
 
   let companyName = null;
   let companyLogo = null;
+  let resumeName = null;
+  let resumeAvatar = null;
+
   if (data.userId) {
-    const { data: companies } = await supabase
-      .from('companies')
-      .select('name, logo_url')
-      .eq('owner_user_id', data.userId)
-      .limit(1);
-    if (companies && companies.length > 0) {
-      companyName = companies[0].name;
-      companyLogo = companies[0].logo_url;
+    const [companiesRes, resumeRes] = await Promise.all([
+      supabase.from('companies').select('name, logo_url').eq('owner_user_id', data.userId).limit(1),
+      supabase.from('resumes').select('data').eq('userId', data.userId).limit(1)
+    ]);
+
+    if (companiesRes.data && companiesRes.data.length > 0) {
+      companyName = companiesRes.data[0].name;
+      companyLogo = companiesRes.data[0].logo_url;
     }
+
+    if (resumeRes.data && resumeRes.data.length > 0) {
+      const personal = resumeRes.data[0].data?.personal;
+      if (personal) {
+        resumeName = [personal.firstName, personal.middleName, personal.lastName].filter(Boolean).join(' ').trim();
+        resumeAvatar = personal.profilePhoto || personal.profileImage || null;
+      }
+    }
+  }
+
+  const dbFirstLast = [(data as any).user?.firstName, (data as any).user?.middleName, (data as any).user?.lastName].filter(Boolean).join(' ').trim();
+  let authorName = companyName || resumeName || dbFirstLast;
+
+  if (!authorName && data.userId === currentUserId) {
+    try {
+      const savedPersonal = localStorage.getItem('onboarding_personal');
+      if (savedPersonal) {
+        const parsed = JSON.parse(savedPersonal);
+        const localName = [parsed.firstName, parsed.middleName, parsed.lastName].filter(Boolean).join(' ').trim();
+        if (localName) authorName = localName;
+      }
+    } catch {}
+  }
+
+  if (!authorName) {
+    const u = (data as any).user;
+    if (u?.username && u.username !== 'user' && !u.username.startsWith('user_')) authorName = u.username;
+    else if (u?.email) {
+      const prefix = u.email.split('@')[0];
+      if (prefix) authorName = prefix.charAt(0).toUpperCase() + prefix.slice(1);
+    }
+  }
+
+  let authorAvatar = companyLogo || resumeAvatar || (data as any).user?.profileImage;
+  if (!authorAvatar && data.userId === currentUserId) {
+    try {
+      const savedPhoto = localStorage.getItem('userProfilePhoto');
+      if (savedPhoto) authorAvatar = savedPhoto;
+    } catch {}
+  }
+
+  if (!authorAvatar) {
+    authorAvatar = `https://api.dicebear.com/7.x/shapes/svg?seed=${encodeURIComponent(data.userId || 'user')}`;
   }
 
   return {
@@ -174,8 +350,8 @@ export async function fetchPostById(postId: string): Promise<Post | null> {
     text: data.body || '',
     image: data.file || null,
     author: {
-      name: companyName || getUserName((data as any).user),
-      avatar: companyLogo || getUserAvatar((data as any).user),
+      name: authorName || 'User',
+      avatar: authorAvatar,
     },
     likes: (data as any).postLikes?.length || 0,
     comments: (data as any).comments?.length || 0,
@@ -204,15 +380,67 @@ export async function fetchPostComments(postId: string): Promise<Comment[]> {
     return [];
   }
 
+  const commentUserIds = Array.from(new Set(data.map((c: any) => c.userId).filter(Boolean)));
+  let companiesMap: Record<string, { name: string, logo_url: string }> = {};
+  let resumesMap: Record<string, { name: string, avatar: string }> = {};
+
+  if (commentUserIds.length > 0) {
+    const [companiesRes, resumesRes] = await Promise.all([
+      supabase.from('companies').select('owner_user_id, name, logo_url').in('owner_user_id', commentUserIds),
+      supabase.from('resumes').select('userId, data').in('userId', commentUserIds)
+    ]);
+
+    if (companiesRes.data) {
+      companiesRes.data.forEach(company => {
+        companiesMap[company.owner_user_id] = {
+          name: company.name || '',
+          logo_url: company.logo_url || ''
+        };
+      });
+    }
+
+    if (resumesRes.data) {
+      resumesRes.data.forEach((r: any) => {
+        const personal = r.data?.personal;
+        if (personal) {
+          const name = [personal.firstName, personal.middleName, personal.lastName].filter(Boolean).join(' ').trim();
+          const avatar = personal.profilePhoto || personal.profileImage || '';
+          if (name || avatar) {
+            resumesMap[r.userId] = { name, avatar };
+          }
+        }
+      });
+    }
+  }
+
   return data.map((comment: any) => {
+    const company = companiesMap[comment.userId];
+    const resumeInfo = resumesMap[comment.userId];
+    const dbFirstLast = [comment.user?.firstName, comment.user?.middleName, comment.user?.lastName].filter(Boolean).join(' ').trim();
+
+    let authorName = company?.name || resumeInfo?.name || dbFirstLast;
+    if (!authorName) {
+      if (comment.user?.username && comment.user.username !== 'user' && !comment.user.username.startsWith('user_')) {
+        authorName = comment.user.username;
+      } else if (comment.user?.email) {
+        const prefix = comment.user.email.split('@')[0];
+        if (prefix) authorName = prefix.charAt(0).toUpperCase() + prefix.slice(1);
+      }
+    }
+
+    let authorAvatar = company?.logo_url || resumeInfo?.avatar || comment.user?.profileImage;
+    if (!authorAvatar) {
+      authorAvatar = `https://api.dicebear.com/7.x/shapes/svg?seed=${encodeURIComponent(comment.userId || 'user')}`;
+    }
+
     return {
       id: comment.id,
       created_at: formatDate(comment.created_at),
       user_id: comment.userId,
       text: comment.body || '',
       author: {
-        name: getUserName(comment.user),
-        avatar: getUserAvatar(comment.user),
+        name: authorName || 'User',
+        avatar: authorAvatar,
       }
     };
   });
@@ -221,7 +449,7 @@ export async function fetchPostComments(postId: string): Promise<Comment[]> {
 /**
  * Create a new post
  */
-export async function createPost(text: string, frequencyId?: string, imageFile?: File): Promise<boolean> {
+export async function createPost(text: string, frequencyId?: string, imageFile?: File): Promise<{success: boolean, error?: string}> {
   const { data: userData } = await supabase.auth.getUser();
   if (!userData?.user) {
     throw new Error("NOT_LOGGED_IN");
@@ -241,7 +469,7 @@ export async function createPost(text: string, frequencyId?: string, imageFile?:
 
     if (uploadError) {
       console.error('Error uploading image:', uploadError);
-      return false;
+      return { success: false, error: 'Failed to upload image: ' + uploadError.message };
     }
 
     const { data: publicUrlData } = supabase.storage
@@ -249,6 +477,39 @@ export async function createPost(text: string, frequencyId?: string, imageFile?:
       .getPublicUrl(filePath);
       
     imageUrl = publicUrlData.publicUrl;
+  }
+
+  // Sync author's profile to Supabase database so other users can see name and avatar
+  try {
+    const savedPhoto = typeof window !== 'undefined' ? localStorage.getItem("userProfilePhoto") : null;
+    const savedPersonal = typeof window !== 'undefined' ? localStorage.getItem("onboarding_personal") : null;
+    const personal = savedPersonal ? JSON.parse(savedPersonal) : null;
+
+    if (personal?.firstName || savedPhoto) {
+      await Promise.allSettled([
+        supabase.from('users').upsert({
+          id: userData.user.id,
+          firstName: personal?.firstName,
+          middleName: personal?.middleName,
+          lastName: personal?.lastName,
+          profileImage: savedPhoto || undefined,
+          onboarded: 1
+        }, { onConflict: 'id' }),
+        supabase.from('resumes').upsert({
+          userId: userData.user.id,
+          data: {
+            personal: {
+              firstName: personal?.firstName,
+              middleName: personal?.middleName,
+              lastName: personal?.lastName,
+              profilePhoto: savedPhoto
+            }
+          }
+        }, { onConflict: 'userId' })
+      ]);
+    }
+  } catch (e) {
+    console.error('Error syncing profile in createPost:', e);
   }
 
   const { error } = await supabase
@@ -262,10 +523,10 @@ export async function createPost(text: string, frequencyId?: string, imageFile?:
 
   if (error) {
     console.error('Error creating post:', error);
-    return false;
+    return { success: false, error: 'Database error: ' + error.message };
   }
 
-  return true;
+  return { success: true };
 }
 
 /**

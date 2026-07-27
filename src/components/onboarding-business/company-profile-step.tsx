@@ -88,6 +88,7 @@ export function CompanyProfileStep({ onNext }: CompanyProfileStepProps) {
     email.trim() !== "" &&
     isEmailValid(email) &&
     isPhoneValid(phone) &&
+    (foundedYear === "" || foundedYear.length === 4) &&
     !isLoading &&
     !isSaving;
 
@@ -128,8 +129,8 @@ export function CompanyProfileStep({ onNext }: CompanyProfileStepProps) {
   const handleLogoUpload = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 2 * 1024 * 1024) {
-        setErrorMessage("File is too large. Maximum size is 2MB.");
+      if (file.size > 1.9 * 1024 * 1024) {
+        setErrorMessage("El archivo excede el límite de 2MB. (File exceeds 2MB limit)");
         setShowErrorModal(true);
         return;
       }

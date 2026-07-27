@@ -3,6 +3,7 @@ import "./globals.css";
 import { Inter } from "next/font/google";
 import { cn } from "@/lib/utils";
 import { StorageProvider } from "@/components/storage-provider";
+import { OneSignalProvider } from "@/components/providers/onesignal-provider";
 
 const inter = Inter({subsets:['latin'],variable:'--font-sans'});
 
@@ -19,8 +20,10 @@ export default function RootLayout({
   return (
     <html lang="en" className={cn("h-full antialiased", "font-sans", inter.variable)}>
       <body className="min-h-full flex flex-col">
-        <StorageProvider />
-        {children}
+        <OneSignalProvider>
+          <StorageProvider />
+          {children}
+        </OneSignalProvider>
       </body>
     </html>
   );

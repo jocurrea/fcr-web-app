@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { ChevronLeft, Edit2, Trash2, Send, X, Check } from "lucide-react";
+import { ChevronLeft, Edit2, Trash2, Send, X, Check, Flag, Forward, Info, Clock } from "lucide-react";
 import { PostCard } from "@/components/home/post-card";
 import { fetchPostById, fetchPostComments, createComment, deleteComment, deletePost, updateComment, Post, Comment } from "@/lib/api/posts";
 import { supabase } from "@/lib/supabase";
@@ -22,8 +22,8 @@ export default function PostDetailPage() {
   const [showDeletePostModal, setShowDeletePostModal] = useState(false);
 
   // Edit comment state
-  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
   const [editingCommentText, setEditingCommentText] = useState("");
+  const [isCompanyPending, setIsCompanyPending] = useState(false);
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -32,6 +32,16 @@ export default function PostDetailPage() {
       const { data: userData } = await supabase.auth.getUser();
       if (userData?.user) {
         setCurrentUserId(userData.user.id);
+        const { data: companies } = await supabase
+          .from('companies')
+          .select('status')
+          .eq('owner_user_id', userData.user.id)
+          .order('created_at', { ascending: false })
+          .limit(1);
+        
+        if (companies && companies.length > 0 && companies[0].status === 'pending') {
+          setIsCompanyPending(true);
+        }
       }
 
       const postData = await fetchPostById(id);
@@ -49,18 +59,26 @@ export default function PostDetailPage() {
   }, [id]);
 
   const handleAddComment = async () => {
+    if (isCompanyPending) {
+      alert("Comentar está deshabilitado mientras su empresa está pendiente de aprobación. (Commenting disabled while pending approval)");
+      return;
+    }
     if (!commentText.trim() || !post) return;
 
     const text = commentText.trim();
     setCommentText(""); // clear input optimistically
     
-    const success = await createComment(id, text);
-    if (success) {
-      // Reload comments
-      const commentsData = await fetchPostComments(id);
-      setComments(commentsData);
-    } else {
-      alert("Error adding comment");
+    try {
+      const success = await createComment(id, text);
+      if (success) {
+        const commentsData = await fetchPostComments(id);
+        setComments(commentsData);
+      } else {
+        alert("Error adding comment");
+      }
+    } catch (error) {
+      console.error("Error al crear comentario:", error);
+      alert("Error de conexión al guardar el comentario.");
     }
   };
 
@@ -110,11 +128,18 @@ export default function PostDetailPage() {
   };
 
   const confirmDeletePost = async () => {
-    const success = await deletePost(id);
-    if (success) {
-      router.back();
-    } else {
-      alert("Error deleting post");
+    try {
+      const success = await deletePost(id);
+      if (success) {
+        router.refresh(); // Refresh to invalidate cache
+        setTimeout(() => router.back(), 100);
+      } else {
+        alert("Error deleting post");
+        setShowDeletePostModal(false);
+      }
+    } catch (error) {
+      console.error("Delete post error:", error);
+      alert("Error de conexión.");
       setShowDeletePostModal(false);
     }
   };
@@ -183,27 +208,41 @@ export default function PostDetailPage() {
         </div>
 
         {/* Comment Input */}
-        <div className="flex items-center gap-3 mt-1">
-          <div className="flex-1">
-            <input 
-              type="text" 
-              value={commentText}
-              onChange={(e) => setCommentText(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleAddComment()}
-              placeholder="Write a comment..."
-              className="w-full border border-gray-300 rounded-full px-5 py-2.5 text-[13.5px] outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors text-gray-700"
-            />
+        {isCompanyPending ? (
+          <div className="bg-[#f0f6ff] border border-[#e0eaff] p-4 rounded-[16px] flex items-start gap-3 w-full mt-1">
+            <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center shrink-0 shadow-sm mt-0.5">
+              <Clock className="w-4 h-4 text-[#1a56db]" strokeWidth={2.5} />
+            </div>
+            <div>
+              <h3 className="font-bold text-[14px] text-gray-900 mb-0.5">Company under review</h3>
+              <p className="text-[13px] text-gray-500 leading-snug">
+                Commenting is disabled until approval.
+              </p>
+            </div>
           </div>
-          <button 
-            onClick={handleAddComment}
-            disabled={!commentText.trim()}
-            className={`w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0 transition-colors border-2 ${
-              commentText.trim() ? "border-[#1a73e8] text-[#1a73e8] bg-white hover:bg-blue-50" : "border-[#1a73e8] text-[#1a73e8] bg-white opacity-50"
-            }`}
-          >
-            <Send className="w-[18px] h-[18px] ml-[-2px]" />
-          </button>
-        </div>
+        ) : (
+          <div className="flex items-center gap-3 mt-1">
+            <div className="flex-1">
+              <input 
+                type="text" 
+                value={commentText}
+                onChange={(e) => setCommentText(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleAddComment()}
+                placeholder="Write a comment..."
+                className="w-full border border-gray-300 rounded-full px-5 py-2.5 text-[13.5px] outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors text-gray-700"
+              />
+            </div>
+            <button 
+              onClick={handleAddComment}
+              disabled={!commentText.trim()}
+              className={`w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0 transition-colors border-2 ${
+                commentText.trim() ? "border-[#1a73e8] text-[#1a73e8] bg-white hover:bg-blue-50" : "border-[#1a73e8] text-[#1a73e8] bg-white opacity-50"
+              }`}
+            >
+              <Send className="w-[18px] h-[18px] ml-[-2px]" />
+            </button>
+          </div>
+        )}
 
         {/* Comments List */}
         <div className="mt-1">
@@ -234,16 +273,24 @@ export default function PostDetailPage() {
                           <span className="text-[12px] text-gray-500 font-medium">{c.created_at}</span>
                         </div>
                         {/* Actions */}
-                        {isCommentOwner && !isEditing && (
-                          <div className="flex items-center gap-2.5 text-gray-400 ml-2">
-                            <button onClick={() => startEditingComment(c)} className="text-gray-400 hover:text-gray-600 transition-colors">
-                              <Edit2 className="w-3.5 h-3.5" />
-                            </button>
-                            <button onClick={() => handleDeleteCommentClick(c.id)} className="text-red-400 hover:text-red-500 transition-colors">
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        )}
+                        <div className="flex items-center gap-2.5 text-gray-400 ml-2">
+                          <button onClick={() => alert("Report comment functionality coming soon")} className="text-gray-400 hover:text-red-500 transition-colors" title="Report">
+                            <Flag className="w-3.5 h-3.5" />
+                          </button>
+                          <button onClick={() => alert("Share functionality coming soon")} className="text-gray-400 hover:text-blue-500 transition-colors" title="Share">
+                            <Forward className="w-4 h-4" />
+                          </button>
+                          {isCommentOwner && !isEditing && (
+                            <>
+                              <button onClick={() => startEditingComment(c)} className="text-gray-400 hover:text-gray-600 transition-colors">
+                                <Edit2 className="w-3.5 h-3.5" />
+                              </button>
+                              <button onClick={() => handleDeleteCommentClick(c.id)} className="text-red-400 hover:text-red-500 transition-colors">
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </>
+                          )}
+                        </div>
                       </div>
                       
                       {isEditing ? (

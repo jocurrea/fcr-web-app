@@ -35,43 +35,75 @@ function NewPostContent() {
       const { supabase } = await import('@/lib/supabase');
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
-        let avatarFetched = false;
+        let resolvedName = "";
+        let resolvedAvatar = "";
+
+        // 1. Try users table
         const { data: userRecord } = await supabase
           .from('users')
           .select('firstName, middleName, lastName, profileImage')
           .eq('id', session.user.id)
-          .single();
-          
+          .maybeSingle();
+
         if (userRecord) {
-          const fullName = `${userRecord.firstName || ""} ${userRecord.middleName || ""} ${userRecord.lastName || ""}`.trim().replace(/\s+/g, ' ');
-          setUserName(fullName || "Pilot User");
-          if (userRecord.profileImage) {
-            setUserAvatar(userRecord.profileImage);
-            avatarFetched = true;
-          }
+          resolvedName = `${userRecord.firstName || ""} ${userRecord.middleName || ""} ${userRecord.lastName || ""}`.trim().replace(/\s+/g, ' ');
+          if (userRecord.profileImage) resolvedAvatar = userRecord.profileImage;
         }
-        
-        // Fallback for business accounts since profiles might not be created or populated properly
+
+        // 2. Try companies table if business account
         const { data: companies } = await supabase
           .from('companies')
           .select('name, logo_url')
           .eq('owner_user_id', session.user.id)
           .limit(1);
-          
+
         if (companies && companies.length > 0) {
-          if (companies[0].name) {
-            setUserName(companies[0].name);
-          }
-          if (companies[0].logo_url && !avatarFetched) {
-            setUserAvatar(companies[0].logo_url);
-            avatarFetched = true;
+          if (companies[0].name) resolvedName = companies[0].name;
+          if (companies[0].logo_url) resolvedAvatar = companies[0].logo_url;
+        }
+
+        // 3. Try resumes table if name or avatar is still empty
+        if (!resolvedName || !resolvedAvatar) {
+          const { data: resumeRecord } = await supabase
+            .from('resumes')
+            .select('data')
+            .eq('userId', session.user.id)
+            .maybeSingle();
+
+          if (resumeRecord?.data?.personal) {
+            const p = resumeRecord.data.personal;
+            if (!resolvedName) {
+              resolvedName = `${p.firstName || ""} ${p.middleName || ""} ${p.lastName || ""}`.trim().replace(/\s+/g, ' ');
+            }
+            if (!resolvedAvatar && (p.profilePhoto || p.profileImage)) {
+              resolvedAvatar = p.profilePhoto || p.profileImage;
+            }
           }
         }
-        
-        if (!avatarFetched) {
-           const savedPhoto = localStorage.getItem("userProfilePhoto");
-           if (savedPhoto) setUserAvatar(savedPhoto);
+
+        // 4. Try localStorage onboarding_personal fallback
+        if (!resolvedName) {
+          try {
+            const savedPersonal = localStorage.getItem("onboarding_personal");
+            if (savedPersonal) {
+              const parsed = JSON.parse(savedPersonal);
+              resolvedName = `${parsed.firstName || ""} ${parsed.middleName || ""} ${parsed.lastName || ""}`.trim().replace(/\s+/g, ' ');
+            }
+          } catch {}
         }
+
+        // 5. Try user_metadata in session
+        if (!resolvedName && session.user.user_metadata) {
+          resolvedName = session.user.user_metadata.full_name || session.user.user_metadata.name || "";
+        }
+
+        if (!resolvedAvatar) {
+          const savedPhoto = localStorage.getItem("userProfilePhoto");
+          if (savedPhoto) resolvedAvatar = savedPhoto;
+        }
+
+        setUserName(resolvedName || session.user.email?.split('@')[0] || "User");
+        if (resolvedAvatar) setUserAvatar(resolvedAvatar);
       }
     }
     loadUser();
@@ -110,6 +142,11 @@ function NewPostContent() {
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      if (file.size > 1.9 * 1024 * 1024) {
+        alert("El archivo excede el límite de 2MB. (File exceeds 2MB limit)");
+        if (fileInputRef.current) fileInputRef.current.value = "";
+        return;
+      }
       setImageFile(file);
       const reader = new FileReader();
       reader.onloadend = () => {
@@ -130,19 +167,21 @@ function NewPostContent() {
     
     try {
       const { createPost, updatePost } = await import('@/lib/api/posts');
-      let success = false;
+      let result = { success: false, error: 'Unknown error' };
       
       if (editId) {
         // Only pass attachedImage if there's no new imageFile, to keep existing image
-        success = await updatePost(editId, text.trim(), selectedFrequency || undefined, imageFile || undefined, imageFile ? null : attachedImage);
+        // Wait, updatePost wasn't modified to return an object yet. I will assume it still returns boolean.
+        const success = await updatePost(editId, text.trim(), selectedFrequency || undefined, imageFile || undefined, imageFile ? null : attachedImage);
+        result = { success, error: success ? undefined : 'Error updating post' };
       } else {
-        success = await createPost(text.trim(), selectedFrequency || undefined, imageFile || undefined);
+        result = await createPost(text.trim(), selectedFrequency || undefined, imageFile || undefined) as any;
       }
       
-      if (success) {
+      if (result.success) {
         router.push("/home");
       } else {
-        alert("Error saving post. Check your connection or permissions.");
+        alert("Error saving post:\n" + (result.error || "Check your connection or permissions."));
       }
     } catch (e: any) {
       if (e.message === "NOT_LOGGED_IN") {
@@ -248,7 +287,7 @@ function NewPostContent() {
               <img src={attachedImage} alt="Attached" className="w-full h-auto object-cover max-h-[300px]" />
             )}
             <button 
-              onClick={() => setAttachedImage(null)}
+              onClick={() => { setAttachedImage(null); setImageFile(null); if (fileInputRef.current) fileInputRef.current.value = ""; }}
               className="absolute top-2 right-2 bg-black/60 p-1.5 rounded-full text-white hover:bg-black/80 transition-colors"
             >
               <X className="w-5 h-5" />

@@ -5,17 +5,68 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Bell, Plus, User, Search, Users, Bot, LogOut, Mail, FileText, Lock, ShieldCheck, Ban, Trash2, FileDown } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { NotificationsBell } from "./notifications-bell";
 
 export function ProtectedHeader() {
   const pathname = usePathname();
   const router = useRouter();
   const [profilePhoto, setProfilePhoto] = useState<string | null>(null);
+  const [profileProgress, setProfileProgress] = useState(0);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    async function syncLocalProfileToDatabase(userId: string) {
+      try {
+        const savedPhoto = localStorage.getItem("userProfilePhoto");
+        const savedPersonal = localStorage.getItem("onboarding_personal");
+        const localPersonal = savedPersonal ? JSON.parse(savedPersonal) : null;
+
+        // Step 1: Read own users row (RLS always allows reading your own row)
+        const { data: dbUser } = await supabase
+          .from('users')
+          .select('firstName, middleName, lastName, profileImage')
+          .eq('id', userId)
+          .maybeSingle();
+
+        // Step 2: Merge — prefer localStorage data, fall back to DB data
+        const firstName = localPersonal?.firstName || dbUser?.firstName || '';
+        const middleName = localPersonal?.middleName || dbUser?.middleName || '';
+        const lastName = localPersonal?.lastName || dbUser?.lastName || '';
+        const profilePhoto = savedPhoto || dbUser?.profileImage || '';
+
+        if (!firstName && !lastName && !profilePhoto) return;
+
+        // Step 3: Save to users table
+        const userPayload: any = { id: userId, onboarded: 1 };
+        if (firstName) userPayload.firstName = firstName;
+        if (middleName) userPayload.middleName = middleName;
+        if (lastName) userPayload.lastName = lastName;
+        if (profilePhoto) userPayload.profileImage = profilePhoto;
+
+        // Step 4: Always upsert to resumes table so OTHER users can read it
+        // (resumes table has permissive RLS; users table does not)
+        await Promise.allSettled([
+          supabase.from('users').upsert(userPayload, { onConflict: 'id' }),
+          supabase.from('resumes').upsert({
+            userId: userId,
+            data: {
+              personal: {
+                firstName,
+                middleName,
+                lastName,
+                profilePhoto
+              }
+            }
+          }, { onConflict: 'userId' })
+        ]);
+      } catch (e) {
+        console.error('[ProtectedHeader] Profile sync error:', e);
+      }
+    }
+
     async function loadProfile() {
       try {
         const { data: { session } } = await supabase.auth.getSession();
@@ -24,6 +75,9 @@ export function ProtectedHeader() {
           router.push("/welcome");
           return;
         }
+
+        // Always sync local profile to Supabase DB so other users can see name & photo
+        syncLocalProfileToDatabase(session.user.id);
 
         let onboarded = false;
         let accountType = '';
@@ -61,12 +115,14 @@ export function ProtectedHeader() {
         // SLOW PATH: DB queries for users without fast-path signal
         // ============================================================
         try {
-          const { data: userRecord } = await supabase
-            .from('users')
-            .select('onboarded, accountType, profileImage')
-            .eq('id', session.user.id)
-            .maybeSingle();
+          const [userRes, resumeRes] = await Promise.all([
+            supabase.from('users').select('onboarded, accountType, profileImage').eq('id', session.user.id).maybeSingle(),
+            supabase.from('resumes').select('data').eq('userId', session.user.id).maybeSingle()
+          ]);
             
+          const userRecord = userRes.data;
+          const resumeFallback = resumeRes.data;
+
           if (userRecord) {
             onboarded = !!userRecord.onboarded;
             accountType = userRecord.accountType || '';
@@ -77,8 +133,32 @@ export function ProtectedHeader() {
               if (savedPhoto) setProfilePhoto(savedPhoto);
             }
           }
+
+          // Calculate progress if we have resume data
+          if (resumeFallback?.data) {
+            const rData = resumeFallback.data as any;
+            let currentProgress = 0;
+            if (rData.personal && Object.keys(rData.personal).length > 0) currentProgress += 15;
+            if (rData.licenses && Array.isArray(rData.licenses) && rData.licenses.length > 0) currentProgress += 15;
+            if (rData.ratings && Array.isArray(rData.ratings) && rData.ratings.length > 0) currentProgress += 20;
+            if (rData.work && Object.keys(rData.work).length > 0) currentProgress += 20;
+            if (rData.resume && Object.keys(rData.resume).length > 0) currentProgress += 30;
+            setProfileProgress(currentProgress);
+            
+            // Also proves they finished flight crew if not yet onboarded
+            if (!onboarded) {
+              accountType = 'flight_crew';
+              onboarded = true;
+            }
+          } else {
+            // Fallback to local storage if no DB data yet
+            let localProg = 0;
+            if (localStorage.getItem("onboarding_personal")) localProg += 15;
+            if (localStorage.getItem("onboarding_licenses")) localProg += 15;
+            setProfileProgress(localProg);
+          }
         } catch (e) {
-          console.error("Failed to fetch from users", e);
+          console.error("Failed to fetch from users/resumes", e);
         }
 
         // Fallback: If the database trigger failed to create the users row, check if they have a company
@@ -106,20 +186,6 @@ export function ProtectedHeader() {
         
         if (companyLogo) {
           setProfilePhoto(companyLogo);
-        }
-
-        // Check resumes table for data (proves they finished flight crew)
-        if (!onboarded) {
-          const { data: resumeFallback } = await supabase
-            .from('resumes')
-            .select('data')
-            .eq('userId', session.user.id)
-            .maybeSingle();
-
-          if (resumeFallback?.data) {
-            accountType = 'flight_crew';
-            onboarded = true;
-          }
         }
 
         // localStorage fallback: user filled step 1 but cookie wasn't set
@@ -216,28 +282,30 @@ export function ProtectedHeader() {
         
         {/* Right side icons */}
         <div className="ml-auto flex items-center gap-5 relative" ref={dropdownRef}>
-          <Link href="/notifications" className="text-gray-600 hover:text-black transition-colors">
-            <Bell className="w-5 h-5" />
-          </Link>
+          <NotificationsBell />
           <Link href="/new-post" className="text-gray-600 hover:text-black transition-colors">
             <Plus className="w-[26px] h-[26px]" />
           </Link>
-          <button 
-            onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-            className="w-10 h-10 rounded-full overflow-hidden border border-gray-300 p-[2px] bg-white cursor-pointer"
-          >
-            {profilePhoto ? (
-              <img 
-                src={profilePhoto} 
-                alt="Avatar" 
-                className="w-full h-full rounded-full object-cover" 
-              />
-            ) : (
-              <div className="w-full h-full rounded-full bg-gray-200 flex items-center justify-center text-xs text-gray-500">
-                Me
-              </div>
-            )}
-          </button>
+          <div className="relative inline-flex items-center justify-center">
+            {/* Avatar Button */}
+            <button 
+              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+              className="rounded-full cursor-pointer overflow-hidden bg-white z-10 hover:opacity-90 transition-opacity"
+              style={{ width: '42px', height: '42px', border: '2px solid white', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}
+            >
+              {profilePhoto ? (
+                <img 
+                  src={profilePhoto} 
+                  alt="Avatar" 
+                  className="w-full h-full object-cover" 
+                />
+              ) : (
+                <span className="w-full h-full flex items-center justify-center text-gray-500 font-medium bg-gray-100" style={{ fontSize: '10px' }}>
+                  Me
+                </span>
+              )}
+            </button>
+          </div>
 
           {/* Dropdown Menu */}
           {isDropdownOpen && (

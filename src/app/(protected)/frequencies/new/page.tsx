@@ -21,6 +21,7 @@ export default function NewFrequencyPage() {
   const [frequencyIcon, setFrequencyIcon] = useState<string | null>(null);
   const [frequencyIconFile, setFrequencyIconFile] = useState<File | null>(null);
   const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const [isCompanyPending, setIsCompanyPending] = useState(false);
@@ -62,6 +63,11 @@ export default function NewFrequencyPage() {
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      if (file.size > 1.9 * 1024 * 1024) {
+        alert("El archivo excede el límite de 2MB. (File exceeds 2MB limit)");
+        e.target.value = "";
+        return;
+      }
       setFrequencyIconFile(file);
       const reader = new FileReader();
       reader.onloadend = () => {
@@ -90,7 +96,7 @@ export default function NewFrequencyPage() {
     
     // Using the new Supabase API
     const { createFrequency } = await import('@/lib/api/frequencies');
-    const success = await createFrequency(frequencyName, null, frequencyIconFile || undefined, isPublic);
+    const success = await createFrequency(frequencyName, description.trim() || null, frequencyIconFile || undefined, isPublic);
 
     if (success) {
       router.push("/frequencies");
@@ -159,6 +165,8 @@ export default function NewFrequencyPage() {
           <label className="block text-[14px] text-gray-700 mb-1.5 ml-1">Personal Description</label>
           <textarea
             rows={4}
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
             className="w-full border border-gray-300 rounded-3xl px-5 py-4 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 resize-none text-gray-900"
           ></textarea>
         </div>
