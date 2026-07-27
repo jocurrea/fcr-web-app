@@ -486,6 +486,25 @@ export async function createPost(text: string, frequencyId?: string, imageFile?:
     const personal = savedPersonal ? JSON.parse(savedPersonal) : null;
 
     if (personal?.firstName || savedPhoto) {
+      const { data: existingResume } = await supabase
+        .from('resumes')
+        .select('data')
+        .eq('userId', userData.user.id)
+        .maybeSingle();
+
+      const currentData = (existingResume?.data as any) || {};
+      const mergedData = {
+        ...currentData,
+        personal: {
+          ...(currentData.personal || {}),
+          ...(personal || {}),
+          firstName: personal?.firstName || currentData.personal?.firstName,
+          middleName: personal?.middleName || currentData.personal?.middleName,
+          lastName: personal?.lastName || currentData.personal?.lastName,
+          profilePhoto: savedPhoto || currentData.personal?.profilePhoto
+        }
+      };
+
       await Promise.allSettled([
         supabase.from('users').upsert({
           id: userData.user.id,
@@ -497,14 +516,7 @@ export async function createPost(text: string, frequencyId?: string, imageFile?:
         }, { onConflict: 'id' }),
         supabase.from('resumes').upsert({
           userId: userData.user.id,
-          data: {
-            personal: {
-              firstName: personal?.firstName,
-              middleName: personal?.middleName,
-              lastName: personal?.lastName,
-              profilePhoto: savedPhoto
-            }
-          }
+          data: mergedData
         }, { onConflict: 'userId' })
       ]);
     }

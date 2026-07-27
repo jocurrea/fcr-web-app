@@ -46,20 +46,31 @@ export function ProtectedHeader() {
         if (lastName) userPayload.lastName = lastName;
         if (profilePhoto) userPayload.profileImage = profilePhoto;
 
-        // Step 4: Always upsert to resumes table so OTHER users can read it
-        // (resumes table has permissive RLS; users table does not)
+        // Step 4: Safely merge resumes data so we NEVER wipe out licenses, ratings, work, etc.
+        const { data: existingResume } = await supabase
+          .from('resumes')
+          .select('data')
+          .eq('userId', userId)
+          .maybeSingle();
+
+        const currentData = (existingResume?.data as any) || {};
+        const mergedData = {
+          ...currentData,
+          personal: {
+            ...(currentData.personal || {}),
+            ...(localPersonal || {}),
+            firstName: firstName || currentData.personal?.firstName,
+            middleName: middleName || currentData.personal?.middleName,
+            lastName: lastName || currentData.personal?.lastName,
+            profilePhoto: profilePhoto || currentData.personal?.profilePhoto
+          }
+        };
+
         await Promise.allSettled([
           supabase.from('users').upsert(userPayload, { onConflict: 'id' }),
           supabase.from('resumes').upsert({
             userId: userId,
-            data: {
-              personal: {
-                firstName,
-                middleName,
-                lastName,
-                profilePhoto
-              }
-            }
+            data: mergedData
           }, { onConflict: 'userId' })
         ]);
       } catch (e) {
