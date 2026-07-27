@@ -164,82 +164,8 @@ export function ResumeStep({ onNext }: ResumeStepProps) {
     }));
   }, [phone, email, websites, skills, languages, awards, trainingFacilities, experiences]);
 
-  const [isSaving, setIsSaving] = useState(false);
-
-  const handleFinish = async () => {
-    setIsSaving(true);
-
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        window.location.assign("/home");
-        return;
-      }
-
-      const personalRaw = localStorage.getItem("onboarding_personal");
-      const licensesRaw = localStorage.getItem("onboarding_licenses");
-      const ratingsRaw = localStorage.getItem("onboarding_ratings");
-      const workRaw = localStorage.getItem("onboarding_work");
-      const resumeRaw = localStorage.getItem("onboarding_resume");
-      const avatarPhoto = localStorage.getItem("userProfilePhoto");
-
-      const personalData = personalRaw ? JSON.parse(personalRaw) : null;
-
-      const crewData = {
-        personal: personalData || {},
-        licenses: licensesRaw ? JSON.parse(licensesRaw) : [],
-        ratings: ratingsRaw ? JSON.parse(ratingsRaw) : [],
-        work: workRaw ? JSON.parse(workRaw) : {},
-        resume: resumeRaw ? JSON.parse(resumeRaw) : {},
-      };
-
-      // Fire and forget DB saves — DO NOT AWAIT so we never hang the UI
-      Promise.allSettled([
-        supabase.from('resumes').upsert({
-          userId: session.user.id,
-          data: crewData
-        }, { onConflict: 'userId' }),
-
-        supabase.from('users').upsert({
-          id: session.user.id,
-          firstName: personalData?.firstName || "Unknown",
-          lastName: personalData?.lastName || "",
-          profileImage: avatarPhoto || null,
-          onboarded: 1,
-          accountType: 'flight_crew'
-        }, { onConflict: 'id' }),
-
-        supabase.auth.updateUser({
-          data: {
-            onboarded: true,
-            accountType: 'flight_crew',
-            crew_data_saved: true
-          }
-        })
-      ]).then(([profileResult, userResult, authResult]) => {
-        console.log('[ResumeStep] Profile save:', profileResult);
-        console.log('[ResumeStep] User save:', userResult);
-        console.log('[ResumeStep] Auth metadata:', authResult);
-      });
-
-      // DO NOT AWAIT THIS.
-      supabase.auth.refreshSession().catch(e => console.error('refresh error:', e));
-
-    } catch (err: any) {
-      console.error("[ResumeStep] Sync error:", err);
-    } finally {
-      // Wrap in try-catch in case private mode throws on storage
-      try {
-        document.cookie = "flightcrew_onboarded=true; path=/; max-age=31536000";
-        sessionStorage.setItem("flightcrew_onboarded", "true");
-        localStorage.setItem("flightcrew_onboarded", "true"); // add local storage too!
-      } catch (e) {
-        console.error("Storage error:", e);
-      }
-      
-      setIsSaving(false);
-      window.location.assign("/onboarding-complete");
-    }
+  const handleFinishLocal = () => {
+    onNext();
   };
 
   const languageOptions = [
@@ -589,11 +515,10 @@ export function ResumeStep({ onNext }: ResumeStepProps) {
 
       <div className="p-4 bg-white mt-auto mb-4">
         <Button 
-          onClick={handleFinish}
-          disabled={isSaving}
+          onClick={handleFinishLocal}
           className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-full py-6 text-lg font-semibold"
         >
-          {isSaving ? "Saving..." : "Finish"}
+          Finish
         </Button>
       </div>
 
