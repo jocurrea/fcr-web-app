@@ -622,6 +622,26 @@ export async function toggleLike(postId: string, currentLikedState: boolean): Pr
       console.error('Error adding like:', error);
       return false;
     }
+
+    // Add notification
+    try {
+      const { data: postData } = await supabase.from('posts').select('userId').eq('id', postId).single();
+      if (postData && postData.userId !== userData.user.id) {
+        const { data: senderData } = await supabase.from('users').select('firstName, lastName, username').eq('id', userData.user.id).single();
+        const senderName = senderData ? ([senderData.firstName, senderData.lastName].filter(Boolean).join(' ').trim() || senderData.username || 'Someone') : 'Someone';
+        
+        await supabase.from('notifications').insert({
+          senderId: userData.user.id,
+          receiverId: postData.userId,
+          title: 'New Like',
+          data: `${senderName} liked your post.`,
+          type: 'like',
+          read: 0
+        });
+      }
+    } catch (err) {
+      console.error('Error creating notification:', err);
+    }
   }
 
   return true;
@@ -645,6 +665,26 @@ export async function createComment(postId: string, text: string): Promise<boole
   if (error) {
     console.error('Error adding comment:', error);
     return false;
+  }
+
+  // Add notification
+  try {
+    const { data: postData } = await supabase.from('posts').select('userId').eq('id', postId).single();
+    if (postData && postData.userId !== userData.user.id) {
+      const { data: senderData } = await supabase.from('users').select('firstName, lastName, username').eq('id', userData.user.id).single();
+      const senderName = senderData ? ([senderData.firstName, senderData.lastName].filter(Boolean).join(' ').trim() || senderData.username || 'Someone') : 'Someone';
+      
+      await supabase.from('notifications').insert({
+        senderId: userData.user.id,
+        receiverId: postData.userId,
+        title: 'New Comment',
+        data: `${senderName} commented on your post: "${text.substring(0, 40)}${text.length > 40 ? '...' : ''}"`,
+        type: 'comment',
+        read: 0
+      });
+    }
+  } catch (err) {
+    console.error('Error creating notification:', err);
   }
 
   return true;
