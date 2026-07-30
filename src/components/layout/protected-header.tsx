@@ -311,7 +311,25 @@ export function ProtectedHeader() {
           <Link href="/new-post" className="text-gray-600 hover:text-black transition-colors">
             <Plus className="w-[26px] h-[26px]" />
           </Link>
-          <div className="relative inline-flex items-center justify-center">
+          <div className="relative inline-flex items-center justify-center" style={{ width: '52px', height: '52px' }}>
+            {/* SVG Progress Ring */}
+            <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 52 52">
+              <circle cx="26" cy="26" r="24" fill="none" stroke="#e5e7eb" strokeWidth="3" />
+              <circle
+                cx="26"
+                cy="26"
+                r="24"
+                fill="none"
+                stroke="#059669"
+                strokeWidth="3"
+                strokeDasharray={`${2 * Math.PI * 24}`}
+                strokeDashoffset={`${2 * Math.PI * 24 - (2 * Math.PI * 24 * profileProgress) / 100}`}
+                strokeLinecap="round"
+                className="transition-all duration-500 ease-out"
+                style={{ transform: 'rotate(-90deg)', transformOrigin: '50% 50%' }}
+              />
+            </svg>
+
             {/* Avatar Button */}
             <button 
               onClick={() => setIsDropdownOpen(!isDropdownOpen)}
@@ -330,6 +348,11 @@ export function ProtectedHeader() {
                 </span>
               )}
             </button>
+
+            {/* Percentage Badge */}
+            <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 bg-white px-2 py-0.5 rounded-full text-[10px] font-bold text-[#059669] border border-gray-100 shadow-sm z-20">
+              {profileProgress}%
+            </div>
           </div>
 
           {/* Dropdown Menu */}
