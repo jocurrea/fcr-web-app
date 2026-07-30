@@ -11,7 +11,8 @@ export function ProtectedHeader() {
   const pathname = usePathname();
   const router = useRouter();
   const [profilePhoto, setProfilePhoto] = useState<string | null>(null);
-  const [profileProgress, setProfileProgress] = useState(0);
+  const [profileProgress, setProfileProgress] = useState(30);
+  const [accountTypeState, setAccountTypeState] = useState<string>('');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -122,6 +123,7 @@ export function ProtectedHeader() {
         if (hasCookie || hasMetadata || hasSessionStorage || hasLocalStorageNew) {
           onboarded = true;
           accountType = 'flight_crew';
+          setAccountTypeState('flight_crew');
           // Still load the profile photo in background
           supabase.from('users').select('profileImage').eq('id', session.user.id).maybeSingle()
             .then(({ data }) => { 
@@ -151,6 +153,7 @@ export function ProtectedHeader() {
           if (userRecord) {
             onboarded = !!userRecord.onboarded;
             accountType = userRecord.accountType || '';
+            setAccountTypeState(accountType);
             if (userRecord.profileImage) {
               setProfilePhoto(userRecord.profileImage);
             } else {
@@ -162,13 +165,13 @@ export function ProtectedHeader() {
           // Calculate progress if we have resume data
           if (resumeFallback?.data) {
             const rData = resumeFallback.data as any;
-            let currentProgress = 0;
+            let currentProgress = 30;
             if (rData.personal && Object.keys(rData.personal).length > 0) currentProgress += 15;
             if (rData.licenses && Array.isArray(rData.licenses) && rData.licenses.length > 0) currentProgress += 15;
-            if (rData.ratings && Array.isArray(rData.ratings) && rData.ratings.length > 0) currentProgress += 20;
-            if (rData.work && Object.keys(rData.work).length > 0) currentProgress += 20;
-            if (rData.resume && Object.keys(rData.resume).length > 0) currentProgress += 30;
-            setProfileProgress(currentProgress);
+            if (rData.ratings && Array.isArray(rData.ratings) && rData.ratings.length > 0) currentProgress += 15;
+            if (rData.work && Object.keys(rData.work).length > 0) currentProgress += 10;
+            if (rData.resume && Object.keys(rData.resume).length > 0) currentProgress += 15;
+            setProfileProgress(Math.min(currentProgress, 100));
             
             // Also proves they finished flight crew if not yet onboarded
             if (!onboarded) {
@@ -177,10 +180,10 @@ export function ProtectedHeader() {
             }
           } else {
             // Fallback to local storage if no DB data yet
-            let localProg = 0;
+            let localProg = 30;
             if (localStorage.getItem("onboarding_personal")) localProg += 15;
             if (localStorage.getItem("onboarding_licenses")) localProg += 15;
-            setProfileProgress(localProg);
+            setProfileProgress(Math.min(localProg, 100));
           }
         } catch (e) {
           console.error("Failed to fetch from users/resumes", e);
@@ -199,6 +202,7 @@ export function ProtectedHeader() {
 
           if (companies && companies.length > 0) {
             accountType = 'business';
+            setAccountTypeState('business');
             const status = companies[0].status;
             if (status === 'approved' || status === 'pending') {
               onboarded = true;
@@ -217,6 +221,7 @@ export function ProtectedHeader() {
         if (!onboarded && hasLocalStorageLegacy && (pathname === '/home' || pathname.startsWith('/home'))) {
           onboarded = true;
           accountType = 'flight_crew';
+          setAccountTypeState('flight_crew');
         }
 
         console.log('[ProtectedHeader] DB path result:', { onboarded, accountType });
@@ -312,23 +317,25 @@ export function ProtectedHeader() {
             <Plus className="w-[26px] h-[26px]" />
           </Link>
           <div className="relative inline-flex items-center justify-center" style={{ width: '52px', height: '52px' }}>
-            {/* SVG Progress Ring */}
-            <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 52 52">
-              <circle cx="26" cy="26" r="24" fill="none" stroke="#e5e7eb" strokeWidth="3" />
-              <circle
-                cx="26"
-                cy="26"
-                r="24"
-                fill="none"
-                stroke="#059669"
-                strokeWidth="3"
-                strokeDasharray={`${2 * Math.PI * 24}`}
-                strokeDashoffset={`${2 * Math.PI * 24 - (2 * Math.PI * 24 * profileProgress) / 100}`}
-                strokeLinecap="round"
-                className="transition-all duration-500 ease-out"
-                style={{ transform: 'rotate(-90deg)', transformOrigin: '50% 50%' }}
-              />
-            </svg>
+            {/* SVG Progress Ring - Only for Flight Crew */}
+            {accountTypeState === 'flight_crew' && (
+              <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 52 52">
+                <circle cx="26" cy="26" r="24" fill="none" stroke="#e5e7eb" strokeWidth="3" />
+                <circle
+                  cx="26"
+                  cy="26"
+                  r="24"
+                  fill="none"
+                  stroke={profileProgress === 100 ? "#059669" : "#f97316"}
+                  strokeWidth="3"
+                  strokeDasharray={`${2 * Math.PI * 24}`}
+                  strokeDashoffset={`${2 * Math.PI * 24 - (2 * Math.PI * 24 * profileProgress) / 100}`}
+                  strokeLinecap="round"
+                  className="transition-all duration-500 ease-out"
+                  style={{ transform: 'rotate(-90deg)', transformOrigin: '50% 50%' }}
+                />
+              </svg>
+            )}
 
             {/* Avatar Button */}
             <button 
@@ -349,10 +356,15 @@ export function ProtectedHeader() {
               )}
             </button>
 
-            {/* Percentage Badge */}
-            <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 bg-white px-2 py-0.5 rounded-full text-[10px] font-bold text-[#059669] border border-gray-100 shadow-sm z-20">
-              {profileProgress}%
-            </div>
+            {/* Percentage Badge - Only for Flight Crew */}
+            {accountTypeState === 'flight_crew' && (
+              <div 
+                className={`absolute left-1/2 -translate-x-1/2 bg-white px-2 py-[1px] rounded-full text-[10px] font-bold ${profileProgress === 100 ? 'text-[#059669]' : 'text-[#f97316]'} border border-gray-100 shadow-sm z-20`}
+                style={{ bottom: '-6px' }}
+              >
+                {profileProgress}%
+              </div>
+            )}
           </div>
 
           {/* Dropdown Menu */}
