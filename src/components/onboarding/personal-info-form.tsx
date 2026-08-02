@@ -99,19 +99,47 @@ export function PersonalInfoForm({ onNext }: PersonalInfoFormProps) {
     }
   }, []);
   
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const url = URL.createObjectURL(file);
-      setPhotoPreview(url);
+      if (file.size > 5 * 1024 * 1024) {
+        alert("File is too large (max 5MB)");
+        return;
+      }
       
-      // Convert to Base64 and save to localStorage
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const base64String = reader.result as string;
-        localStorage.setItem("userProfilePhoto", base64String);
-      };
-      reader.readAsDataURL(file);
+      const url = URL.createObjectURL(file);
+      setPhotoPreview(url); // Optimistic preview
+      
+      try {
+        const { supabase } = await import('@/lib/supabase');
+        const { data: userData } = await supabase.auth.getUser();
+        
+        if (userData?.user) {
+          const fileExt = file.name.split('.').pop();
+          const fileName = `${Math.random()}.${fileExt}`;
+          const filePath = `profiles/${userData.user.id}-${fileName}`;
+          
+          const { error: uploadError } = await supabase.storage
+            .from('uploads')
+            .upload(filePath, file);
+            
+          if (uploadError) {
+            console.error("Error uploading profile image:", uploadError);
+            alert("Error uploading image. Please try again.");
+            return;
+          }
+          
+          const { data: publicUrlData } = supabase.storage
+            .from('uploads')
+            .getPublicUrl(filePath);
+            
+          if (publicUrlData?.publicUrl) {
+            localStorage.setItem("userProfilePhoto", publicUrlData.publicUrl);
+          }
+        }
+      } catch (err) {
+        console.error("Upload failed", err);
+      }
     }
   };
 

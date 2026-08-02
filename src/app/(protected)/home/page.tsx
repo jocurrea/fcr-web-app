@@ -4,8 +4,8 @@ import { useState, useEffect, Suspense, useRef } from "react";
 import { PostCard } from "@/components/home/post-card";
 import { fetchPosts, Post } from "@/lib/api/posts";
 import { supabase } from "@/lib/supabase";
-import { Clock, CheckCircle2, X } from "lucide-react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { Clock, CheckCircle2, X, Check } from "lucide-react";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
 
 function HomeContent() {
   const [posts, setPosts] = useState<Post[]>([]);
@@ -13,8 +13,25 @@ function HomeContent() {
   const [isCompanyPending, setIsCompanyPending] = useState(false);
   const searchParams = useSearchParams();
   const router = useRouter();
+  const pathname = usePathname();
   const [showSuccessBanner, setShowSuccessBanner] = useState(false);
+  const [showReportToast, setShowReportToast] = useState(false);
   const hasTriggeredRef = useRef(false);
+
+  useEffect(() => {
+    if (!loading && searchParams.get("reported") === "true") {
+      console.log("Home: Setting toast to true after loading finished");
+      setShowReportToast(true);
+      
+      const timer = setTimeout(() => {
+        console.log("Home: Hiding toast and clearing URL");
+        setShowReportToast(false);
+        router.replace(pathname, { scroll: false });
+      }, 3000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [loading, searchParams, pathname, router]);
 
   useEffect(() => {
     if (searchParams.get("registered") === "true" && !hasTriggeredRef.current) {
@@ -63,6 +80,23 @@ function HomeContent() {
       setLoading(false);
     }
     loadData();
+
+    // Subscribe to new posts for real-time feed updates
+    const channel = supabase
+      .channel('home-posts')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'posts' },
+        () => {
+          // When a new post is created, fetch the latest posts to update the UI
+          fetchPosts().then(data => setPosts(data));
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   if (loading) {
@@ -127,6 +161,21 @@ function HomeContent() {
             comments={post.comments}
           />
         ))
+      )}
+
+      {/* Report Toast Notification */}
+      {showReportToast && (
+        <div className="fixed top-28 left-1/2 -translate-x-1/2 z-[100] w-[90%] max-w-sm bg-white rounded-full shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-gray-100 p-3 pr-4 flex items-center justify-between gap-3 animate-in fade-in slide-in-from-top-4 duration-300">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full border-2 flex items-center justify-center shrink-0 ml-1" style={{ borderColor: '#16a34a' }}>
+              <Check className="w-5 h-5 stroke-[3]" color="#16a34a" />
+            </div>
+            <p className="text-gray-900 font-semibold text-[15px]">Report submitted</p>
+          </div>
+          <button onClick={() => setShowReportToast(false)} className="p-1.5 hover:bg-gray-100 rounded-full transition-colors shrink-0">
+            <X className="w-5 h-5 text-gray-800" />
+          </button>
+        </div>
       )}
     </div>
   );

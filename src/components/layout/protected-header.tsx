@@ -124,7 +124,7 @@ export function ProtectedHeader() {
           onboarded = true;
           accountType = 'flight_crew';
           setAccountTypeState('flight_crew');
-          // Still load the profile photo in background
+          // Still load the profile photo and progress in background
           supabase.from('users').select('profileImage').eq('id', session.user.id).maybeSingle()
             .then(({ data }) => { 
               if (data?.profileImage) {
@@ -134,6 +134,49 @@ export function ProtectedHeader() {
                 if (savedPhoto) setProfilePhoto(savedPhoto);
               }
             });
+
+          supabase.from('resumes').select('data').eq('userId', session.user.id).maybeSingle()
+            .then(({ data: resumeFallback }) => {
+              if (resumeFallback?.data) {
+                const rData = resumeFallback.data as any;
+                let currentProgress = 30;
+                
+                const hasValue = (obj: any) => {
+                  if (!obj) return false;
+                  if (Array.isArray(obj)) return obj.length > 0;
+                  return Object.values(obj).some(val => {
+                    if (typeof val === 'string') return val.trim().length > 0;
+                    if (Array.isArray(val)) return val.length > 0;
+                    return val !== null && val !== undefined;
+                  });
+                };
+
+                if (hasValue(rData.personal)) currentProgress += 15;
+                if (hasValue(rData.licenses)) currentProgress += 15;
+                if (hasValue(rData.ratings)) currentProgress += 15;
+                if (hasValue(rData.work)) currentProgress += 10;
+                if (hasValue(rData.resume)) currentProgress += 15;
+                
+                setProfileProgress(Math.min(currentProgress, 100));
+              } else {
+                let localProg = 30;
+                try {
+                  const getLocal = (key: string) => {
+                    const item = localStorage.getItem(key);
+                    return item ? JSON.parse(item) : null;
+                  };
+                  if (hasValue(getLocal("onboarding_personal"))) localProg += 15;
+                  if (hasValue(getLocal("onboarding_licenses"))) localProg += 15;
+                  if (hasValue(getLocal("onboarding_ratings"))) localProg += 15;
+                  if (hasValue(getLocal("onboarding_work"))) localProg += 10;
+                  if (hasValue(getLocal("onboarding_resume"))) localProg += 15;
+                } catch (e) {
+                  console.error("Error parsing local storage for progress", e);
+                }
+                setProfileProgress(Math.min(localProg, 100));
+              }
+            });
+
           // No need for redirect checks — user is onboarded
           return;
         }
@@ -166,11 +209,23 @@ export function ProtectedHeader() {
           if (resumeFallback?.data) {
             const rData = resumeFallback.data as any;
             let currentProgress = 30;
-            if (rData.personal && Object.keys(rData.personal).length > 0) currentProgress += 15;
-            if (rData.licenses && Array.isArray(rData.licenses) && rData.licenses.length > 0) currentProgress += 15;
-            if (rData.ratings && Array.isArray(rData.ratings) && rData.ratings.length > 0) currentProgress += 15;
-            if (rData.work && Object.keys(rData.work).length > 0) currentProgress += 10;
-            if (rData.resume && Object.keys(rData.resume).length > 0) currentProgress += 15;
+            
+            const hasValue = (obj: any) => {
+              if (!obj) return false;
+              if (Array.isArray(obj)) return obj.length > 0;
+              return Object.values(obj).some(val => {
+                if (typeof val === 'string') return val.trim().length > 0;
+                if (Array.isArray(val)) return val.length > 0;
+                return val !== null && val !== undefined;
+              });
+            };
+
+            if (hasValue(rData.personal)) currentProgress += 15;
+            if (hasValue(rData.licenses)) currentProgress += 15;
+            if (hasValue(rData.ratings)) currentProgress += 15;
+            if (hasValue(rData.work)) currentProgress += 10;
+            if (hasValue(rData.resume)) currentProgress += 15;
+            
             setProfileProgress(Math.min(currentProgress, 100));
             
             // Also proves they finished flight crew if not yet onboarded
@@ -181,8 +236,19 @@ export function ProtectedHeader() {
           } else {
             // Fallback to local storage if no DB data yet
             let localProg = 30;
-            if (localStorage.getItem("onboarding_personal")) localProg += 15;
-            if (localStorage.getItem("onboarding_licenses")) localProg += 15;
+            try {
+              const getLocal = (key: string) => {
+                const item = localStorage.getItem(key);
+                return item ? JSON.parse(item) : null;
+              };
+              if (hasValue(getLocal("onboarding_personal"))) localProg += 15;
+              if (hasValue(getLocal("onboarding_licenses"))) localProg += 15;
+              if (hasValue(getLocal("onboarding_ratings"))) localProg += 15;
+              if (hasValue(getLocal("onboarding_work"))) localProg += 10;
+              if (hasValue(getLocal("onboarding_resume"))) localProg += 15;
+            } catch (e) {
+              console.error("Error parsing local storage for progress", e);
+            }
             setProfileProgress(Math.min(localProg, 100));
           }
         } catch (e) {

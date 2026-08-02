@@ -18,12 +18,14 @@ import {
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
+import { Loader2 } from "lucide-react";
 
 interface ResumeStepProps {
   onNext: () => void;
+  isSaving?: boolean;
 }
 
-export function ResumeStep({ onNext }: ResumeStepProps) {
+export function ResumeStep({ onNext, isSaving }: ResumeStepProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -516,14 +518,22 @@ export function ResumeStep({ onNext }: ResumeStepProps) {
       <div className="p-4 bg-white mt-auto mb-4">
         <Button 
           onClick={handleFinishLocal}
+          disabled={isSaving}
           className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-full py-6 text-lg font-semibold"
         >
-          Save Profile
+          {isSaving ? (
+            <div className="flex items-center justify-center gap-2">
+              <Loader2 className="w-5 h-5 animate-spin" />
+              Saving...
+            </div>
+          ) : (
+            "Save Profile"
+          )}
         </Button>
       </div>
 
       <Dialog open={isWebsiteModalOpen} onOpenChange={setIsWebsiteModalOpen}>
-        <DialogContent className="sm:max-w-[400px] bg-white p-6 rounded-3xl">
+        <DialogContent className="sm:max-w-[500px] bg-white p-6 rounded-3xl">
           <DialogHeader className="mb-2">
             <DialogTitle className="text-xl font-bold text-gray-900 text-left">
               Add website
@@ -567,14 +577,14 @@ export function ResumeStep({ onNext }: ResumeStepProps) {
       </Dialog>
 
       <Dialog open={isSkillModalOpen} onOpenChange={setIsSkillModalOpen}>
-        <DialogContent className="sm:max-w-[400px] bg-white p-6 rounded-3xl max-h-[90vh] flex flex-col">
+        <DialogContent className="sm:max-w-[500px] bg-white p-6 rounded-3xl max-h-[90vh] flex flex-col">
           <DialogHeader className="mb-2 shrink-0">
             <DialogTitle className="text-xl font-bold text-gray-900 text-left">
               Add Skill
             </DialogTitle>
           </DialogHeader>
           
-          <div className="flex-1 overflow-y-auto pr-2 space-y-4">
+          <div className="flex-1 overflow-y-auto px-2 space-y-4">
             <Input 
               placeholder="Enter text" 
               className="rounded-2xl py-6"
@@ -630,7 +640,7 @@ export function ResumeStep({ onNext }: ResumeStepProps) {
       </Dialog>
 
       <Dialog open={isLangModalOpen} onOpenChange={setIsLangModalOpen}>
-        <DialogContent className="sm:max-w-[400px] bg-white p-6 rounded-3xl">
+        <DialogContent className="sm:max-w-[500px] bg-white p-6 rounded-3xl">
           <DialogHeader className="mb-2">
             <DialogTitle className="text-xl font-bold text-gray-900 text-left">
               Add Language
@@ -701,7 +711,7 @@ export function ResumeStep({ onNext }: ResumeStepProps) {
       </Dialog>
 
       <Dialog open={isAwardModalOpen} onOpenChange={setIsAwardModalOpen}>
-        <DialogContent className="sm:max-w-[400px] bg-white p-6 rounded-3xl">
+        <DialogContent className="sm:max-w-[500px] bg-white p-6 rounded-3xl">
           <DialogHeader className="mb-2">
             <DialogTitle className="text-xl font-bold text-gray-900 text-left">
               Add award
@@ -747,7 +757,7 @@ export function ResumeStep({ onNext }: ResumeStepProps) {
       </Dialog>
 
       <Dialog open={isTrainingModalOpen} onOpenChange={setIsTrainingModalOpen}>
-        <DialogContent className="sm:max-w-[400px] bg-white p-6 rounded-3xl">
+        <DialogContent className="sm:max-w-[500px] bg-white p-6 rounded-3xl">
           <DialogHeader className="mb-2">
             <DialogTitle className="text-xl font-bold text-gray-900 text-left">
               Education
@@ -824,13 +834,13 @@ export function ResumeStep({ onNext }: ResumeStepProps) {
       </Dialog>
 
       <Dialog open={isExpModalOpen} onOpenChange={setIsExpModalOpen}>
-        <DialogContent className="sm:max-w-[400px] bg-white p-6 rounded-3xl max-h-[90vh] flex flex-col">
+        <DialogContent className="sm:max-w-[500px] bg-white p-6 rounded-3xl max-h-[90vh] flex flex-col">
           <DialogHeader className="mb-2 shrink-0">
             <DialogTitle className="text-xl font-bold text-gray-900 text-left">
               Add Experience
             </DialogTitle>
           </DialogHeader>
-          <div className="flex-1 overflow-y-auto pr-2 space-y-6 pb-6">
+          <div className="flex-1 overflow-y-auto px-2 space-y-6 pb-6">
             
             <div className="space-y-2">
               <Label className="text-gray-700 font-normal">Company</Label>
@@ -1061,7 +1071,7 @@ export function ResumeStep({ onNext }: ResumeStepProps) {
       </Dialog>
 
       <Dialog open={isAddingPlane} onOpenChange={setIsAddingPlane}>
-        <DialogContent className="sm:max-w-[400px] bg-white p-6 rounded-3xl z-[100]">
+        <DialogContent className="sm:max-w-[500px] bg-white p-6 rounded-3xl z-[100]">
           <DialogHeader className="mb-2">
             <DialogTitle className="text-xl font-bold text-gray-900 text-left">
               Add Plane

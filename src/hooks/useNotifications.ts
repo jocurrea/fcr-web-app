@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { createClient } from '@/lib/supabase/client';
+import { useEffect, useState, useMemo } from 'react';
+import { supabase } from '@/lib/supabase';
 
 export type Notification = {
   id: number;
@@ -10,12 +10,18 @@ export type Notification = {
   data: string;
   read: number;
   type: string;
+  sender?: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    profileImage: string;
+  };
 };
 
 export function useNotifications(userId?: string) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
-  const supabase = createClient();
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
     if (!userId) return;
@@ -28,7 +34,35 @@ export function useNotifications(userId?: string) {
         .eq('receiverId', userId)
         .order('created_at', { ascending: false });
 
-      if (!error && data) {
+      if (error) {
+        console.error("Notifications fetch error:", error);
+        setErrorMsg(error.message);
+        return;
+      }
+
+      if (data) {
+        // Fetch sender details
+        const senderIds = Array.from(
+          new Set(data.map((n) => n.senderId || (n as any).sender_id).filter(Boolean))
+        ) as string[];
+        
+        if (senderIds.length > 0) {
+          const { data: usersData } = await supabase
+            .from('users')
+            .select('id, firstName, lastName, profileImage')
+            .in('id', senderIds);
+            
+          if (usersData) {
+            const userMap = new Map(usersData.map((u) => [u.id, u]));
+            data.forEach((n) => {
+              const sId = n.senderId || (n as any).sender_id;
+              if (sId && userMap.has(sId)) {
+                n.sender = userMap.get(sId);
+              }
+            });
+          }
+        }
+
         setNotifications(data);
         setUnreadCount(data.filter((n) => n.read === 0).length);
       }
@@ -37,8 +71,9 @@ export function useNotifications(userId?: string) {
     fetchNotifications();
 
     // Subscribe to realtime changes
+    const channelId = `schema-db-changes-${Math.random().toString(36).substring(7)}`;
     const channel = supabase
-      .channel('schema-db-changes')
+      .channel(channelId)
       .on(
         'postgres_changes',
         {
@@ -47,8 +82,25 @@ export function useNotifications(userId?: string) {
           table: 'notifications',
           filter: `receiverId=eq.${userId}`,
         },
-        (payload) => {
+        async (payload) => {
           const newNotification = payload.new as Notification;
+          const sId = newNotification.senderId || (newNotification as any).sender_id || (newNotification as any).userId;
+          
+          if (sId) {
+            try {
+              const { data: userData } = await supabase
+                .from('users')
+                .select('id, firstName, lastName, profileImage')
+                .eq('id', sId)
+                .maybeSingle();
+              if (userData) {
+                newNotification.sender = userData;
+              }
+            } catch (err) {
+              console.error('Error fetching sender info for realtime notification:', err);
+            }
+          }
+          
           setNotifications((prev) => [newNotification, ...prev]);
           setUnreadCount((prev) => prev + 1);
         }
@@ -64,15 +116,8 @@ export function useNotifications(userId?: string) {
         (payload) => {
           const updatedNotification = payload.new as Notification;
           setNotifications((prev) =>
-            prev.map((n) => (n.id === updatedNotification.id ? updatedNotification : n))
+            prev.map((n) => (n.id === updatedNotification.id ? { ...updatedNotification, sender: n.sender } : n))
           );
-          // Recalculate unread count
-          setUnreadCount((prev) => {
-            const wasUnread = payload.old.read === 0;
-            const isNowRead = updatedNotification.read !== 0;
-            if (wasUnread && isNowRead) return Math.max(0, prev - 1);
-            return prev;
-          });
         }
       )
       .subscribe();
@@ -80,9 +125,18 @@ export function useNotifications(userId?: string) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [userId, supabase]);
+  }, [userId]);
+
+  // Automatically recalculate unread count whenever notifications array changes
+  useEffect(() => {
+    setUnreadCount(notifications.filter((n) => n.read === 0 || (n.read as any) === false).length);
+  }, [notifications]);
 
   const markAsRead = async (notificationId: number) => {
+    // Optimistic update for better UX
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === notificationId ? { ...n, read: 1 } : n))
+    );
     await supabase
       .from('notifications')
       .update({ read: 1 })
@@ -91,6 +145,12 @@ export function useNotifications(userId?: string) {
 
   const markAllAsRead = async () => {
     if (!userId) return;
+    
+    // Optimistic update
+    setNotifications((prev) =>
+      prev.map((n) => ({ ...n, read: 1 }))
+    );
+    
     await supabase
       .from('notifications')
       .update({ read: 1 })
@@ -101,6 +161,7 @@ export function useNotifications(userId?: string) {
   return {
     notifications,
     unreadCount,
+    errorMsg,
     markAsRead,
     markAllAsRead,
   };

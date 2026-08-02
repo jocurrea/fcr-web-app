@@ -306,9 +306,12 @@ export default function ProfilePage() {
         
         {/* Location */}
         <div className="flex flex-col gap-1.5">
-          <div className="flex items-center gap-1.5 text-gray-800 font-medium">
+          <div className="flex items-center gap-2 text-gray-800 font-medium">
             <MapPin className="w-[16px] h-[16px] text-gray-600" />
-            <span className="text-[14px] uppercase">{country}</span>
+            {rawCountry && (
+              <img src={`https://flagcdn.com/w20/${rawCountry}.png`} srcSet={`https://flagcdn.com/w40/${rawCountry}.png 2x`} width="20" alt="flag" className="shadow-sm" />
+            )}
+            <span className="text-[15px]">{country}</span>
           </div>
           {website && <a href={website} target="_blank" rel="noreferrer" className="text-blue-500 hover:underline text-[14px] font-medium ml-[22px]">{website}</a>}
         </div>

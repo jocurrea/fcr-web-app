@@ -14,16 +14,23 @@ export default function FrequencyFeedPage() {
   const [frequencyName, setFrequencyName] = useState("test");
   const [frequencyBanner, setFrequencyBanner] = useState("https://images.unsplash.com/photo-1544015759-237f88e55f56?auto=format&fit=crop&q=80&w=800");
   const [showLeaveModal, setShowLeaveModal] = useState(false);
+  const [canEdit, setCanEdit] = useState(false);
 
   useEffect(() => {
     // Attempt to load frequency name and banner from DB
     async function loadData() {
       const { fetchFrequencyById } = await import("@/lib/api/frequencies");
+      const { supabase } = await import("@/lib/supabase");
+      const { data: { session } } = await supabase.auth.getSession();
+      
       const freq = await fetchFrequencyById(id);
       
       if (freq) {
         setFrequencyName(freq.name);
         if (freq.image) setFrequencyBanner(freq.image);
+        if (session && freq.userId === session.user.id) {
+          setCanEdit(true);
+        }
       }
 
       // Load posts for this frequency
@@ -98,9 +105,21 @@ export default function FrequencyFeedPage() {
       </header>
 
       {/* Banner */}
-      <div className="px-4 mt-1">
-        <div className="w-full h-44 rounded-2xl overflow-hidden relative shadow-sm bg-gray-200">
-          <img src={frequencyBanner} alt="Banner" className="w-full h-full object-cover" />
+      <div className="relative w-full h-[180px] shrink-0 px-4">
+        <div className="w-full h-full rounded-3xl overflow-hidden relative shadow-sm bg-gray-200">
+          <img 
+            src={frequencyBanner} 
+            alt="Frequency Banner" 
+            className="w-full h-full object-cover"
+          />
+          {canEdit && (
+            <Link 
+              href={`/frequencies/${id}/edit`}
+              className="absolute top-3 right-3 bg-white text-blue-600 font-semibold text-[14px] px-5 py-1.5 rounded-full shadow-md hover:bg-gray-50 transition-colors z-10"
+            >
+              Edit
+            </Link>
+          )}
         </div>
       </div>
 

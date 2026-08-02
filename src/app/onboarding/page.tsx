@@ -255,7 +255,7 @@ export default function OnboardingPage() {
         {step === 2 && <LicensesStep onNext={isEditMode ? handleNext : handleFinish} isSaving={!isEditMode && isSaving} buttonLabel={isEditMode ? "Next" : "Finish"} />}
         {isEditMode && step === 3 && <RatingsStep onNext={handleNext} />}
         {isEditMode && step === 4 && <WorkStep onNext={handleNext} />}
-        {isEditMode && step === 5 && <ResumeStep onNext={handleFinish} />}
+        {isEditMode && step === 5 && <ResumeStep onNext={handleFinish} isSaving={isSaving} />}
       </div>
     </div>
   );

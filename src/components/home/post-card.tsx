@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
+import Link from "next/link";
 import { MoreHorizontal, Heart, MessageCircle, Flag, Forward } from "lucide-react";
 
 interface PostCardProps {
@@ -19,6 +20,7 @@ interface PostCardProps {
 
 export function PostCard({ id, user, date, content, image, likes, liked, comments, hideActions }: PostCardProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const [isLiked, setIsLiked] = useState(liked || false);
   const [likeCount, setLikeCount] = useState(likes || 0);
 
@@ -114,9 +116,9 @@ export function PostCard({ id, user, date, content, image, likes, liked, comment
         <button onClick={() => alert("Share functionality coming soon")} className="hover:text-blue-500 transition-colors" title="Share">
           <Forward className="w-[22px] h-[22px]" />
         </button>
-        <button onClick={() => alert("Report content functionality coming soon")} className="hover:text-red-500 transition-colors" title="Report">
+        <Link href={`/report-post/${id}?returnTo=${encodeURIComponent(pathname)}`} className="hover:text-red-500 transition-colors" title="Report">
           <Flag className="w-[20px] h-[20px]" />
-        </button>
+        </Link>
       </div>
     </div>
   );

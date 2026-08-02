@@ -1,38 +1,31 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
-import { ChevronLeft, Upload, ChevronDown, XCircle, Info, X, Clock } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { ChevronLeft, Upload, XCircle, Info, X, Clock } from "lucide-react";
+import { useRouter, useParams } from "next/navigation";
 
-type DBUser = {
-  id: string;
-  firstName: string;
-  lastName: string;
-  profileImage: string | null;
-};
-
-export default function NewFrequencyPage() {
+export default function EditFrequencyPage() {
   const router = useRouter();
-  const [isPublic, setIsPublic] = useState(true);
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
-  const [users, setUsers] = useState<DBUser[]>([]);
-  const [searchQuery, setSearchQuery] = useState("");
+  const params = useParams();
+  const id = params.id as string;
+
   const [frequencyIcon, setFrequencyIcon] = useState<string | null>(null);
   const [frequencyIconFile, setFrequencyIconFile] = useState<File | null>(null);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [errorToast, setErrorToast] = useState<string | null>(null);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-
+  
   const [isCompanyPending, setIsCompanyPending] = useState(false);
   const [showPendingModal, setShowPendingModal] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    async function loadCompanyStatus() {
+    async function loadData() {
+      const { fetchFrequencyById } = await import("@/lib/api/frequencies");
       const { supabase } = await import('@/lib/supabase');
       const { data: { session } } = await supabase.auth.getSession();
+      
       if (session) {
         const { data: companies } = await supabase
           .from('companies')
@@ -45,32 +38,26 @@ export default function NewFrequencyPage() {
           setIsCompanyPending(true);
         }
       }
-    }
-    async function loadUsers() {
-      const { supabase } = await import('@/lib/supabase');
-      const { data } = await supabase.from('users').select('id, firstName, lastName, profileImage').limit(100);
-      if (data) {
-        // Filter out users with no name
-        const validUsers = data.filter(u => (u.firstName && u.firstName.trim() !== '') || (u.lastName && u.lastName.trim() !== ''));
-        setUsers(validUsers);
-      }
-    }
-    loadCompanyStatus();
-    loadUsers();
-    function handleClickOutside(event: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsDropdownOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
 
-  const toggleUser = (id: string) => {
-    setSelectedUsers(prev => 
-      prev.includes(id) ? prev.filter(uid => uid !== id) : [...prev, id]
-    );
-  };
+      const freq = await fetchFrequencyById(id);
+      if (freq) {
+        // Pre-populate fields
+        setName(freq.name || "");
+        setDescription(freq.description || "");
+        if (freq.image) {
+          setFrequencyIcon(freq.image);
+        }
+        
+        // Security check
+        if (!session || freq.userId !== session.user.id) {
+          router.push(`/frequencies/${id}`); // redirect non-owners
+          return;
+        }
+      }
+      setIsLoading(false);
+    }
+    loadData();
+  }, [id, router]);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -94,7 +81,7 @@ export default function NewFrequencyPage() {
     setFrequencyIconFile(null);
   };
 
-  const handleCreateFrequency = async () => {
+  const handleUpdateFrequency = async () => {
     if (isCompanyPending) {
       setShowPendingModal(true);
       return;
@@ -103,33 +90,29 @@ export default function NewFrequencyPage() {
       setErrorToast("Please provide a name for the frequency.");
       return;
     }
-    
-    if (selectedUsers.length === 0) {
-      setErrorToast("Please invite at least 1 frequency member");
-      return;
-    }
 
     const frequencyName = name.trim();
     
-    // Using the new Supabase API
-    const { createFrequency } = await import('@/lib/api/frequencies');
-    const result = await createFrequency(frequencyName, description.trim() || null, frequencyIconFile || undefined, isPublic, selectedUsers);
+    const { updateFrequency } = await import('@/lib/api/frequencies');
+    const result = await updateFrequency(id, frequencyName, description.trim() || null, frequencyIconFile || undefined);
 
     if (result.success) {
-      router.push("/frequencies");
+      router.push(`/frequencies/${id}`);
     } else {
-      setErrorToast(result.error || "Error creating frequency. Please try again.");
+      setErrorToast(result.error || "Error updating frequency. Please try again.");
     }
   };
+
+  if (isLoading) return <div className="min-h-screen bg-white" />;
 
   return (
     <div className="max-w-lg mx-auto flex flex-col w-full bg-white min-h-screen z-50 fixed inset-0 md:relative md:inset-auto pb-10 overflow-y-auto">
       {/* Header */}
       <header className="flex items-center py-5 px-4 relative mt-2">
-        <Link href="/frequencies" className="p-2.5 bg-gray-100 hover:bg-gray-200 transition-colors rounded-full shadow-sm">
+        <Link href={`/frequencies/${id}`} className="p-2.5 bg-gray-100 hover:bg-gray-200 transition-colors rounded-full shadow-sm">
           <ChevronLeft className="w-5 h-5 text-gray-800 stroke-[2.5]" />
         </Link>
-        <h1 className="flex-1 text-center text-[19px] font-semibold text-gray-800 pr-10">New Frequency</h1>
+        <h1 className="flex-1 text-center text-[19px] font-semibold text-gray-800 pr-10">Update Frequency</h1>
       </header>
 
       <div className="px-6 mt-4">
@@ -147,26 +130,6 @@ export default function NewFrequencyPage() {
           </div>
         )}
 
-        {/* Toggle Public / Private */}
-        <div className="flex bg-[#e2e8f0] rounded-full p-1 mb-8 shadow-inner">
-          <button
-            className={`flex-1 py-2.5 text-[15px] font-semibold rounded-full transition-all ${
-              isPublic ? "bg-[#1a73e8] text-white shadow-sm" : "text-gray-500 hover:text-gray-700"
-            }`}
-            onClick={() => setIsPublic(true)}
-          >
-            Public
-          </button>
-          <button
-            className={`flex-1 py-2.5 text-[15px] font-semibold rounded-full transition-all ${
-              !isPublic ? "bg-gray-300 text-gray-700 shadow-sm" : "text-gray-500 hover:text-gray-700"
-            }`}
-            onClick={() => setIsPublic(false)}
-          >
-            Private
-          </button>
-        </div>
-
         {/* Inputs */}
         <div className="mb-6">
           <label className="block text-[14px] text-gray-700 mb-1.5 ml-1">Name</label>
@@ -179,7 +142,7 @@ export default function NewFrequencyPage() {
         </div>
 
         <div className="mb-6">
-          <label className="block text-[14px] text-gray-700 mb-1.5 ml-1">Personal Description</label>
+          <label className="block text-[14px] text-gray-700 mb-1.5 ml-1">Description</label>
           <textarea
             rows={4}
             value={description}
@@ -208,83 +171,12 @@ export default function NewFrequencyPage() {
           )}
         </div>
 
-        <div className="mb-6" ref={dropdownRef}>
-          <label className="block text-[14px] text-gray-700 mb-1.5 ml-1">Invite Members</label>
-          <div className="relative">
-            <div 
-              className="w-full border border-gray-300 rounded-full px-5 py-3 bg-white flex items-center justify-between cursor-text"
-              onClick={() => setIsDropdownOpen(true)}
-            >
-              <input 
-                type="text"
-                placeholder="Search users..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full text-[14px] text-gray-800 focus:outline-none bg-transparent"
-              />
-              <ChevronDown className="w-5 h-5 text-gray-400 cursor-pointer" onClick={(e) => { e.stopPropagation(); setIsDropdownOpen(!isDropdownOpen); }} />
-            </div>
-
-            {/* Dropdown */}
-            {isDropdownOpen && (
-              <div className="mt-2 w-full bg-white rounded-xl shadow-sm border border-gray-200 py-2 max-h-60 overflow-y-auto">
-                {users.filter(u => `${u.firstName} ${u.lastName}`.toLowerCase().includes(searchQuery.toLowerCase())).map((user) => (
-                  <div 
-                    key={user.id} 
-                    className={`flex items-center gap-3 px-4 py-2 cursor-pointer transition-colors ${
-                      selectedUsers.includes(user.id) ? "bg-blue-50" : "hover:bg-gray-50"
-                    }`}
-                    onClick={() => {
-                      toggleUser(user.id);
-                      setSearchQuery("");
-                      setIsDropdownOpen(false);
-                    }}
-                  >
-                    <img src={user.profileImage || `https://ui-avatars.com/api/?name=${user.firstName}+${user.lastName}&background=random`} alt={user.firstName} className="w-8 h-8 rounded-full object-cover" />
-                    <span className={`text-[15px] ${selectedUsers.includes(user.id) ? "text-blue-700 font-medium" : "text-gray-700"}`}>
-                      {user.firstName} {user.lastName}
-                    </span>
-                  </div>
-                ))}
-                {users.filter(u => `${u.firstName} ${u.lastName}`.toLowerCase().includes(searchQuery.toLowerCase())).length === 0 && (
-                  <div className="px-4 py-3 text-sm text-gray-500 text-center">No users found</div>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Selected Members List */}
-        {selectedUsers.length > 0 && (
-          <div className="mb-8">
-            <h3 className="text-[15px] text-gray-800 mb-3 ml-1">Frequency Members</h3>
-            <div className="flex flex-col gap-3">
-              {selectedUsers.map(id => {
-                const user = users.find(u => u.id === id);
-                if (!user) return null;
-                return (
-                  <div key={user.id} className="flex items-center gap-3 ml-1">
-                    <img src={user.profileImage || `https://ui-avatars.com/api/?name=${user.firstName}+${user.lastName}&background=random`} alt={user.firstName} className="w-7 h-7 rounded-full object-cover" />
-                    <span className="text-[15px] text-gray-800">{user.firstName} {user.lastName}</span>
-                    <button 
-                      onClick={() => toggleUser(user.id)}
-                      className="text-red-500 hover:text-red-600 transition-colors ml-1"
-                    >
-                      <XCircle className="w-5 h-5 stroke-[1.5]" />
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
         {/* Submit Button */}
         <button 
-          onClick={handleCreateFrequency}
+          onClick={handleUpdateFrequency}
           className="w-full bg-[#1a73e8] hover:bg-blue-700 transition-colors text-white font-bold text-[16px] py-4 rounded-full shadow-md mt-4"
         >
-          Create Frequency
+          Update Frequency
         </button>
       </div>
 

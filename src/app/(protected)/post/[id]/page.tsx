@@ -1,15 +1,19 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter, useParams } from "next/navigation";
+import { useRouter, useParams, useSearchParams, usePathname } from "next/navigation";
+import Link from "next/link";
 import { ChevronLeft, Edit2, Trash2, Send, X, Check, Flag, Forward, Info, Clock } from "lucide-react";
 import { PostCard } from "@/components/home/post-card";
 import { fetchPostById, fetchPostComments, createComment, deleteComment, deletePost, updateComment, Post, Comment } from "@/lib/api/posts";
 import { supabase } from "@/lib/supabase";
 
-export default function PostDetailPage() {
+import { Suspense } from "react";
+
+function PostDetailContent() {
   const router = useRouter();
   const params = useParams();
+  const pathname = usePathname();
   const id = params?.id as string;
   
   const [post, setPost] = useState<Post | null>(null);
@@ -24,6 +28,22 @@ export default function PostDetailPage() {
   // Edit comment state
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
   const [editingCommentText, setEditingCommentText] = useState("");
+  const [showReportToast, setShowReportToast] = useState(false);
+
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    if (!loading && searchParams.get("reported") === "true") {
+      setShowReportToast(true);
+      
+      const timer = setTimeout(() => {
+        setShowReportToast(false);
+        router.replace(pathname, { scroll: false });
+      }, 3000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [loading, searchParams, pathname, router]);
   const [isCompanyPending, setIsCompanyPending] = useState(false);
 
   useEffect(() => {
@@ -275,12 +295,11 @@ export default function PostDetailPage() {
                         </div>
                         {/* Actions */}
                         <div className="flex items-center gap-2.5 text-gray-400 ml-2">
-                          <button onClick={() => alert("Report comment functionality coming soon")} className="text-gray-400 hover:text-red-500 transition-colors" title="Report">
-                            <Flag className="w-3.5 h-3.5" />
-                          </button>
-                          <button onClick={() => alert("Share functionality coming soon")} className="text-gray-400 hover:text-blue-500 transition-colors" title="Share">
-                            <Forward className="w-4 h-4" />
-                          </button>
+                          {!isCommentOwner && (
+                            <Link href={`/report-comment/${c.id}?returnTo=${encodeURIComponent(pathname)}`} className="text-gray-400 hover:text-red-500 transition-colors" title="Report">
+                              <Flag className="w-3.5 h-3.5" />
+                            </Link>
+                          )}
                           {isCommentOwner && !isEditing && (
                             <>
                               <button onClick={() => startEditingComment(c)} className="text-gray-400 hover:text-gray-600 transition-colors">
@@ -371,6 +390,29 @@ export default function PostDetailPage() {
           </div>
         </div>
       )}
+
+      {/* Report Toast Notification */}
+      {showReportToast && (
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[100] w-[90%] max-w-sm bg-white rounded-full shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-gray-100 p-3 pr-4 flex items-center justify-between gap-3 animate-in fade-in slide-in-from-top-4 duration-300">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full border-2 flex items-center justify-center shrink-0 ml-1" style={{ borderColor: '#16a34a' }}>
+              <Check className="w-5 h-5 stroke-[3]" color="#16a34a" />
+            </div>
+            <p className="text-gray-900 font-semibold text-[15px]">Report submitted</p>
+          </div>
+          <button onClick={() => setShowReportToast(false)} className="p-1.5 hover:bg-gray-100 rounded-full transition-colors shrink-0">
+            <X className="w-5 h-5 text-gray-800" />
+          </button>
+        </div>
+      )}
     </div>
+  );
+}
+
+export default function PostDetailPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex flex-col items-center justify-center bg-[#f8f9fa] px-4 text-center"><p className="text-gray-500 mt-4 text-lg font-semibold">Loading...</p></div>}>
+      <PostDetailContent />
+    </Suspense>
   );
 }

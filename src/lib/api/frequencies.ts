@@ -91,11 +91,17 @@ export async function fetchAvailableFrequencies(): Promise<Frequency[]> {
 /**
  * Create a new frequency
  */
-export async function createFrequency(name: string, description: string | null, iconFile?: File, isPublic: boolean = true): Promise<boolean> {
+export async function createFrequency(
+  name: string,
+  description: string | null,
+  iconFile: File | undefined,
+  isPublic: boolean,
+  selectedUsers: string[] = []
+): Promise<{ success: boolean; error?: string }> {
   const { data: userData } = await supabase.auth.getUser();
-  if (!userData?.user) return false;
+  if (!userData?.user) return { success: false, error: 'Not authenticated' };
 
-  let iconUrl = null;
+  let iconUrl: string | null = null;
 
   // Upload icon if provided
   if (iconFile) {
@@ -104,12 +110,12 @@ export async function createFrequency(name: string, description: string | null, 
     const filePath = `groups/${userData.user.id}-${fileName}`;
 
     const { error: uploadError } = await supabase.storage
-      .from('uploads') // Reusing the existing bucket for simplicity
+      .from('uploads')
       .upload(filePath, iconFile);
 
     if (uploadError) {
       console.error('Error uploading image:', uploadError);
-      return false;
+      return { success: false, error: `Error uploading image: ${uploadError.message}. Make sure the 'uploads' bucket exists.` };
     }
 
     const { data: publicUrlData } = supabase.storage
@@ -126,7 +132,7 @@ export async function createFrequency(name: string, description: string | null, 
       name: name,
       description: description,
       image: iconUrl,
-      isPublic: isPublic,
+      isPublic: isPublic ? 1 : 0,
       userId: userData.user.id
     })
     .select('id')
@@ -134,24 +140,84 @@ export async function createFrequency(name: string, description: string | null, 
 
   if (createError || !newFreq) {
     console.error('Error creating frequency:', createError);
-    return false;
+    return { success: false, error: `Error creating frequency: ${createError?.message}` };
   }
 
   // Add creator as member
+  const membersToInsert = [
+    { groupId: newFreq.id, userId: userData.user.id },
+    ...selectedUsers.map(uid => ({ groupId: newFreq.id, userId: uid }))
+  ];
+
   const { error: memberError } = await supabase
     .from('groupMembers')
-    .insert({
-      groupId: newFreq.id,
-      userId: userData.user.id
-    });
+    .insert(membersToInsert);
 
   if (memberError) {
-    console.error('Error adding creator to frequency:', memberError);
-    // Ideally we would delete the frequency here if this fails, but skipping for brevity
-    return false;
+    console.error('Error adding members:', memberError);
+    return { success: false, error: `Frequency created but failed to add members: ${memberError.message}` };
   }
 
-  return true;
+  return { success: true };
+}
+
+/**
+ * Update an existing frequency
+ */
+export async function updateFrequency(
+  frequencyId: string,
+  name: string,
+  description: string | null,
+  iconFile: File | undefined
+): Promise<{ success: boolean; error?: string }> {
+  const { data: userData } = await supabase.auth.getUser();
+  if (!userData?.user) return { success: false, error: 'Not authenticated' };
+
+  let iconUrl: string | undefined = undefined;
+
+  // Upload new icon if provided
+  if (iconFile) {
+    const fileExt = iconFile.name.split('.').pop();
+    const fileName = `${Math.random()}.${fileExt}`;
+    const filePath = `groups/${userData.user.id}-${fileName}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('uploads')
+      .upload(filePath, iconFile);
+
+    if (uploadError) {
+      console.error('Error uploading image:', uploadError);
+      return { success: false, error: `Error uploading image: ${uploadError.message}` };
+    }
+
+    const { data: publicUrlData } = supabase.storage
+      .from('uploads')
+      .getPublicUrl(filePath);
+      
+    iconUrl = publicUrlData.publicUrl;
+  }
+
+  const updateData: any = {
+    name: name,
+    description: description
+  };
+
+  if (iconUrl) {
+    updateData.image = iconUrl;
+  }
+
+  const { error: updateError } = await supabase
+    .from('groups')
+    .update(updateData)
+    .eq('id', frequencyId)
+    .eq('userId', userData.user.id); // Ensure only owner can update
+
+  if (updateError) {
+    console.error('Error updating frequency:', updateError);
+    return { success: false, error: `Error updating frequency: ${updateError.message}` };
+  }
+
+  return { success: true };
 }
 
 /**
