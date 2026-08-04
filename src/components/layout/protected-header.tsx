@@ -7,6 +7,16 @@ import { Bell, Plus, User, Search, Users, Bot, LogOut, Mail, FileText, Lock, Shi
 import { supabase } from "@/lib/supabase";
 import { NotificationsBell } from "./notifications-bell";
 
+const hasValue = (obj: any) => {
+  if (!obj) return false;
+  if (Array.isArray(obj)) return obj.length > 0;
+  return Object.values(obj).some(val => {
+    if (typeof val === 'string') return val.trim().length > 0;
+    if (Array.isArray(val)) return val.length > 0;
+    return val !== null && val !== undefined;
+  });
+};
+
 export function ProtectedHeader() {
   const pathname = usePathname();
   const router = useRouter();
@@ -140,16 +150,6 @@ export function ProtectedHeader() {
               if (resumeFallback?.data) {
                 const rData = resumeFallback.data as any;
                 let currentProgress = 30;
-                
-                const hasValue = (obj: any) => {
-                  if (!obj) return false;
-                  if (Array.isArray(obj)) return obj.length > 0;
-                  return Object.values(obj).some(val => {
-                    if (typeof val === 'string') return val.trim().length > 0;
-                    if (Array.isArray(val)) return val.length > 0;
-                    return val !== null && val !== undefined;
-                  });
-                };
 
                 if (hasValue(rData.personal)) currentProgress += 15;
                 if (hasValue(rData.licenses)) currentProgress += 15;
@@ -210,16 +210,6 @@ export function ProtectedHeader() {
             const rData = resumeFallback.data as any;
             let currentProgress = 30;
             
-            const hasValue = (obj: any) => {
-              if (!obj) return false;
-              if (Array.isArray(obj)) return obj.length > 0;
-              return Object.values(obj).some(val => {
-                if (typeof val === 'string') return val.trim().length > 0;
-                if (Array.isArray(val)) return val.length > 0;
-                return val !== null && val !== undefined;
-              });
-            };
-
             if (hasValue(rData.personal)) currentProgress += 15;
             if (hasValue(rData.licenses)) currentProgress += 15;
             if (hasValue(rData.ratings)) currentProgress += 15;
