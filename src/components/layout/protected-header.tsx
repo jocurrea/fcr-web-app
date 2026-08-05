@@ -22,7 +22,7 @@ export function ProtectedHeader() {
   const pathname = usePathname();
   const router = useRouter();
   const [profilePhoto, setProfilePhoto] = useState<string | null>(null);
-  const [profileProgress, setProfileProgress] = useState(30);
+  const [profileProgress, setProfileProgress] = useState(70);
   const [accountTypeState, setAccountTypeState] = useState<string>('');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);

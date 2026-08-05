@@ -24,7 +24,7 @@ export default function ProfilePage() {
   const [companyInfo, setCompanyInfo] = useState<{ name: string, status: string, logo?: string | null } | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const [profileProgress, setProfileProgress] = useState(15);
+  const [profileProgress, setProfileProgress] = useState(70);
 
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [visitors, setVisitors] = useState<any[]>([]);

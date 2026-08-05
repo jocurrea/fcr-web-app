@@ -31,7 +31,7 @@ export default function PublicProfilePage() {
   const [hasLiked, setHasLiked] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
-  const [profileProgress, setProfileProgress] = useState(15);
+  const [profileProgress, setProfileProgress] = useState(70);
 
   const [viewsCount, setViewsCount] = useState(0);
   const [likesCount, setLikesCount] = useState(0);
