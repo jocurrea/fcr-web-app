@@ -450,7 +450,7 @@ export default function PublicProfilePage() {
           </div>
 
           {isOwnProfile && (
-            <Link href="/onboarding?edit=true" className="absolute bottom-0 right-0 w-9 h-9 bg-white border border-gray-200 rounded-full flex items-center justify-center shadow-md text-blue-600 hover:bg-gray-50 transition-colors cursor-pointer z-40">
+            <Link href="/onboarding?edit=true" className="absolute bottom-0 right-0 w-9 h-9 bg-white border-2 border-white rounded-full flex items-center justify-center shadow-lg text-blue-600 hover:bg-gray-50 transition-colors cursor-pointer z-50">
               <Pencil className="w-[16px] h-[16px]" />
             </Link>
           )}

@@ -395,8 +395,8 @@ export default function ProfilePage() {
             {profileProgress}%
           </div>
 
-          {/* Edit Icon - Elevated to z-40 so white circle sits ON TOP of orange ring */}
-          <Link href="/onboarding?edit=true" className="absolute bottom-0 right-0 w-9 h-9 bg-white border border-gray-200 rounded-full flex items-center justify-center shadow-md text-blue-600 hover:bg-gray-50 transition-colors cursor-pointer z-40">
+          {/* Edit Icon - Elevated to z-50 with white border to cleanly mask out the orange ring underneath */}
+          <Link href="/onboarding?edit=true" className="absolute bottom-0 right-0 w-9 h-9 bg-white border-2 border-white rounded-full flex items-center justify-center shadow-lg text-blue-600 hover:bg-gray-50 transition-colors cursor-pointer z-50">
             <Pencil className="w-[16px] h-[16px]" />
           </Link>
         </div>
