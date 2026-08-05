@@ -154,6 +154,8 @@ export function PersonalInfoForm({ onNext }: PersonalInfoFormProps) {
   const [currentEmployer, setCurrentEmployer] = useState("");
   const [totalFlightHours, setTotalFlightHours] = useState("");
 
+  const sanitizeName = (val: string) => val.replace(/[^a-zA-ZÀ-ÿ\s]/g, '');
+
   // Load draft from localStorage after hydration
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -163,9 +165,9 @@ export function PersonalInfoForm({ onNext }: PersonalInfoFormProps) {
           const parsed = JSON.parse(saved);
           if (parsed.role) setRole(parsed.role);
           if (parsed.selectedCountry) setSelectedCountry(parsed.selectedCountry);
-          if (parsed.firstName) setFirstName(parsed.firstName);
-          if (parsed.middleName) setMiddleName(parsed.middleName);
-          if (parsed.lastName) setLastName(parsed.lastName);
+          if (parsed.firstName) setFirstName(sanitizeName(parsed.firstName));
+          if (parsed.middleName) setMiddleName(sanitizeName(parsed.middleName));
+          if (parsed.lastName) setLastName(sanitizeName(parsed.lastName));
           if (parsed.description) setDescription(parsed.description);
           if (parsed.currentEmployer) setCurrentEmployer(parsed.currentEmployer);
           if (parsed.totalFlightHours) setTotalFlightHours(parsed.totalFlightHours);
@@ -187,9 +189,9 @@ export function PersonalInfoForm({ onNext }: PersonalInfoFormProps) {
       ]);
 
       if (userRecord.data) {
-        if (userRecord.data.firstName) setFirstName(userRecord.data.firstName);
-        if (userRecord.data.middleName) setMiddleName(userRecord.data.middleName);
-        if (userRecord.data.lastName) setLastName(userRecord.data.lastName);
+        if (userRecord.data.firstName) setFirstName(sanitizeName(userRecord.data.firstName));
+        if (userRecord.data.middleName) setMiddleName(sanitizeName(userRecord.data.middleName));
+        if (userRecord.data.lastName) setLastName(sanitizeName(userRecord.data.lastName));
         if (userRecord.data.profileImage) setPhotoPreview(userRecord.data.profileImage);
       }
       
@@ -221,8 +223,8 @@ export function PersonalInfoForm({ onNext }: PersonalInfoFormProps) {
   );
 
   return (
-    <div className="flex flex-col flex-1 h-full mt-6">
-      <div className="flex-1 overflow-y-auto pb-24 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] px-2 -mx-2">
+    <div className="flex flex-col flex-1 mt-6 min-h-0">
+      <div className="flex-1 overflow-y-auto pb-24 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] px-2 -mx-2 min-h-0">
         <form className="space-y-6">
           {/* Role Toggle */}
           <div className="space-y-3">
@@ -261,8 +263,7 @@ export function PersonalInfoForm({ onNext }: PersonalInfoFormProps) {
               id="firstName" 
               value={firstName} 
               onChange={(e) => {
-                const val = e.target.value.replace(/[^a-zA-ZÀ-ÿ\s]/g, '');
-                setFirstName(val);
+                setFirstName(sanitizeName(e.target.value));
               }} 
               className="rounded-2xl py-6" 
               required 
@@ -276,7 +277,9 @@ export function PersonalInfoForm({ onNext }: PersonalInfoFormProps) {
             <Input 
               id="middleName" 
               value={middleName} 
-              onChange={(e) => setMiddleName(e.target.value)} 
+              onChange={(e) => {
+                setMiddleName(sanitizeName(e.target.value));
+              }} 
               className="rounded-2xl py-6" 
             />
           </div>
@@ -287,8 +290,7 @@ export function PersonalInfoForm({ onNext }: PersonalInfoFormProps) {
               id="lastName" 
               value={lastName} 
               onChange={(e) => {
-                const val = e.target.value.replace(/[^a-zA-ZÀ-ÿ\s]/g, '');
-                setLastName(val);
+                setLastName(sanitizeName(e.target.value));
               }} 
               className="rounded-2xl py-6" 
               required 

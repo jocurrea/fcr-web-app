@@ -32,8 +32,8 @@ export function RatingsStep({ onNext }: RatingsStepProps) {
   };
 
   return (
-    <div className="flex flex-col flex-1 h-full mt-6">
-      <div className="flex-1 overflow-y-auto pb-24 px-2">
+    <div className="flex flex-col flex-1 mt-6 min-h-0">
+      <div className="flex-1 overflow-y-auto pb-24 px-2 min-h-0">
         <div className="flex items-center justify-between mb-8">
           <h2 className="text-lg font-medium text-gray-900">Ratings List</h2>
           <Button 

@@ -740,3 +740,45 @@ export async function updateComment(commentId: string, text: string): Promise<bo
 
   return true;
 }
+
+/**
+ * Fetch list of users who liked a specific post
+ */
+export async function fetchPostLikers(postId: string) {
+  try {
+    const { data: likesData, error } = await supabase
+      .from('postLikes')
+      .select('id, created_at, userId')
+      .eq('postId', postId)
+      .order('created_at', { ascending: false });
+
+    if (error || !likesData || likesData.length === 0) return [];
+
+    const userIds = Array.from(new Set(likesData.map((l: any) => l.userId).filter(Boolean))) as string[];
+    if (userIds.length === 0) return [];
+
+    const { data: usersData } = await supabase
+      .from('users')
+      .select('id, firstName, middleName, lastName, username, profileImage')
+      .in('id', userIds);
+
+    const userMap = new Map(usersData?.map((u: any) => [u.id, u]) || []);
+
+    return likesData.map((like: any) => {
+      const userObj = userMap.get(like.userId);
+      const name = userObj
+        ? ([userObj.firstName, userObj.lastName].filter(Boolean).join(' ').trim() || userObj.username || 'User')
+        : 'User';
+      return {
+        id: like.id,
+        created_at: like.created_at,
+        user_id: like.userId,
+        name,
+        avatar: userObj?.profileImage || 'https://api.dicebear.com/7.x/shapes/svg?seed=user'
+      };
+    });
+  } catch (err) {
+    console.error('Error in fetchPostLikers:', err);
+    return [];
+  }
+}

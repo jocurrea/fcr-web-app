@@ -143,7 +143,7 @@ export async function createFrequency(
     return { success: false, error: `Error creating frequency: ${createError?.message}` };
   }
 
-  // Add creator as member
+  // Add creator and invited members (creator has admin rights to invite members)
   const membersToInsert = [
     { groupId: newFreq.id, userId: userData.user.id },
     ...selectedUsers.map(uid => ({ groupId: newFreq.id, userId: uid }))
@@ -156,6 +156,23 @@ export async function createFrequency(
   if (memberError) {
     console.error('Error adding members:', memberError);
     return { success: false, error: `Frequency created but failed to add members: ${memberError.message}` };
+  }
+
+  if (selectedUsers.length > 0) {
+    try {
+      const notifsToInsert = selectedUsers.map(invitedUserId => ({
+        senderId: userData.user.id,
+        receiverId: invitedUserId,
+        title: 'Frequency Invitation',
+        data: JSON.stringify({ message: `Invited you to ${name}`, frequencyId: newFreq.id }),
+        type: 'frequency_invite',
+        read: 0
+      }));
+
+      await supabase.from('notifications').insert(notifsToInsert);
+    } catch (err) {
+      console.error('Failed to create invitation notifications:', err);
+    }
   }
 
   return { success: true };
@@ -223,26 +240,64 @@ export async function updateFrequency(
 /**
  * Join a frequency
  */
-export async function joinFrequency(frequencyId: string): Promise<boolean> {
+export async function joinFrequency(frequencyId: string | number): Promise<{ success: boolean; error?: string }> {
   const { data: userData } = await supabase.auth.getUser();
-  if (!userData?.user) return false;
+  if (!userData?.user) return { success: false, error: "User not authenticated" };
 
+  const numericId = Number(frequencyId);
+  const targetGroupId = !isNaN(numericId) && String(numericId) === String(frequencyId).trim() ? numericId : frequencyId;
+
+  // 1. Check if user is ALREADY a member
+  const { data: existingMember } = await supabase
+    .from('groupMembers')
+    .select('*')
+    .eq('groupId', targetGroupId)
+    .eq('userId', userData.user.id)
+    .maybeSingle();
+
+  if (existingMember) {
+    return { success: true };
+  }
+
+  // 2. Try inserting with groupId
   const { error } = await supabase
     .from('groupMembers')
     .insert({
-      groupId: frequencyId,
+      groupId: targetGroupId,
       userId: userData.user.id
     });
 
   if (error) {
-    // If it violates unique constraint (already joined), we can just return true
-    if (error.code === '23505') return true; 
-    
-    console.error('Error joining frequency:', error);
-    return false;
+    if (error.code === '23505') return { success: true }; 
+
+    // Try fallback with snake_case fields or string ID
+    const { error: fallbackError } = await supabase
+      .from('groupMembers')
+      .insert({
+        group_id: targetGroupId,
+        user_id: userData.user.id
+      } as any);
+
+    if (!fallbackError || fallbackError.code === '23505') return { success: true };
+
+    // Check if member already exists via snake_case columns
+    const { data: existingFallback } = await supabase
+      .from('groupMembers')
+      .select('*')
+      .eq('group_id', targetGroupId)
+      .eq('user_id', userData.user.id)
+      .maybeSingle();
+
+    if (existingFallback) return { success: true };
+
+    console.error('Error joining frequency:', error, fallbackError);
+    return { 
+      success: false, 
+      error: error.message || fallbackError.message || error.details || "Database constraint failed" 
+    };
   }
 
-  return true;
+  return { success: true };
 }
 
 /**

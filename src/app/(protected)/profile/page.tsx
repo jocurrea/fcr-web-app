@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { PostCard } from "@/components/home/post-card";
-import { MapPin, Pencil, Clock } from "lucide-react";
+import { MapPin, Pencil, Clock, Heart, Eye, User, X, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { fetchPosts } from "@/lib/api/posts";
@@ -23,6 +23,101 @@ export default function ProfilePage() {
   const [companyInfo, setCompanyInfo] = useState<{ name: string, status: string, logo?: string | null } | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [visitors, setVisitors] = useState<any[]>([]);
+  const [likers, setLikers] = useState<any[]>([]);
+  const [showVisitorsModal, setShowVisitorsModal] = useState(false);
+  const [showLikersModal, setShowLikersModal] = useState(false);
+  const [loadingVisitors, setLoadingVisitors] = useState(false);
+  const [loadingLikers, setLoadingLikers] = useState(false);
+
+  const handleOpenVisitorsModal = async () => {
+    if (!currentUserId) return;
+    setShowVisitorsModal(true);
+    setLoadingVisitors(true);
+    try {
+      let { data: visitsData } = await supabase
+        .from('profile_visits')
+        .select('*')
+        .or(`visited_id.eq.${currentUserId},profile_user_id.eq.${currentUserId}`)
+        .order('created_at', { ascending: false });
+
+      if (visitsData && visitsData.length > 0) {
+        const visitorIds = Array.from(new Set(visitsData.map(v => v.visitor_user_id || v.visitor_id).filter(Boolean)));
+        
+        if (visitorIds.length > 0) {
+          const { data: usersData } = await supabase
+            .from('users')
+            .select('id, firstName, lastName, username, profileImage')
+            .in('id', visitorIds);
+
+          const userMap = new Map(usersData?.map(u => [u.id, u]) || []);
+          const formatted = visitsData.map(v => {
+            const vId = v.visitor_user_id || v.visitor_id;
+            return {
+              ...v,
+              visitor_id: vId,
+              created_at: v.first_visited_at || v.created_at || v.last_visited_at,
+              user: userMap.get(vId)
+            };
+          });
+          setVisitors(formatted);
+        } else {
+          setVisitors(visitsData);
+        }
+      } else {
+        setVisitors([]);
+      }
+    } catch (err) {
+      console.error("Error fetching visitors:", err);
+    } finally {
+      setLoadingVisitors(false);
+    }
+  };
+
+  const handleOpenLikersModal = async () => {
+    if (!currentUserId) return;
+    setShowLikersModal(true);
+    setLoadingLikers(true);
+    try {
+      let { data: likesData } = await supabase
+        .from('profile_likes')
+        .select('*')
+        .or(`liked_id.eq.${currentUserId},profile_user_id.eq.${currentUserId}`)
+        .order('created_at', { ascending: false });
+
+      if (likesData && likesData.length > 0) {
+        const likerIds = Array.from(new Set(likesData.map(l => l.liker_user_id || l.liker_id).filter(Boolean)));
+        
+        if (likerIds.length > 0) {
+          const { data: usersData } = await supabase
+            .from('users')
+            .select('id, firstName, lastName, username, profileImage')
+            .in('id', likerIds);
+
+          const userMap = new Map(usersData?.map(u => [u.id, u]) || []);
+          const formatted = likesData.map(l => {
+            const lId = l.liker_user_id || l.liker_id;
+            return {
+              ...l,
+              liker_id: lId,
+              user: userMap.get(lId)
+            };
+          });
+          setLikers(formatted);
+        } else {
+          setLikers(likesData);
+        }
+      } else {
+        setLikers([]);
+      }
+    } catch (err) {
+      console.error("Error fetching likers:", err);
+    } finally {
+      setLoadingLikers(false);
+    }
+  };
+
   useEffect(() => {
     // Load Data from Supabase
     async function loadData() {
@@ -31,6 +126,7 @@ export default function ProfilePage() {
         
         const allPosts = await fetchPosts();
         if (session?.user) {
+          setCurrentUserId(session.user.id);
           setUserPosts(allPosts.filter(p => p.user_id === session.user.id));
 
           // Fetch user profile data (crew_data) from resumes and users
@@ -288,6 +384,27 @@ export default function ProfilePage() {
           </div>
         </div>
 
+        {/* Profile Action Buttons (Profile likes & Profile visitors) */}
+        <div className="flex items-center gap-3 mt-4 flex-wrap">
+          <button 
+            onClick={handleOpenLikersModal}
+            style={{ color: '#1d6bf3', borderColor: '#1d6bf3', borderWidth: '2px' }}
+            className="bg-white rounded-full px-5 py-2 flex items-center gap-2 font-bold text-[14.5px] hover:bg-blue-50 transition-all shadow-sm cursor-pointer border-solid"
+          >
+            <Heart className="w-5 h-5" style={{ fill: '#1d6bf3', color: '#1d6bf3' }} />
+            <span style={{ color: '#1d6bf3' }}>Profile likes</span>
+          </button>
+
+          <button 
+            onClick={handleOpenVisitorsModal}
+            style={{ color: '#1d6bf3', borderColor: '#1d6bf3', borderWidth: '2px' }}
+            className="bg-white rounded-full px-5 py-2 flex items-center gap-2 font-bold text-[14.5px] hover:bg-blue-50 transition-all shadow-sm cursor-pointer border-solid"
+          >
+            <Eye className="w-5 h-5" style={{ color: '#1d6bf3' }} />
+            <span style={{ color: '#1d6bf3' }}>Profile visitors</span>
+          </button>
+        </div>
+
         {/* Rank Badge */}
         <div className="mt-8 flex flex-col items-center">
           <img src="/silver.png" alt="Silver Rank" className="w-[360px] h-auto object-contain" />
@@ -391,6 +508,154 @@ export default function ProfilePage() {
       <div className="text-center text-gray-500 text-sm py-4">
         No more posts
       </div>
+
+      {/* Profile Visitors Modal (HU14.4) */}
+      {showVisitorsModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-[24px] w-full max-w-md p-6 shadow-2xl flex flex-col gap-4 max-h-[80vh]">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600">
+                  <Eye className="w-5 h-5" />
+                </div>
+                <h2 className="text-lg font-bold text-gray-900">Profile Visitors</h2>
+              </div>
+              <button 
+                onClick={() => setShowVisitorsModal(false)}
+                className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-600 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto flex flex-col gap-3 pr-1">
+              {loadingVisitors ? (
+                <div className="flex items-center justify-center py-10">
+                  <div className="w-7 h-7 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                </div>
+              ) : visitors.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-10 text-center text-gray-500 gap-2">
+                  <User className="w-10 h-10 text-gray-300" />
+                  <p className="text-sm font-medium">No profile visits recorded yet.</p>
+                </div>
+              ) : (
+                visitors.map((visit, index) => {
+                  const visitorUser = visit.user;
+                  const name = visitorUser 
+                    ? ([visitorUser.firstName, visitorUser.lastName].filter(Boolean).join(' ').trim() || visitorUser.username || 'User')
+                    : 'Anonymous User';
+                  
+                  return (
+                    <Link
+                      key={visit.id || index}
+                      href={`/profile/${visit.visitor_id}`}
+                      onClick={() => setShowVisitorsModal(false)}
+                      className="flex items-center justify-between p-3 rounded-2xl hover:bg-gray-50 transition-colors border border-gray-100 group"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        {visitorUser?.profileImage ? (
+                          <img 
+                            src={visitorUser.profileImage} 
+                            alt="" 
+                            className="w-11 h-11 rounded-full object-cover shrink-0 bg-gray-100"
+                          />
+                        ) : (
+                          <div className="w-11 h-11 rounded-full bg-blue-600 text-white font-bold flex items-center justify-center shrink-0">
+                            {name[0]?.toUpperCase() || 'U'}
+                          </div>
+                        )}
+                        <div className="flex flex-col min-w-0">
+                          <span className="text-sm font-bold text-gray-900 truncate group-hover:text-blue-600 transition-colors">
+                            {name}
+                          </span>
+                          <span className="text-xs text-gray-500">
+                            Visited {new Date(visit.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+                      </div>
+                      <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-blue-600 transition-colors shrink-0" />
+                    </Link>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Profile Likers Modal (HU14.5) */}
+      {showLikersModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-[24px] w-full max-w-md p-6 shadow-2xl flex flex-col gap-4 max-h-[80vh]">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600">
+                  <Heart className="w-5 h-5 fill-blue-600 text-blue-600" />
+                </div>
+                <h2 className="text-lg font-bold text-gray-900">Profile Likes</h2>
+              </div>
+              <button 
+                onClick={() => setShowLikersModal(false)}
+                className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-600 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto flex flex-col gap-3 pr-1">
+              {loadingLikers ? (
+                <div className="flex items-center justify-center py-10">
+                  <div className="w-7 h-7 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                </div>
+              ) : likers.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-10 text-center text-gray-500 gap-2">
+                  <Heart className="w-10 h-10 text-gray-300" />
+                  <p className="text-sm font-medium">No profile likes recorded yet.</p>
+                </div>
+              ) : (
+                likers.map((like, index) => {
+                  const likerUser = like.user;
+                  const name = likerUser 
+                    ? ([likerUser.firstName, likerUser.lastName].filter(Boolean).join(' ').trim() || likerUser.username || 'User')
+                    : 'Anonymous User';
+                  
+                  return (
+                    <Link
+                      key={like.id || index}
+                      href={`/profile/${like.liker_id}`}
+                      onClick={() => setShowLikersModal(false)}
+                      className="flex items-center justify-between p-3 rounded-2xl hover:bg-gray-50 transition-colors border border-gray-100 group"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        {likerUser?.profileImage ? (
+                          <img 
+                            src={likerUser.profileImage} 
+                            alt="" 
+                            className="w-11 h-11 rounded-full object-cover shrink-0 bg-gray-100"
+                          />
+                        ) : (
+                          <div className="w-11 h-11 rounded-full bg-blue-600 text-white font-bold flex items-center justify-center shrink-0">
+                            {name[0]?.toUpperCase() || 'U'}
+                          </div>
+                        )}
+                        <div className="flex flex-col min-w-0">
+                          <span className="text-sm font-bold text-gray-900 truncate group-hover:text-blue-600 transition-colors">
+                            {name}
+                          </span>
+                          <span className="text-xs text-gray-500">
+                            Liked {new Date(like.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+                      </div>
+                      <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-blue-600 transition-colors shrink-0" />
+                    </Link>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

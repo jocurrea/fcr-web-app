@@ -150,6 +150,7 @@ function HomeContent() {
             key={post.id} 
             id={post.id}
             user={{
+              id: post.user_id,
               name: post.author?.name || "User",
               avatar: post.author?.avatar || "https://api.dicebear.com/7.x/shapes/svg?seed=user",
             }}

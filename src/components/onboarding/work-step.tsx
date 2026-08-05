@@ -81,12 +81,20 @@ export function WorkStep({ onNext }: WorkStepProps) {
     return "administration";
   });
 
+  const EMPLOYMENT_STATUS_MAP: Record<string, string> = {
+    "flying_high_current": "Flying high and enjoying my current skies",
+    "flying_high_new": "Flying high and open to new horizons",
+    "looking_new": "Looking for new skies with new wings",
+  };
+
   const [employmentStatus, setEmploymentStatus] = useState(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem("onboarding_work");
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (parsed.employmentStatus) return parsed.employmentStatus;
+        if (parsed.employmentStatus) {
+          return EMPLOYMENT_STATUS_MAP[parsed.employmentStatus] || parsed.employmentStatus;
+        }
       }
     }
     return "";
@@ -119,8 +127,8 @@ export function WorkStep({ onNext }: WorkStepProps) {
   }, [medicalClass, commandType, crossedOcean, adminExp, adminRole, employmentStatus, workCountry, adminDescription]);
 
   return (
-    <div className="flex-1 flex flex-col mt-4">
-      <div className="flex-1 overflow-y-auto px-4 pb-20 space-y-6">
+    <div className="flex-1 flex flex-col mt-4 min-h-0">
+      <div className="flex-1 overflow-y-auto px-4 pb-20 space-y-6 min-h-0">
         
         <div className="space-y-3">
           <Label className="text-gray-700">Medical Certificate Class</Label>
@@ -150,9 +158,9 @@ export function WorkStep({ onNext }: WorkStepProps) {
               <SelectValue placeholder="Select an Item" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="flying_high_current">Flying high and enjoying my current skies</SelectItem>
-              <SelectItem value="flying_high_new">Flying high and open to new horizons</SelectItem>
-              <SelectItem value="looking_new">Looking for new skies with new wings</SelectItem>
+              <SelectItem value="Flying high and enjoying my current skies">Flying high and enjoying my current skies</SelectItem>
+              <SelectItem value="Flying high and open to new horizons">Flying high and open to new horizons</SelectItem>
+              <SelectItem value="Looking for new skies with new wings">Looking for new skies with new wings</SelectItem>
             </SelectContent>
           </Select>
         </div>

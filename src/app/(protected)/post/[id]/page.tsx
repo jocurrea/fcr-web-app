@@ -215,6 +215,7 @@ function PostDetailContent() {
           <PostCard 
             id={post.id}
             user={{
+              id: post.user_id,
               name: post.author?.name || "User",
               avatar: post.author?.avatar || "https://api.dicebear.com/7.x/shapes/svg?seed=user",
             }}
@@ -278,18 +279,20 @@ function PostDetailContent() {
                 return (
                   <div key={c.id || i} className="flex gap-3 items-start">
                     {/* Avatar */}
-                    <div className="w-10 h-10 rounded-full overflow-hidden border border-gray-200 bg-white flex-shrink-0 mt-1">
+                    <Link href={`/profile/${c.user_id}`} className="w-10 h-10 rounded-full overflow-hidden border border-gray-200 bg-white flex-shrink-0 mt-1 hover:opacity-80 transition-opacity">
                       <img 
                         src={c.author.avatar || "https://api.dicebear.com/7.x/shapes/svg?seed=user"} 
                         alt={c.author.name} 
                         className="w-full h-full object-cover" 
                       />
-                    </div>
+                    </Link>
                     {/* Gray Box */}
                     <div className="flex-1 bg-[#f1f3f4] p-3 rounded-2xl rounded-tl-sm relative">
                       <div className="flex items-start justify-between">
                         <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="font-bold text-[13.5px] text-gray-900">{c.author.name}</span>
+                          <Link href={`/profile/${c.user_id}`} className="font-bold text-[13.5px] text-gray-900 hover:text-blue-600 transition-colors">
+                            {c.author.name}
+                          </Link>
                           <span className="text-gray-400 text-[10px]">●</span>
                           <span className="text-[12px] text-gray-500 font-medium">{c.created_at}</span>
                         </div>

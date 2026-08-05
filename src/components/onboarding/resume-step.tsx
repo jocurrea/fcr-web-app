@@ -81,6 +81,44 @@ export function ResumeStep({ onNext, isSaving }: ResumeStepProps) {
     }
   };
 
+  const getMax18YearsAgoDate = () => {
+    const today = new Date();
+    const maxDateObj = new Date(today.getFullYear() - 18, today.getMonth(), today.getDate());
+    return maxDateObj.toISOString().split("T")[0];
+  };
+
+  const [dateOfBirth, setDateOfBirth] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem("onboarding_resume");
+      if (saved) { const p = JSON.parse(saved); if (p.dateOfBirth) return p.dateOfBirth; }
+    }
+    return "";
+  });
+  const [dobError, setDobError] = useState("");
+
+  const handleDobChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setDateOfBirth(val);
+    if (!val) {
+      setDobError("");
+      return;
+    }
+
+    const birthDate = new Date(val);
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+
+    if (age < 18) {
+      setDobError("You must be at least 18 years old.");
+    } else {
+      setDobError("");
+    }
+  };
+
   const [isSkillModalOpen, setIsSkillModalOpen] = useState(false);
   const [skillText, setSkillText] = useState("");
   const [skills, setSkills] = useState<string[]>(() => {
@@ -162,9 +200,9 @@ export function ResumeStep({ onNext, isSaving }: ResumeStepProps) {
 
   useEffect(() => {
     localStorage.setItem("onboarding_resume", JSON.stringify({
-      phone, email, websites, skills, languages, awards, trainingFacilities, experiences
+      phone, email, dateOfBirth, websites, skills, languages, awards, trainingFacilities, experiences
     }));
-  }, [phone, email, websites, skills, languages, awards, trainingFacilities, experiences]);
+  }, [phone, email, dateOfBirth, websites, skills, languages, awards, trainingFacilities, experiences]);
 
   const handleFinishLocal = () => {
     onNext();
@@ -185,8 +223,8 @@ export function ResumeStep({ onNext, isSaving }: ResumeStepProps) {
     "Yiddish", "Yoruba", "Zulu"
   ];
   return (
-    <div className="flex-1 flex flex-col mt-4">
-      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto px-4 pb-20 space-y-6">
+    <div className="flex-1 flex flex-col mt-4 min-h-0">
+      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto px-4 pb-20 space-y-6 min-h-0">
         
         {/* Contact Section */}
         <div className="space-y-4">
@@ -368,8 +406,17 @@ export function ResumeStep({ onNext, isSaving }: ResumeStepProps) {
           <div className="space-y-2">
             <Label className="text-gray-700">Date of birth</Label>
             <div className="relative">
-              <Input type="date" className="rounded-2xl py-6" />
+              <Input 
+                type="date" 
+                max={getMax18YearsAgoDate()}
+                value={dateOfBirth}
+                onChange={handleDobChange}
+                className={cn("rounded-2xl py-6", dobError ? "border-red-500 focus-visible:ring-red-500" : "")} 
+              />
             </div>
+            {dobError && (
+              <p className="text-xs text-red-500 mt-1 font-medium">{dobError}</p>
+            )}
           </div>
 
           <div className="space-y-2">

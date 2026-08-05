@@ -158,11 +158,34 @@ export function useNotifications(userId?: string) {
       .eq('read', 0);
   };
 
+  const deleteNotification = async (notificationId: number) => {
+    // Optimistic update
+    setNotifications((prev) => prev.filter((n) => n.id !== notificationId));
+    await supabase
+      .from('notifications')
+      .delete()
+      .eq('id', notificationId);
+  };
+
+  const clearAllNotifications = async () => {
+    if (!userId) return;
+    
+    // Optimistic update
+    setNotifications([]);
+    
+    await supabase
+      .from('notifications')
+      .delete()
+      .eq('receiverId', userId);
+  };
+
   return {
     notifications,
     unreadCount,
     errorMsg,
     markAsRead,
     markAllAsRead,
+    deleteNotification,
+    clearAllNotifications,
   };
 }
