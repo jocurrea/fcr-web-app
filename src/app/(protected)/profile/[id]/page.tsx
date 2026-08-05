@@ -442,9 +442,10 @@ export default function PublicProfilePage() {
             )}
           </div>
 
-          {/* Percentage Badge - Positioned at 6 o'clock centered on bottom edge of circle */}
+          {/* Percentage Badge - Explicit inline style guarantees bottom positioning at 6 o'clock */}
           <div 
-            className={`absolute bottom-[-14px] left-1/2 -translate-x-1/2 bg-white px-3 py-0.5 rounded-full text-[12px] font-bold ${profileProgress === 100 ? 'text-[#059669]' : profileProgress >= 70 ? 'text-[#f97316]' : 'text-[#16a34a]'} border border-gray-200 shadow-lg z-50`}
+            className={`absolute left-1/2 -translate-x-1/2 bg-white px-3 py-0.5 rounded-full text-[12px] font-bold ${profileProgress === 100 ? 'text-[#059669]' : profileProgress >= 70 ? 'text-[#f97316]' : 'text-[#16a34a]'} border border-gray-200 shadow-lg z-50`}
+            style={{ bottom: '-10px' }}
           >
             {profileProgress}%
           </div>
