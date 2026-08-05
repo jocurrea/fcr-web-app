@@ -6,6 +6,7 @@ import { PostCard } from "@/components/home/post-card";
 import Link from "next/link";
 import { MapPin, Heart, Eye, User, X, ChevronRight, Pencil } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { fetchProfileProgress } from "@/lib/profile-progress";
 import { fetchPosts } from "@/lib/api/posts";
 import { cn } from "@/lib/utils";
 
@@ -76,19 +77,9 @@ export default function PublicProfilePage() {
             if (crewData.resume.languages) setLanguages(crewData.resume.languages);
           }
 
-          const hasVal = (val: any) => {
-            if (!val) return false;
-            if (Array.isArray(val)) return val.length > 0;
-            if (typeof val === "object") return Object.keys(val).length > 0;
-            return true;
-          };
-          let calcProgress = 30;
-          if (hasVal(crewData.personal)) calcProgress += 15;
-          if (crewData.licenses && crewData.licenses.length > 0) calcProgress += 15;
-          if (crewData.ratings && crewData.ratings.length > 0) calcProgress += 15;
-          if (hasVal(crewData.work)) calcProgress += 10;
-          if (hasVal(crewData.resume)) calcProgress += 15;
-          setProfileProgress(Math.min(calcProgress, 100));
+        if (profileId) {
+          fetchProfileProgress(profileId).then((progress) => setProfileProgress(progress));
+        }
         }
 
         // Check if user has a business company

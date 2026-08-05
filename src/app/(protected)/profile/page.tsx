@@ -5,6 +5,7 @@ import { PostCard } from "@/components/home/post-card";
 import { MapPin, Pencil, Clock, Heart, Eye, User, X, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
+import { fetchProfileProgress } from "@/lib/profile-progress";
 import { fetchPosts } from "@/lib/api/posts";
 
 export default function ProfilePage() {
@@ -169,20 +170,9 @@ export default function ProfilePage() {
             if (finalResume.languages) setLanguages(finalResume.languages);
           }
 
-          // Calculate profile completion percentage (Exact match with header)
-          const hasVal = (val: any) => {
-            if (!val) return false;
-            if (Array.isArray(val)) return val.length > 0;
-            if (typeof val === "object") return Object.keys(val).length > 0;
-            return true;
-          };
-          let calcProgress = 30;
-          if (hasVal(finalPersonal)) calcProgress += 15;
-          if (finalLicenses && finalLicenses.length > 0) calcProgress += 15;
-          if (finalRatings && finalRatings.length > 0) calcProgress += 15;
-          if (hasVal(finalWork)) calcProgress += 10;
-          if (hasVal(finalResume)) calcProgress += 15;
-          setProfileProgress(Math.min(calcProgress, 100));
+          if (session?.user?.id) {
+            fetchProfileProgress(session.user.id).then((progress) => setProfileProgress(progress));
+          }
 
           // Check if user has a business company
           const { data: companies, error } = await supabase

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Bell, Plus, User, Search, Users, Bot, LogOut, Mail, FileText, Lock, ShieldCheck, Ban, Trash2, FileDown } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { fetchProfileProgress } from "@/lib/profile-progress";
 import { NotificationsBell } from "./notifications-bell";
 
 const hasValue = (obj: any) => {
@@ -145,37 +146,7 @@ export function ProtectedHeader() {
               }
             });
 
-          supabase.from('resumes').select('data').eq('userId', session.user.id).maybeSingle()
-            .then(({ data: resumeFallback }) => {
-              if (resumeFallback?.data) {
-                const rData = resumeFallback.data as any;
-                let currentProgress = 30;
-
-                if (hasValue(rData.personal)) currentProgress += 15;
-                if (hasValue(rData.licenses)) currentProgress += 15;
-                if (hasValue(rData.ratings)) currentProgress += 15;
-                if (hasValue(rData.work)) currentProgress += 10;
-                if (hasValue(rData.resume)) currentProgress += 15;
-                
-                setProfileProgress(Math.min(currentProgress, 100));
-              } else {
-                let localProg = 30;
-                try {
-                  const getLocal = (key: string) => {
-                    const item = localStorage.getItem(key);
-                    return item ? JSON.parse(item) : null;
-                  };
-                  if (hasValue(getLocal("onboarding_personal"))) localProg += 15;
-                  if (hasValue(getLocal("onboarding_licenses"))) localProg += 15;
-                  if (hasValue(getLocal("onboarding_ratings"))) localProg += 15;
-                  if (hasValue(getLocal("onboarding_work"))) localProg += 10;
-                  if (hasValue(getLocal("onboarding_resume"))) localProg += 15;
-                } catch (e) {
-                  console.error("Error parsing local storage for progress", e);
-                }
-                setProfileProgress(Math.min(localProg, 100));
-              }
-            });
+          fetchProfileProgress(session.user.id).then((progress) => setProfileProgress(progress));
 
           // No need for redirect checks — user is onboarded
           return;
