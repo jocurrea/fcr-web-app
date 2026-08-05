@@ -444,13 +444,13 @@ export default function PublicProfilePage() {
 
           {/* Percentage Badge */}
           <div 
-            className={`absolute bottom-[-8px] left-1/2 -translate-x-1/2 bg-white px-2.5 py-0.5 rounded-full text-[11px] font-bold ${profileProgress === 100 ? 'text-[#059669]' : profileProgress >= 70 ? 'text-[#f97316]' : 'text-[#16a34a]'} border border-gray-200 shadow-md z-30`}
+            className={`absolute bottom-[-8px] left-1/2 -translate-x-1/2 bg-white px-2.5 py-0.5 rounded-full text-[11px] font-bold ${profileProgress === 100 ? 'text-[#059669]' : profileProgress >= 70 ? 'text-[#f97316]' : 'text-[#16a34a]'} border border-gray-200 shadow-md z-40`}
           >
             {profileProgress}%
           </div>
 
           {isOwnProfile && (
-            <Link href="/onboarding?edit=true" className="absolute bottom-0 right-0 w-9 h-9 bg-white border border-gray-200 rounded-full flex items-center justify-center shadow-md text-blue-600 hover:bg-gray-50 transition-colors cursor-pointer z-30">
+            <Link href="/onboarding?edit=true" className="absolute bottom-0 right-0 w-9 h-9 bg-white border border-gray-200 rounded-full flex items-center justify-center shadow-md text-blue-600 hover:bg-gray-50 transition-colors cursor-pointer z-40">
               <Pencil className="w-[16px] h-[16px]" />
             </Link>
           )}
