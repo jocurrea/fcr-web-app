@@ -404,27 +404,27 @@ export default function PublicProfilePage() {
 
       <div className="w-full flex justify-center -mt-20 relative z-10">
         <div className="relative w-44 h-44 flex items-center justify-center">
-          {/* Progress Ring SVG - Elevated z-20 to render on top of avatar border */}
+          {/* Progress Ring SVG - Positioned completely AROUND the avatar */}
           <svg className="absolute inset-0 w-full h-full pointer-events-none z-20" viewBox="0 0 176 176">
             {/* Background Track */}
             <circle
               cx="88"
               cy="88"
-              r="74"
+              r="77"
               fill="none"
               stroke="#e5e7eb"
-              strokeWidth="5"
+              strokeWidth="4"
             />
             {/* Active Progress Arc */}
             <circle
               cx="88"
               cy="88"
-              r="74"
+              r="77"
               fill="none"
               stroke={profileProgress === 100 ? "#059669" : "#f97316"}
-              strokeWidth="5"
-              strokeDasharray={`${2 * Math.PI * 74}`}
-              strokeDashoffset={`${2 * Math.PI * 74 - (2 * Math.PI * 74 * profileProgress) / 100}`}
+              strokeWidth="4"
+              strokeDasharray={`${2 * Math.PI * 77}`}
+              strokeDashoffset={`${2 * Math.PI * 77 - (2 * Math.PI * 77 * profileProgress) / 100}`}
               strokeLinecap="round"
               className="transition-all duration-500 ease-out"
               style={{ transform: 'rotate(-90deg)', transformOrigin: '50% 50%' }}
@@ -432,7 +432,7 @@ export default function PublicProfilePage() {
           </svg>
 
           {/* Avatar Image */}
-          <div className="w-36 h-36 rounded-full overflow-hidden border-[3px] border-[#f8f9fa] bg-[#f8f9fa] z-10 shadow-sm">
+          <div className="w-36 h-36 rounded-full overflow-hidden border-[4px] border-[#f8f9fa] bg-[#f8f9fa] z-10 shadow-sm">
             {profilePhoto ? (
               <img src={profilePhoto} alt="Avatar" className="w-full h-full object-cover" />
             ) : (
@@ -444,7 +444,7 @@ export default function PublicProfilePage() {
 
           {/* Percentage Badge - Centered on bottom of ring */}
           <div 
-            className={`absolute bottom-[-2px] left-1/2 -translate-x-1/2 bg-white px-2.5 py-0.5 rounded-full text-[12px] font-bold ${profileProgress === 100 ? 'text-[#059669]' : 'text-[#f97316]'} border border-gray-200 shadow-md z-30`}
+            className={`absolute bottom-[2px] left-1/2 -translate-x-1/2 bg-white px-2.5 py-0.5 rounded-full text-[12px] font-bold ${profileProgress === 100 ? 'text-[#059669]' : 'text-[#f97316]'} border border-gray-200 shadow-md z-30`}
           >
             {profileProgress}%
           </div>
