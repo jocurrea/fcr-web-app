@@ -23,6 +23,8 @@ export default function ProfilePage() {
   const [companyInfo, setCompanyInfo] = useState<{ name: string, status: string, logo?: string | null } | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const [profileProgress, setProfileProgress] = useState(15);
+
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [visitors, setVisitors] = useState<any[]>([]);
   const [likers, setLikers] = useState<any[]>([]);
@@ -166,6 +168,21 @@ export default function ProfilePage() {
             setResume(finalResume);
             if (finalResume.languages) setLanguages(finalResume.languages);
           }
+
+          // Calculate profile completion percentage
+          const hasVal = (val: any) => {
+            if (!val) return false;
+            if (Array.isArray(val)) return val.length > 0;
+            if (typeof val === "object") return Object.keys(val).length > 0;
+            return true;
+          };
+          let calcProgress = 15;
+          if (hasVal(finalPersonal)) calcProgress += 20;
+          if (finalLicenses && finalLicenses.length > 0) calcProgress += 20;
+          if (finalRatings && finalRatings.length > 0) calcProgress += 15;
+          if (hasVal(finalWork)) calcProgress += 15;
+          if (hasVal(finalResume)) calcProgress += 15;
+          setProfileProgress(Math.min(calcProgress, 100));
 
           // Check if user has a business company
           const { data: companies, error } = await supabase
@@ -341,9 +358,37 @@ export default function ProfilePage() {
       </div>
 
       {/* Avatar Container - Overlaps cover */}
-      <div className="w-full flex justify-center -mt-20 relative z-10">
-        <div className="relative">
-          <div className="w-36 h-36 rounded-full overflow-hidden border-[4px] border-[#f8f9fa] bg-[#f8f9fa]">
+      <div className="w-full flex justify-center -mt-24 relative z-10">
+        <div className="relative flex items-center justify-center p-3">
+          {/* Progress Ring SVG */}
+          <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 170 170">
+            {/* Background Track */}
+            <circle
+              cx="85"
+              cy="85"
+              r="78"
+              fill="none"
+              stroke="#e5e7eb"
+              strokeWidth="6"
+            />
+            {/* Active Progress Arc */}
+            <circle
+              cx="85"
+              cy="85"
+              r="78"
+              fill="none"
+              stroke={profileProgress === 100 ? "#059669" : "#16a34a"}
+              strokeWidth="6"
+              strokeDasharray={`${2 * Math.PI * 78}`}
+              strokeDashoffset={`${2 * Math.PI * 78 - (2 * Math.PI * 78 * profileProgress) / 100}`}
+              strokeLinecap="round"
+              className="transition-all duration-500 ease-out"
+              style={{ transform: 'rotate(-90deg)', transformOrigin: '50% 50%' }}
+            />
+          </svg>
+
+          {/* Avatar Image */}
+          <div className="w-36 h-36 rounded-full overflow-hidden border-[4px] border-[#f8f9fa] bg-[#f8f9fa] z-10 shadow-sm">
             {profilePhoto ? (
               <img src={profilePhoto} alt="Avatar" className="w-full h-full object-cover" />
             ) : (
@@ -352,6 +397,14 @@ export default function ProfilePage() {
               </div>
             )}
           </div>
+
+          {/* Percentage Badge */}
+          <div 
+            className="absolute bottom-[-6px] left-1/2 -translate-x-1/2 bg-white px-3 py-0.5 rounded-full text-[12px] font-bold text-[#16a34a] border border-gray-200 shadow-md z-20"
+          >
+            {profileProgress}%
+          </div>
+
           {/* Edit Icon */}
           <Link href="/onboarding?edit=true" className="absolute bottom-1 right-1 w-9 h-9 bg-white border border-gray-200 rounded-full flex items-center justify-center shadow-md text-blue-600 hover:bg-gray-50 transition-colors cursor-pointer z-20">
             <Pencil className="w-[16px] h-[16px]" />

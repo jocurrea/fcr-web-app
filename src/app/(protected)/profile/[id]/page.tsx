@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { PostCard } from "@/components/home/post-card";
 import Link from "next/link";
-import { MapPin, Heart, Eye, User, X, ChevronRight } from "lucide-react";
+import { MapPin, Heart, Eye, User, X, ChevronRight, Pencil } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { fetchPosts } from "@/lib/api/posts";
 import { cn } from "@/lib/utils";
@@ -29,6 +29,8 @@ export default function PublicProfilePage() {
 
   const [hasLiked, setHasLiked] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+
+  const [profileProgress, setProfileProgress] = useState(15);
 
   const [viewsCount, setViewsCount] = useState(0);
   const [likesCount, setLikesCount] = useState(0);
@@ -73,6 +75,20 @@ export default function PublicProfilePage() {
             setResume(crewData.resume);
             if (crewData.resume.languages) setLanguages(crewData.resume.languages);
           }
+
+          const hasVal = (val: any) => {
+            if (!val) return false;
+            if (Array.isArray(val)) return val.length > 0;
+            if (typeof val === "object") return Object.keys(val).length > 0;
+            return true;
+          };
+          let calcProgress = 15;
+          if (hasVal(crewData.personal)) calcProgress += 20;
+          if (crewData.licenses && crewData.licenses.length > 0) calcProgress += 20;
+          if (crewData.ratings && crewData.ratings.length > 0) calcProgress += 15;
+          if (hasVal(crewData.work)) calcProgress += 15;
+          if (hasVal(crewData.resume)) calcProgress += 15;
+          setProfileProgress(Math.min(calcProgress, 100));
         }
 
         // Check if user has a business company
@@ -395,12 +411,57 @@ export default function PublicProfilePage() {
          {profilePhoto && <img src={profilePhoto} alt="Cover" className="w-full h-full object-cover blur-lg opacity-80 scale-110" />}
       </div>
 
-      <div className="w-full flex justify-between items-end px-6 -mt-20 relative z-10">
-        <div className="w-36 h-36 rounded-full overflow-hidden border-[4px] border-[#f8f9fa] bg-[#f8f9fa]">
-          {profilePhoto ? (
-            <img src={profilePhoto} alt="Avatar" className="w-full h-full object-cover" />
-          ) : (
-            <div className="w-full h-full bg-gray-100" />
+      <div className="w-full flex justify-center -mt-24 relative z-10">
+        <div className="relative flex items-center justify-center p-3">
+          {/* Progress Ring SVG */}
+          <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 170 170">
+            {/* Background Track */}
+            <circle
+              cx="85"
+              cy="85"
+              r="78"
+              fill="none"
+              stroke="#e5e7eb"
+              strokeWidth="6"
+            />
+            {/* Active Progress Arc */}
+            <circle
+              cx="85"
+              cy="85"
+              r="78"
+              fill="none"
+              stroke={profileProgress === 100 ? "#059669" : "#16a34a"}
+              strokeWidth="6"
+              strokeDasharray={`${2 * Math.PI * 78}`}
+              strokeDashoffset={`${2 * Math.PI * 78 - (2 * Math.PI * 78 * profileProgress) / 100}`}
+              strokeLinecap="round"
+              className="transition-all duration-500 ease-out"
+              style={{ transform: 'rotate(-90deg)', transformOrigin: '50% 50%' }}
+            />
+          </svg>
+
+          {/* Avatar Image */}
+          <div className="w-36 h-36 rounded-full overflow-hidden border-[4px] border-[#f8f9fa] bg-[#f8f9fa] z-10 shadow-sm">
+            {profilePhoto ? (
+              <img src={profilePhoto} alt="Avatar" className="w-full h-full object-cover" />
+            ) : (
+              <div className="w-full h-full bg-gray-100 flex items-center justify-center text-gray-400">
+                <svg className="w-12 h-12" fill="currentColor" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+              </div>
+            )}
+          </div>
+
+          {/* Percentage Badge */}
+          <div 
+            className="absolute bottom-[-6px] left-1/2 -translate-x-1/2 bg-white px-3 py-0.5 rounded-full text-[12px] font-bold text-[#16a34a] border border-gray-200 shadow-md z-20"
+          >
+            {profileProgress}%
+          </div>
+
+          {isOwnProfile && (
+            <Link href="/onboarding?edit=true" className="absolute bottom-1 right-1 w-9 h-9 bg-white border border-gray-200 rounded-full flex items-center justify-center shadow-md text-blue-600 hover:bg-gray-50 transition-colors cursor-pointer z-20">
+              <Pencil className="w-[16px] h-[16px]" />
+            </Link>
           )}
         </div>
       </div>
