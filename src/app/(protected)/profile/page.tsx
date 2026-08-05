@@ -169,18 +169,18 @@ export default function ProfilePage() {
             if (finalResume.languages) setLanguages(finalResume.languages);
           }
 
-          // Calculate profile completion percentage
+          // Calculate profile completion percentage (Exact match with header)
           const hasVal = (val: any) => {
             if (!val) return false;
             if (Array.isArray(val)) return val.length > 0;
             if (typeof val === "object") return Object.keys(val).length > 0;
             return true;
           };
-          let calcProgress = 15;
-          if (hasVal(finalPersonal)) calcProgress += 20;
-          if (finalLicenses && finalLicenses.length > 0) calcProgress += 20;
+          let calcProgress = 30;
+          if (hasVal(finalPersonal)) calcProgress += 15;
+          if (finalLicenses && finalLicenses.length > 0) calcProgress += 15;
           if (finalRatings && finalRatings.length > 0) calcProgress += 15;
-          if (hasVal(finalWork)) calcProgress += 15;
+          if (hasVal(finalWork)) calcProgress += 10;
           if (hasVal(finalResume)) calcProgress += 15;
           setProfileProgress(Math.min(calcProgress, 100));
 
@@ -358,7 +358,7 @@ export default function ProfilePage() {
       </div>
 
       {/* Avatar Container - Overlaps cover */}
-      <div className="w-full flex justify-center -mt-24 relative z-10">
+      <div className="w-full flex justify-center -mt-20 relative z-10">
         <div className="relative flex items-center justify-center p-3">
           {/* Progress Ring SVG */}
           <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 170 170">
@@ -377,7 +377,7 @@ export default function ProfilePage() {
               cy="85"
               r="78"
               fill="none"
-              stroke={profileProgress === 100 ? "#059669" : "#16a34a"}
+              stroke={profileProgress === 100 ? "#059669" : "#f97316"}
               strokeWidth="6"
               strokeDasharray={`${2 * Math.PI * 78}`}
               strokeDashoffset={`${2 * Math.PI * 78 - (2 * Math.PI * 78 * profileProgress) / 100}`}
@@ -398,15 +398,15 @@ export default function ProfilePage() {
             )}
           </div>
 
-          {/* Percentage Badge */}
+          {/* Percentage Badge - Centered below circle */}
           <div 
-            className="absolute bottom-[-6px] left-1/2 -translate-x-1/2 bg-white px-3 py-0.5 rounded-full text-[12px] font-bold text-[#16a34a] border border-gray-200 shadow-md z-20"
+            className={`absolute bottom-[-10px] left-1/2 -translate-x-1/2 bg-white px-2.5 py-0.5 rounded-full text-[11px] font-bold ${profileProgress === 100 ? 'text-[#059669]' : 'text-[#f97316]'} border border-gray-200 shadow-md z-30`}
           >
             {profileProgress}%
           </div>
 
           {/* Edit Icon */}
-          <Link href="/onboarding?edit=true" className="absolute bottom-1 right-1 w-9 h-9 bg-white border border-gray-200 rounded-full flex items-center justify-center shadow-md text-blue-600 hover:bg-gray-50 transition-colors cursor-pointer z-20">
+          <Link href="/onboarding?edit=true" className="absolute bottom-1 right-1 w-9 h-9 bg-white border border-gray-200 rounded-full flex items-center justify-center shadow-md text-blue-600 hover:bg-gray-50 transition-colors cursor-pointer z-30">
             <Pencil className="w-[16px] h-[16px]" />
           </Link>
         </div>

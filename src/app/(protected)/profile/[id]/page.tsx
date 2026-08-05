@@ -82,11 +82,11 @@ export default function PublicProfilePage() {
             if (typeof val === "object") return Object.keys(val).length > 0;
             return true;
           };
-          let calcProgress = 15;
-          if (hasVal(crewData.personal)) calcProgress += 20;
-          if (crewData.licenses && crewData.licenses.length > 0) calcProgress += 20;
+          let calcProgress = 30;
+          if (hasVal(crewData.personal)) calcProgress += 15;
+          if (crewData.licenses && crewData.licenses.length > 0) calcProgress += 15;
           if (crewData.ratings && crewData.ratings.length > 0) calcProgress += 15;
-          if (hasVal(crewData.work)) calcProgress += 15;
+          if (hasVal(crewData.work)) calcProgress += 10;
           if (hasVal(crewData.resume)) calcProgress += 15;
           setProfileProgress(Math.min(calcProgress, 100));
         }
@@ -411,7 +411,7 @@ export default function PublicProfilePage() {
          {profilePhoto && <img src={profilePhoto} alt="Cover" className="w-full h-full object-cover blur-lg opacity-80 scale-110" />}
       </div>
 
-      <div className="w-full flex justify-center -mt-24 relative z-10">
+      <div className="w-full flex justify-center -mt-20 relative z-10">
         <div className="relative flex items-center justify-center p-3">
           {/* Progress Ring SVG */}
           <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 170 170">
@@ -430,7 +430,7 @@ export default function PublicProfilePage() {
               cy="85"
               r="78"
               fill="none"
-              stroke={profileProgress === 100 ? "#059669" : "#16a34a"}
+              stroke={profileProgress === 100 ? "#059669" : "#f97316"}
               strokeWidth="6"
               strokeDasharray={`${2 * Math.PI * 78}`}
               strokeDashoffset={`${2 * Math.PI * 78 - (2 * Math.PI * 78 * profileProgress) / 100}`}
@@ -451,15 +451,15 @@ export default function PublicProfilePage() {
             )}
           </div>
 
-          {/* Percentage Badge */}
+          {/* Percentage Badge - Centered below circle */}
           <div 
-            className="absolute bottom-[-6px] left-1/2 -translate-x-1/2 bg-white px-3 py-0.5 rounded-full text-[12px] font-bold text-[#16a34a] border border-gray-200 shadow-md z-20"
+            className={`absolute bottom-[-10px] left-1/2 -translate-x-1/2 bg-white px-2.5 py-0.5 rounded-full text-[11px] font-bold ${profileProgress === 100 ? 'text-[#059669]' : 'text-[#f97316]'} border border-gray-200 shadow-md z-30`}
           >
             {profileProgress}%
           </div>
 
           {isOwnProfile && (
-            <Link href="/onboarding?edit=true" className="absolute bottom-1 right-1 w-9 h-9 bg-white border border-gray-200 rounded-full flex items-center justify-center shadow-md text-blue-600 hover:bg-gray-50 transition-colors cursor-pointer z-20">
+            <Link href="/onboarding?edit=true" className="absolute bottom-1 right-1 w-9 h-9 bg-white border border-gray-200 rounded-full flex items-center justify-center shadow-md text-blue-600 hover:bg-gray-50 transition-colors cursor-pointer z-30">
               <Pencil className="w-[16px] h-[16px]" />
             </Link>
           )}
