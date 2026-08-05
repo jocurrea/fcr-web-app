@@ -348,7 +348,7 @@ export default function ProfilePage() {
       </div>
 
       {/* Avatar Container - Overlaps cover */}
-      <div className="w-full flex justify-center -mt-20 relative z-10">
+      <div className="w-full flex justify-center -mt-20 mb-4 relative z-20">
         <div className="relative flex items-center justify-center p-1.5 bg-white rounded-full shadow-xl">
           {/* Progress Ring SVG - Acts as the ring border directly around photo */}
           <svg className="absolute inset-0 w-full h-full pointer-events-none z-20" viewBox="0 0 160 160">
@@ -388,9 +388,9 @@ export default function ProfilePage() {
             )}
           </div>
 
-          {/* Percentage Badge */}
+          {/* Percentage Badge - Positioned at 6 o'clock centered on bottom edge of circle */}
           <div 
-            className={`absolute bottom-[-2px] left-1/2 -translate-x-1/2 bg-white px-3 py-0.5 rounded-full text-[12px] font-bold ${profileProgress === 100 ? 'text-[#059669]' : profileProgress >= 70 ? 'text-[#f97316]' : 'text-[#16a34a]'} border border-gray-200 shadow-lg z-50`}
+            className={`absolute bottom-[-14px] left-1/2 -translate-x-1/2 bg-white px-3 py-0.5 rounded-full text-[12px] font-bold ${profileProgress === 100 ? 'text-[#059669]' : profileProgress >= 70 ? 'text-[#f97316]' : 'text-[#16a34a]'} border border-gray-200 shadow-lg z-50`}
           >
             {profileProgress}%
           </div>
