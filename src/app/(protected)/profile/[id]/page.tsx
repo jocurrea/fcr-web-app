@@ -444,7 +444,7 @@ export default function PublicProfilePage() {
 
           {/* Percentage Badge */}
           <div 
-            className={`absolute bottom-[-8px] left-1/2 -translate-x-1/2 bg-white px-2.5 py-0.5 rounded-full text-[11px] font-bold ${profileProgress === 100 ? 'text-[#059669]' : profileProgress >= 70 ? 'text-[#f97316]' : 'text-[#16a34a]'} border border-gray-200 shadow-md z-40`}
+            className={`absolute bottom-[-2px] left-1/2 -translate-x-1/2 bg-white px-3 py-0.5 rounded-full text-[12px] font-bold ${profileProgress === 100 ? 'text-[#059669]' : profileProgress >= 70 ? 'text-[#f97316]' : 'text-[#16a34a]'} border border-gray-200 shadow-lg z-50`}
           >
             {profileProgress}%
           </div>
