@@ -39,10 +39,20 @@ export async function fetchJoinedFrequencies(): Promise<Frequency[]> {
     return [];
   }
 
-  // Extract the inner frequency objects
-  return data
-    .map((item: any) => item.groups as Frequency)
-    .filter(Boolean)
+  // Extract inner frequency objects and deduplicate by ID
+  const uniqueMap = new Map<string, Frequency>();
+  data.forEach((item: any) => {
+    if (item.groups?.id) {
+      const g = item.groups;
+      const freqObj: Frequency = {
+        ...g,
+        userId: g.userId || g.user_id || ''
+      };
+      uniqueMap.set(String(g.id), freqObj);
+    }
+  });
+
+  return Array.from(uniqueMap.values())
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
@@ -143,11 +153,9 @@ export async function createFrequency(
     return { success: false, error: `Error creating frequency: ${createError?.message}` };
   }
 
-  // Add creator and invited members (creator has admin rights to invite members)
-  const membersToInsert = [
-    { groupId: newFreq.id, userId: userData.user.id },
-    ...selectedUsers.map(uid => ({ groupId: newFreq.id, userId: uid }))
-  ];
+  // Add creator and invited members (deduplicate user IDs)
+  const uniqueUserIds = Array.from(new Set([userData.user.id, ...selectedUsers]));
+  const membersToInsert = uniqueUserIds.map(uid => ({ groupId: newFreq.id, userId: uid }));
 
   const { error: memberError } = await supabase
     .from('groupMembers')
@@ -314,7 +322,11 @@ export async function fetchFrequencyById(frequencyId: string): Promise<Frequency
     return null;
   }
 
-  return data as Frequency;
+  const raw = data as any;
+  return {
+    ...raw,
+    userId: raw.userId || raw.user_id || raw.created_by || ''
+  } as Frequency;
 }
 
 /**
@@ -339,3 +351,99 @@ export async function leaveFrequency(frequencyId: string): Promise<boolean> {
 
   return true;
 }
+
+export interface FrequencyMember {
+  id: string;
+  name: string;
+  role: string;
+  avatar: string;
+}
+
+/**
+ * Fetch real members of a frequency from groupMembers, users, and resumes
+ */
+export async function fetchFrequencyMembers(frequencyId: string): Promise<FrequencyMember[]> {
+  try {
+    // 1. Fetch group members for this frequency
+    let { data: membersData, error } = await supabase
+      .from('groupMembers')
+      .select('*')
+      .or(`groupId.eq.${frequencyId},group_id.eq.${frequencyId}`);
+
+    if (error || !membersData || membersData.length === 0) {
+      // Fallback: check if group creator exists
+      const { data: group } = await supabase
+        .from('groups')
+        .select('userId')
+        .eq('id', frequencyId)
+        .maybeSingle();
+
+      if (group?.userId) {
+        membersData = [{ userId: group.userId }];
+      } else {
+        return [];
+      }
+    }
+
+    const userIds = Array.from(
+      new Set(membersData.map((m: any) => m.userId || m.user_id).filter(Boolean))
+    ) as string[];
+
+    if (userIds.length === 0) return [];
+
+    // 2. Fetch user profile data, resumes, & companies in parallel
+    const [{ data: usersData }, { data: resumesData }, { data: companiesData }] = await Promise.all([
+      supabase.from('users').select('id, firstName, lastName, username, profileImage, position, accountType').in('id', userIds),
+      supabase.from('resumes').select('userId, data').in('userId', userIds),
+      supabase.from('companies').select('owner_user_id, name, logo_url, company_type').in('owner_user_id', userIds)
+    ]);
+
+    const usersMap = new Map(usersData?.map(u => [u.id, u]) || []);
+    const resumesMap = new Map(resumesData?.map(r => [r.userId, r.data]) || []);
+    const companiesMap = new Map(companiesData?.map(c => [c.owner_user_id, c]) || []);
+
+    const { data: currentAuth } = await supabase.auth.getUser();
+    const currentUserId = currentAuth?.user?.id;
+
+    return userIds.map(uid => {
+      const u = usersMap.get(uid);
+      const r = resumesMap.get(uid) as any;
+      const c = companiesMap.get(uid);
+
+      // Check if logged-in user has local storage photo/name fallback
+      let localPhoto: string | null = null;
+      let localFirstName: string | null = null;
+      let localLastName: string | null = null;
+      if (typeof window !== 'undefined' && uid === currentUserId) {
+        localPhoto = localStorage.getItem("userProfilePhoto");
+        try {
+          const localPers = localStorage.getItem("onboarding_personal");
+          if (localPers) {
+            const parsed = JSON.parse(localPers);
+            localFirstName = parsed?.firstName || null;
+            localLastName = parsed?.lastName || null;
+          }
+        } catch {}
+      }
+
+      const firstName = u?.firstName || r?.personal?.firstName || localFirstName || '';
+      const lastName = u?.lastName || r?.personal?.lastName || localLastName || '';
+      const fullName = `${firstName} ${lastName}`.trim();
+
+      const name = c?.name || fullName || u?.username || 'Crew Member';
+      const role = c?.company_type || u?.position || r?.personal?.position || r?.work?.position || (u?.accountType === 'business' ? 'Business' : 'Pilot');
+      const avatar = localPhoto || c?.logo_url || u?.profileImage || r?.personal?.profilePhoto || `https://api.dicebear.com/7.x/shapes/svg?seed=${uid}`;
+
+      return {
+        id: uid,
+        name,
+        role,
+        avatar
+      };
+    });
+  } catch (err) {
+    console.error('Error fetching frequency members:', err);
+    return [];
+  }
+}
+

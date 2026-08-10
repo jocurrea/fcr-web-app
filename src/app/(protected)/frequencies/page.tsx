@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
-import { Menu, MoreHorizontal, Users, BellOff, Bell, LogOut } from "lucide-react";
+import { Menu, MoreHorizontal, Users, BellOff, Bell, LogOut, Pencil } from "lucide-react";
 
 export default function FrequenciesPage() {
   const [isMainMenuOpen, setIsMainMenuOpen] = useState(false);
@@ -11,11 +11,17 @@ export default function FrequenciesPage() {
   const [mutedFrequencies, setMutedFrequencies] = useState<string[]>([]);
   const [frequencyToLeave, setFrequencyToLeave] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   const mainRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     async function loadFrequencies() {
+      const { supabase } = await import('@/lib/supabase');
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        setCurrentUserId(session.user.id);
+      }
       const { fetchJoinedFrequencies } = await import('@/lib/api/frequencies');
       const data = await fetchJoinedFrequencies();
       setFrequencies(data);
@@ -109,8 +115,8 @@ export default function FrequenciesPage() {
         ) : frequencies.length === 0 ? (
           <p className="text-gray-500 text-center mt-10">You haven't joined any frequencies yet.</p>
         ) : (
-          frequencies.map((freq) => (
-            <div key={freq.id} className="item-menu-container flex items-center justify-between w-full relative hover:bg-gray-50 transition-colors p-2 -mx-2 rounded-xl">
+          frequencies.map((freq, idx) => (
+            <div key={`${freq.id}-${idx}`} className="item-menu-container flex items-center justify-between w-full relative hover:bg-gray-50 transition-colors p-2 -mx-2 rounded-xl">
               <Link href={`/frequencies/${freq.id}`} className="flex items-center gap-4 flex-1 cursor-pointer">
                 {freq.image ? (
                   <img src={freq.image} alt={freq.name} className="w-[52px] h-[52px] rounded-full object-cover border border-gray-200" />
@@ -134,27 +140,44 @@ export default function FrequenciesPage() {
 
               {/* Item Dropdown */}
               {activeMenuId === freq.id && (
-                <div className="absolute top-10 right-0 w-56 bg-white rounded-xl shadow-md border border-gray-200 py-2 z-50">
-                  <button 
-                    className="flex items-center w-full gap-3 px-4 py-3 hover:bg-gray-50 text-gray-900 font-medium text-[15px]" 
-                    onClick={() => toggleMute(freq.id)}
-                  >
-                    {mutedFrequencies.includes(freq.id) ? (
-                      <>
-                        <Bell className="w-5 h-5 text-gray-700" /> Enable notifications
-                      </>
-                    ) : (
-                      <>
-                        <BellOff className="w-5 h-5 text-gray-700" /> Disable notifications
-                      </>
-                    )}
-                  </button>
-                  <button 
-                    className="flex items-center w-full gap-3 px-4 py-3 hover:bg-red-50 text-[#ef4444] font-medium text-[15px]"
-                    onClick={() => handleInitiateLeave(freq)}
-                  >
-                    <LogOut className="w-5 h-5" /> Leave Frequency
-                  </button>
+                <div className="absolute top-10 right-0 w-60 bg-white rounded-2xl shadow-lg border border-gray-100 py-2 z-50 divide-y divide-gray-100 animate-in fade-in zoom-in-95 duration-150">
+                  <div className="px-4 py-2 font-bold text-gray-900 text-[15px] truncate">
+                    {freq.name}
+                  </div>
+
+                  <div className="py-1">
+                    <Link 
+                      href={`/frequencies/${freq.id}/edit`}
+                      className="flex items-center w-full gap-3 px-4 py-2.5 hover:bg-gray-50 text-gray-800 font-medium text-[15px] transition-colors"
+                      onClick={() => setActiveMenuId(null)}
+                    >
+                      <Pencil className="w-4 h-4 text-gray-600" /> Update Frequency
+                    </Link>
+
+                    <button 
+                      className="flex items-center w-full gap-3 px-4 py-2.5 hover:bg-gray-50 text-gray-800 font-medium text-[15px] transition-colors" 
+                      onClick={() => toggleMute(freq.id)}
+                    >
+                      {mutedFrequencies.includes(freq.id) ? (
+                        <>
+                          <Bell className="w-4 h-4 text-gray-600" /> Enable notifications
+                        </>
+                      ) : (
+                        <>
+                          <BellOff className="w-4 h-4 text-gray-600" /> Disable notifications
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  <div className="pt-1">
+                    <button 
+                      className="flex items-center w-full gap-3 px-4 py-2.5 hover:bg-red-50 text-[#ef4444] font-medium text-[15px] transition-colors"
+                      onClick={() => handleInitiateLeave(freq)}
+                    >
+                      <LogOut className="w-4 h-4" /> Leave Frequency
+                    </button>
+                  </div>
                 </div>
               )}
             </div>

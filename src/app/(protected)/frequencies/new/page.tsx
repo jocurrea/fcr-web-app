@@ -28,6 +28,7 @@ export default function NewFrequencyPage() {
 
   const [isCompanyPending, setIsCompanyPending] = useState(false);
   const [showPendingModal, setShowPendingModal] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     async function loadCompanyStatus() {
@@ -95,6 +96,7 @@ export default function NewFrequencyPage() {
   };
 
   const handleCreateFrequency = async () => {
+    if (isSubmitting) return;
     if (isCompanyPending) {
       setShowPendingModal(true);
       return;
@@ -110,15 +112,22 @@ export default function NewFrequencyPage() {
     }
 
     const frequencyName = name.trim();
+    setIsSubmitting(true);
     
-    // Using the new Supabase API
-    const { createFrequency } = await import('@/lib/api/frequencies');
-    const result = await createFrequency(frequencyName, description.trim() || null, frequencyIconFile || undefined, isPublic, selectedUsers);
+    try {
+      // Using the new Supabase API
+      const { createFrequency } = await import('@/lib/api/frequencies');
+      const result = await createFrequency(frequencyName, description.trim() || null, frequencyIconFile || undefined, isPublic, selectedUsers);
 
-    if (result.success) {
-      router.push("/frequencies");
-    } else {
-      setErrorToast(result.error || "Error creating frequency. Please try again.");
+      if (result.success) {
+        router.push("/frequencies");
+      } else {
+        setErrorToast(result.error || "Error creating frequency. Please try again.");
+        setIsSubmitting(false);
+      }
+    } catch (e: any) {
+      setErrorToast(e?.message || "Error creating frequency. Please try again.");
+      setIsSubmitting(false);
     }
   };
 
@@ -282,9 +291,17 @@ export default function NewFrequencyPage() {
         {/* Submit Button */}
         <button 
           onClick={handleCreateFrequency}
-          className="w-full bg-[#1a73e8] hover:bg-blue-700 transition-colors text-white font-bold text-[16px] py-4 rounded-full shadow-md mt-4"
+          disabled={isSubmitting}
+          className={`w-full bg-[#1a73e8] hover:bg-blue-700 transition-colors text-white font-bold text-[16px] py-4 rounded-full shadow-md mt-4 flex items-center justify-center gap-2 ${isSubmitting ? 'opacity-70 cursor-not-allowed' : ''}`}
         >
-          Create Frequency
+          {isSubmitting ? (
+            <>
+              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+              <span>Creating Frequency...</span>
+            </>
+          ) : (
+            "Create Frequency"
+          )}
         </button>
       </div>
 

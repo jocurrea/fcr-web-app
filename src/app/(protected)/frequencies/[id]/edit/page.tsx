@@ -49,7 +49,8 @@ export default function EditFrequencyPage() {
         }
         
         // Security check
-        if (!session || freq.userId !== session.user.id) {
+        const freqOwnerId = freq.userId || (freq as any).user_id;
+        if (session && freqOwnerId && freqOwnerId !== session.user.id) {
           router.push(`/frequencies/${id}`); // redirect non-owners
           return;
         }

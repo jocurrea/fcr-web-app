@@ -176,41 +176,13 @@ export function ProtectedHeader() {
             }
           }
 
-          // Calculate progress if we have resume data
-          if (resumeFallback?.data) {
-            const rData = resumeFallback.data as any;
-            let currentProgress = 30;
-            
-            if (hasValue(rData.personal)) currentProgress += 15;
-            if (hasValue(rData.licenses)) currentProgress += 15;
-            if (hasValue(rData.ratings)) currentProgress += 15;
-            if (hasValue(rData.work)) currentProgress += 10;
-            if (hasValue(rData.resume)) currentProgress += 15;
-            
-            setProfileProgress(Math.min(currentProgress, 100));
-            
-            // Also proves they finished flight crew if not yet onboarded
-            if (!onboarded) {
-              accountType = 'flight_crew';
-              onboarded = true;
-            }
-          } else {
-            // Fallback to local storage if no DB data yet
-            let localProg = 30;
-            try {
-              const getLocal = (key: string) => {
-                const item = localStorage.getItem(key);
-                return item ? JSON.parse(item) : null;
-              };
-              if (hasValue(getLocal("onboarding_personal"))) localProg += 15;
-              if (hasValue(getLocal("onboarding_licenses"))) localProg += 15;
-              if (hasValue(getLocal("onboarding_ratings"))) localProg += 15;
-              if (hasValue(getLocal("onboarding_work"))) localProg += 10;
-              if (hasValue(getLocal("onboarding_resume"))) localProg += 15;
-            } catch (e) {
-              console.error("Error parsing local storage for progress", e);
-            }
-            setProfileProgress(Math.min(localProg, 100));
+          // Calculate progress using standardized fetchProfileProgress
+          const progress = await fetchProfileProgress(session.user.id);
+          setProfileProgress(progress);
+
+          if (resumeFallback?.data && !onboarded) {
+            accountType = 'flight_crew';
+            onboarded = true;
           }
         } catch (e) {
           console.error("Failed to fetch from users/resumes", e);

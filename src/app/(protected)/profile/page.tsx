@@ -367,7 +367,7 @@ export default function ProfilePage() {
               cy="80"
               r="74"
               fill="none"
-              stroke={profileProgress === 100 ? "#059669" : profileProgress >= 70 ? "#f97316" : "#16a34a"}
+              stroke={profileProgress === 100 ? "#059669" : "#f97316"}
               strokeWidth="8"
               strokeDasharray={`${2 * Math.PI * 74}`}
               strokeDashoffset={`${2 * Math.PI * 74 - (2 * Math.PI * 74 * profileProgress) / 100}`}
@@ -390,7 +390,7 @@ export default function ProfilePage() {
 
           {/* Percentage Badge - Explicit inline style guarantees bottom positioning at 6 o'clock */}
           <div 
-            className={`absolute left-1/2 -translate-x-1/2 bg-white px-3 py-0.5 rounded-full text-[12px] font-bold ${profileProgress === 100 ? 'text-[#059669]' : profileProgress >= 70 ? 'text-[#f97316]' : 'text-[#16a34a]'} border border-gray-200 shadow-lg z-50`}
+            className={`absolute left-1/2 -translate-x-1/2 bg-white px-3 py-0.5 rounded-full text-[12px] font-bold ${profileProgress === 100 ? 'text-[#059669]' : 'text-[#f97316]'} border border-gray-200 shadow-lg z-50`}
             style={{ bottom: '-10px' }}
           >
             {profileProgress}%

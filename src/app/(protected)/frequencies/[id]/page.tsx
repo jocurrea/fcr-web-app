@@ -95,12 +95,12 @@ export default function FrequencyFeedPage() {
     <div className="max-w-lg mx-auto flex flex-col w-full bg-[#f8f9fa] min-h-screen pb-10 relative">
       {/* Header */}
       <header className="flex items-center py-5 px-4 relative mt-2 bg-[#f8f9fa]">
-        <button 
-          onClick={() => router.back()} 
+        <Link 
+          href="/frequencies" 
           className="p-2.5 bg-white hover:bg-gray-100 transition-colors rounded-full shadow-sm border border-gray-100"
         >
           <ChevronLeft className="w-5 h-5 text-gray-800 stroke-[2.5]" />
-        </button>
+        </Link>
         <h1 className="flex-1 text-center text-[19px] font-semibold text-gray-800 pr-10">{frequencyName}</h1>
       </header>
 
