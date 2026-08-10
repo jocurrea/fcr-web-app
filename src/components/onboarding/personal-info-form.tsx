@@ -135,6 +135,11 @@ export function PersonalInfoForm({ onNext }: PersonalInfoFormProps) {
             
           if (publicUrlData?.publicUrl) {
             localStorage.setItem("userProfilePhoto", publicUrlData.publicUrl);
+            setPhotoPreview(publicUrlData.publicUrl);
+            await supabase
+              .from('users')
+              .update({ profileImage: publicUrlData.publicUrl })
+              .eq('id', userData.user.id);
           }
         }
       } catch (err) {

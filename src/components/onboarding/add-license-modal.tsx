@@ -43,11 +43,18 @@ export function AddLicenseModal({ open, onOpenChange, onAddLicense, editingLicen
   const [backImagePreview, setBackImagePreview] = useState<string | null>(null);
   const backFileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleFrontImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFrontImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const url = URL.createObjectURL(file);
-      setFrontImagePreview(url);
+      const tempUrl = URL.createObjectURL(file);
+      setFrontImagePreview(tempUrl);
+      try {
+        const { uploadToStorage } = await import("@/lib/upload");
+        const publicUrl = await uploadToStorage(file, "licenses");
+        setFrontImagePreview(publicUrl);
+      } catch (err) {
+        console.error("Error uploading front license image:", err);
+      }
     }
   };
 
@@ -59,11 +66,18 @@ export function AddLicenseModal({ open, onOpenChange, onAddLicense, editingLicen
     }
   };
 
-  const handleBackImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleBackImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const url = URL.createObjectURL(file);
-      setBackImagePreview(url);
+      const tempUrl = URL.createObjectURL(file);
+      setBackImagePreview(tempUrl);
+      try {
+        const { uploadToStorage } = await import("@/lib/upload");
+        const publicUrl = await uploadToStorage(file, "licenses");
+        setBackImagePreview(publicUrl);
+      } catch (err) {
+        console.error("Error uploading back license image:", err);
+      }
     }
   };
 

@@ -126,7 +126,9 @@ export function CompanyProfileStep({ onNext }: CompanyProfileStepProps) {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleLogoUpload = (e: ChangeEvent<HTMLInputElement>) => {
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+
+  const handleLogoUpload = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       if (file.size > 1.9 * 1024 * 1024) {
@@ -134,11 +136,17 @@ export function CompanyProfileStep({ onNext }: CompanyProfileStepProps) {
         setShowErrorModal(true);
         return;
       }
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setLogo(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+      try {
+        setIsUploadingLogo(true);
+        const { uploadToStorage } = await import("@/lib/upload");
+        const publicUrl = await uploadToStorage(file, "companies");
+        setLogo(publicUrl);
+      } catch (err: any) {
+        setErrorMessage(err?.message || "Error al subir el logo");
+        setShowErrorModal(true);
+      } finally {
+        setIsUploadingLogo(false);
+      }
     }
   };
 
@@ -168,10 +176,16 @@ export function CompanyProfileStep({ onNext }: CompanyProfileStepProps) {
           />
           <button 
             type="button"
+            disabled={isUploadingLogo}
             onClick={() => fileInputRef.current?.click()}
             className="w-full flex flex-col items-center justify-center p-8 border-[1.5px] border-dashed border-gray-300 rounded-[28px] bg-[#f8fafc] hover:bg-gray-50 transition-colors overflow-hidden relative"
           >
-            {logo ? (
+            {isUploadingLogo ? (
+              <div className="flex flex-col items-center py-4">
+                <div className="w-8 h-8 border-2 border-[#2d73f5] border-t-transparent rounded-full animate-spin mb-2" />
+                <p className="text-xs text-gray-500 font-medium">Uploading logo...</p>
+              </div>
+            ) : logo ? (
               <img src={logo} alt="Company Logo" className="w-full h-full object-contain absolute inset-0 p-2" />
             ) : (
               <>
