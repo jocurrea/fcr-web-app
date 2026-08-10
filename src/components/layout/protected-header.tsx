@@ -36,18 +36,26 @@ export function ProtectedHeader() {
         const savedPersonal = localStorage.getItem("onboarding_personal");
         const localPersonal = savedPersonal ? JSON.parse(savedPersonal) : null;
 
-        // Step 1: Read own users row (RLS always allows reading your own row)
-        const { data: dbUser } = await supabase
-          .from('users')
-          .select('firstName, middleName, lastName, profileImage')
-          .eq('id', userId)
-          .maybeSingle();
+        // Step 1: Read own users row & company row
+        const [{ data: dbUser }, { data: companyData }] = await Promise.all([
+          supabase
+            .from('users')
+            .select('firstName, middleName, lastName, profileImage')
+            .eq('id', userId)
+            .maybeSingle(),
+          supabase
+            .from('companies')
+            .select('logo_url')
+            .eq('owner_user_id', userId)
+            .order('created_at', { ascending: false })
+            .maybeSingle()
+        ]);
 
-        // Step 2: Merge — prefer localStorage data, fall back to DB data
+        // Step 2: Merge — prefer company logo_url if business, then localStorage photo, then dbUser
         const firstName = localPersonal?.firstName || dbUser?.firstName || '';
         const middleName = localPersonal?.middleName || dbUser?.middleName || '';
         const lastName = localPersonal?.lastName || dbUser?.lastName || '';
-        const profilePhoto = savedPhoto || dbUser?.profileImage || '';
+        const profilePhoto = companyData?.logo_url || savedPhoto || dbUser?.profileImage || '';
 
         if (!firstName && !lastName && !profilePhoto) return;
 

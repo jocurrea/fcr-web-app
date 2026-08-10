@@ -139,6 +139,17 @@ async function buildPostsWithResumes(data: any[], mode?: string): Promise<Post[]
   if (companiesRes.status === 'fulfilled' && companiesRes.value?.data) {
     for (const c of companiesRes.value.data as any[]) {
       companiesMap[c.owner_user_id] = { name: c.name || '', avatar: c.logo_url || '' };
+      
+      // Auto-sync company logo_url into users.profileImage for mobile app compatibility
+      if (c.owner_user_id && c.logo_url) {
+        supabase
+          .from('users')
+          .update({ profileImage: c.logo_url })
+          .eq('id', c.owner_user_id)
+          .then(({ error }) => {
+            if (error) console.error('[posts.ts] company logo sync error:', error);
+          });
+      }
     }
   }
 

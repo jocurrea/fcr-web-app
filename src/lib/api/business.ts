@@ -328,6 +328,14 @@ export async function saveCompanyProfile(profile: CompanyProfileInput): Promise<
 
     if (error) throw new Error(error.message);
     
+    // Sync logo_url into users.profileImage so Mobile App displays company logos on posts
+    if (profile.logo && company.owner_user_id) {
+      await supabase
+        .from("users")
+        .update({ profileImage: profile.logo })
+        .eq("id", company.owner_user_id);
+    }
+
     return { success: true, data };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "Could not save company profile." };
