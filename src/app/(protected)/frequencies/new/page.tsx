@@ -9,6 +9,7 @@ type DBUser = {
   id: string;
   firstName: string;
   lastName: string;
+  name?: string;
   profileImage: string | null;
 };
 
@@ -49,11 +50,29 @@ export default function NewFrequencyPage() {
     }
     async function loadUsers() {
       const { supabase } = await import('@/lib/supabase');
-      const { data } = await supabase.from('users').select('id, firstName, lastName, profileImage').limit(100);
-      if (data) {
-        // Filter out users with no name
-        const validUsers = data.filter(u => (u.firstName && u.firstName.trim() !== '') || (u.lastName && u.lastName.trim() !== ''));
-        setUsers(validUsers);
+      const [{ data: usersData }, { data: companiesData }] = await Promise.all([
+        supabase.from('users').select('id, firstName, lastName, username, profileImage, accountType').limit(100),
+        supabase.from('companies').select('owner_user_id, name, logo_url')
+      ]);
+
+      const companyMap = new Map((companiesData || []).map(c => [c.owner_user_id, c]));
+
+      if (usersData) {
+        const resolvedUsers = usersData.map(u => {
+          const comp = companyMap.get(u.id);
+          const fullName = [u.firstName, u.lastName].filter(Boolean).join(' ').trim();
+          const displayName = comp?.name || fullName || u.username || 'User';
+          const avatar = comp?.logo_url || u.profileImage || '';
+          return {
+            id: u.id,
+            firstName: displayName,
+            lastName: '',
+            name: displayName,
+            profileImage: avatar,
+          };
+        }).filter(u => u.name && u.name.trim() !== '');
+
+        setUsers(resolvedUsers);
       }
     }
     loadCompanyStatus();
@@ -237,25 +256,34 @@ export default function NewFrequencyPage() {
             {/* Dropdown */}
             {isDropdownOpen && (
               <div className="mt-2 w-full bg-white rounded-xl shadow-sm border border-gray-200 py-2 max-h-60 overflow-y-auto">
-                {users.filter(u => `${u.firstName} ${u.lastName}`.toLowerCase().includes(searchQuery.toLowerCase())).map((user) => (
-                  <div 
-                    key={user.id} 
-                    className={`flex items-center gap-3 px-4 py-2 cursor-pointer transition-colors ${
-                      selectedUsers.includes(user.id) ? "bg-blue-50" : "hover:bg-gray-50"
-                    }`}
-                    onClick={() => {
-                      toggleUser(user.id);
-                      setSearchQuery("");
-                      setIsDropdownOpen(false);
-                    }}
-                  >
-                    <img src={user.profileImage || `https://ui-avatars.com/api/?name=${user.firstName}+${user.lastName}&background=random`} alt={user.firstName} className="w-8 h-8 rounded-full object-cover" />
-                    <span className={`text-[15px] ${selectedUsers.includes(user.id) ? "text-blue-700 font-medium" : "text-gray-700"}`}>
-                      {user.firstName} {user.lastName}
-                    </span>
-                  </div>
-                ))}
-                {users.filter(u => `${u.firstName} ${u.lastName}`.toLowerCase().includes(searchQuery.toLowerCase())).length === 0 && (
+                {users.filter(u => (u.name || u.firstName).toLowerCase().includes(searchQuery.toLowerCase())).map((user) => {
+                  const displayName = user.name || user.firstName;
+                  return (
+                    <div 
+                      key={user.id} 
+                      className={`flex items-center gap-3 px-4 py-2 cursor-pointer transition-colors ${
+                        selectedUsers.includes(user.id) ? "bg-blue-50" : "hover:bg-gray-50"
+                      }`}
+                      onClick={() => {
+                        toggleUser(user.id);
+                        setSearchQuery("");
+                        setIsDropdownOpen(false);
+                      }}
+                    >
+                      {user.profileImage ? (
+                        <img src={user.profileImage} alt={displayName} className="w-8 h-8 rounded-full object-cover shrink-0 bg-gray-100 border border-gray-200" />
+                      ) : (
+                        <div className="w-8 h-8 rounded-full bg-blue-600 text-white font-bold flex items-center justify-center shrink-0 text-xs uppercase shadow-sm">
+                          {displayName[0] || 'U'}
+                        </div>
+                      )}
+                      <span className={`text-[15px] ${selectedUsers.includes(user.id) ? "text-blue-700 font-medium" : "text-gray-700"}`}>
+                        {displayName}
+                      </span>
+                    </div>
+                  );
+                })}
+                {users.filter(u => (u.name || u.firstName).toLowerCase().includes(searchQuery.toLowerCase())).length === 0 && (
                   <div className="px-4 py-3 text-sm text-gray-500 text-center">No users found</div>
                 )}
               </div>
@@ -271,10 +299,17 @@ export default function NewFrequencyPage() {
               {selectedUsers.map(id => {
                 const user = users.find(u => u.id === id);
                 if (!user) return null;
+                const displayName = user.name || user.firstName;
                 return (
                   <div key={user.id} className="flex items-center gap-3 ml-1">
-                    <img src={user.profileImage || `https://ui-avatars.com/api/?name=${user.firstName}+${user.lastName}&background=random`} alt={user.firstName} className="w-7 h-7 rounded-full object-cover" />
-                    <span className="text-[15px] text-gray-800">{user.firstName} {user.lastName}</span>
+                    {user.profileImage ? (
+                      <img src={user.profileImage} alt={displayName} className="w-7 h-7 rounded-full object-cover shrink-0 bg-gray-100 border border-gray-200" />
+                    ) : (
+                      <div className="w-7 h-7 rounded-full bg-blue-600 text-white font-bold flex items-center justify-center shrink-0 text-xs uppercase shadow-sm">
+                        {displayName[0] || 'U'}
+                      </div>
+                    )}
+                    <span className="text-[15px] text-gray-800">{displayName}</span>
                     <button 
                       onClick={() => toggleUser(user.id)}
                       className="text-red-500 hover:text-red-600 transition-colors ml-1"

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, Building2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 export default function AvailableFrequenciesPage() {
@@ -55,13 +55,21 @@ export default function AvailableFrequenciesPage() {
         ) : (
           frequencies.map((freq) => (
             <div key={freq.id} className="flex items-center justify-between w-full relative">
-              <div className="flex items-center gap-4 flex-1">
+              <div className="flex items-center gap-4 flex-1 min-w-0">
                 {freq.image ? (
-                  <img src={freq.image} alt={freq.name} className="w-[52px] h-[52px] rounded-full object-cover border border-gray-200" />
+                  <img src={freq.image} alt={freq.name} className="w-[52px] h-[52px] rounded-full object-cover border border-gray-200 shrink-0" />
                 ) : (
-                  <div className="w-[52px] h-[52px] rounded-full bg-[#cbd5e1] overflow-hidden flex items-center justify-center opacity-80" style={{ backgroundImage: 'radial-gradient(#94a3b8 1px, transparent 1px)', backgroundSize: '4px 4px' }} />
+                  <div className="w-[52px] h-[52px] rounded-full bg-[#cbd5e1] overflow-hidden flex items-center justify-center opacity-80 shrink-0" style={{ backgroundImage: 'radial-gradient(#94a3b8 1px, transparent 1px)', backgroundSize: '4px 4px' }} />
                 )}
-                <span className="text-[15px] text-gray-800 font-medium tracking-wide">{freq.name}</span>
+                <div className="flex flex-col min-w-0">
+                  <span className="text-[15px] text-gray-800 font-medium tracking-wide truncate">{freq.name}</span>
+                  {freq.isBusiness && (
+                    <div className="flex items-center gap-1.5 px-2.5 py-0.5 mt-1 bg-gray-100/90 border border-gray-200/80 rounded-full w-fit">
+                      <Building2 className="w-3.5 h-3.5 text-gray-700 shrink-0" />
+                      <span className="text-[12px] font-medium text-gray-700 leading-none">Business</span>
+                    </div>
+                  )}
+                </div>
               </div>
               
               <button 

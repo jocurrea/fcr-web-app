@@ -23,7 +23,7 @@ export default function LoginPage() {
 
     try {
       const { data, error: authError } = await supabase.auth.signInWithPassword({
-        email,
+        email: email.trim().toLowerCase(),
         password,
       });
 
@@ -50,7 +50,14 @@ export default function LoginPage() {
         router.push("/home");
       }
     } catch (err: any) {
-      setError(err.message || "Invalid login credentials");
+      const msg = err?.message || "";
+      if (msg.includes("Email not confirmed")) {
+        setError("Your email confirmation is pending. Please check your inbox or confirm your email to sign in.");
+      } else if (msg.includes("Invalid login credentials")) {
+        setError("Invalid credentials or email confirmation pending. If you just registered, please verify your email address.");
+      } else {
+        setError(msg || "Invalid login credentials");
+      }
     } finally {
       setIsLoading(false);
     }
