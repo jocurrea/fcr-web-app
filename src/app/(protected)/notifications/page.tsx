@@ -117,6 +117,18 @@ export default function NotificationsPage() {
     }
   };
 
+  const formatSenderName = (sender?: any) => {
+    if (!sender) return "Someone";
+    const fn = sender.firstName && sender.firstName !== "null" ? sender.firstName : "";
+    const ln = sender.lastName && sender.lastName !== "null" ? sender.lastName : "";
+    const fullName = [fn, ln].filter(Boolean).join(" ").trim();
+    if (fullName) return fullName;
+    if (sender.companyName && sender.companyName !== "null") return sender.companyName;
+    if (sender.username && sender.username !== "null") return sender.username;
+    if (sender.name && sender.name !== "null") return sender.name;
+    return "Someone";
+  };
+
   const getNotificationText = (notification: Notification) => {
     if (notification.data && notification.data.startsWith('{')) {
       try {
@@ -250,9 +262,7 @@ export default function NotificationsPage() {
                 <div className="flex flex-col flex-1 min-w-0 pt-0.5">
                   <div className="flex justify-between items-start w-full gap-2">
                     <span className="text-[14px] text-gray-900 font-medium truncate">
-                      {notification.sender 
-                        ? `${notification.sender.firstName} ${notification.sender.lastName}` 
-                        : 'Someone'}
+                      {formatSenderName(notification.sender)}
                     </span>
                     <span className="text-[13px] text-gray-700 whitespace-nowrap">
                       {new Date(notification.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
@@ -300,16 +310,14 @@ export default function NotificationsPage() {
                   />
                 ) : (
                   <div className="w-12 h-12 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-lg">
-                    {selectedInvite.sender?.firstName?.[0] || 'U'}
+                    {formatSenderName(selectedInvite.sender)[0]?.toUpperCase() || 'U'}
                   </div>
                 )}
               </div>
 
               <div className="flex flex-col min-w-0 flex-1">
                 <h3 className="text-base font-bold text-gray-900 truncate leading-snug">
-                  {selectedInvite.sender 
-                    ? `${selectedInvite.sender.firstName} ${selectedInvite.sender.lastName}` 
-                    : 'Someone'}
+                  {formatSenderName(selectedInvite.sender)}
                 </h3>
                 <p className="text-sm text-gray-600 truncate leading-snug">
                   {getNotificationText(selectedInvite)}

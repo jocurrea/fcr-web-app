@@ -12,9 +12,11 @@ export type Notification = {
   type: string;
   sender?: {
     id: string;
-    firstName: string;
-    lastName: string;
-    profileImage: string;
+    firstName?: string | null;
+    lastName?: string | null;
+    profileImage?: string | null;
+    companyName?: string | null;
+    username?: string | null;
   };
 };
 
@@ -41,26 +43,54 @@ export function useNotifications(userId?: string) {
       }
 
       if (data) {
+        const getSenderId = (n: any) => n.senderId || n.sender_id || n.latestSenderId || n.latest_sender_id;
+
         // Fetch sender details
         const senderIds = Array.from(
-          new Set(data.map((n) => n.senderId || (n as any).sender_id).filter(Boolean))
+          new Set(data.map(getSenderId).filter(Boolean))
         ) as string[];
         
         if (senderIds.length > 0) {
-          const { data: usersData } = await supabase
-            .from('users')
-            .select('id, firstName, lastName, profileImage')
-            .in('id', senderIds);
+          const [{ data: usersData }, { data: companiesData }] = await Promise.all([
+            supabase
+              .from('users')
+              .select('id, firstName, lastName, profileImage, username')
+              .in('id', senderIds),
+            supabase
+              .from('companies')
+              .select('owner_user_id, name, logo_url')
+              .in('owner_user_id', senderIds)
+          ]);
             
-          if (usersData) {
-            const userMap = new Map(usersData.map((u) => [u.id, u]));
-            data.forEach((n) => {
-              const sId = n.senderId || (n as any).sender_id;
-              if (sId && userMap.has(sId)) {
-                n.sender = userMap.get(sId);
-              }
+          const companyMap = new Map((companiesData || []).map((c) => [c.owner_user_id, c]));
+          const userMap = new Map();
+          
+          (usersData || []).forEach((u: any) => {
+            const comp = companyMap.get(u.id);
+            userMap.set(u.id, {
+              ...u,
+              companyName: comp?.name || null,
+              profileImage: u.profileImage || comp?.logo_url || null
             });
-          }
+          });
+
+          // Also set any company-only senders
+          (companiesData || []).forEach((c: any) => {
+            if (!userMap.has(c.owner_user_id)) {
+              userMap.set(c.owner_user_id, {
+                id: c.owner_user_id,
+                companyName: c.name,
+                profileImage: c.logo_url
+              });
+            }
+          });
+
+          data.forEach((n) => {
+            const sId = getSenderId(n);
+            if (sId && userMap.has(sId)) {
+              n.sender = userMap.get(sId);
+            }
+          });
         }
 
         setNotifications(data);
@@ -88,13 +118,24 @@ export function useNotifications(userId?: string) {
           
           if (sId) {
             try {
-              const { data: userData } = await supabase
-                .from('users')
-                .select('id, firstName, lastName, profileImage')
-                .eq('id', sId)
-                .maybeSingle();
+              const [{ data: userData }, { data: compData }] = await Promise.all([
+                supabase
+                  .from('users')
+                  .select('id, firstName, lastName, profileImage, username')
+                  .eq('id', sId)
+                  .maybeSingle(),
+                supabase
+                  .from('companies')
+                  .select('name, logo_url')
+                  .eq('owner_user_id', sId)
+                  .maybeSingle()
+              ]);
               if (userData) {
-                newNotification.sender = userData;
+                newNotification.sender = {
+                  ...userData,
+                  companyName: compData?.name || null,
+                  profileImage: userData.profileImage || compData?.logo_url || null
+                };
               }
             } catch (err) {
               console.error('Error fetching sender info for realtime notification:', err);

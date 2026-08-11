@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { PostCard } from "@/components/home/post-card";
-import { MapPin, Pencil, Clock, Heart, Eye, User, X, ChevronRight, Phone, Mail, Globe, Calendar, FileText, Briefcase, Plane } from "lucide-react";
+import { MapPin, Pencil, Clock, Heart, Eye, User, X, ChevronRight, ChevronLeft, Phone, Mail, Globe, Calendar, FileText, Briefcase, Plane } from "lucide-react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { fetchProfileProgress } from "@/lib/profile-progress";
@@ -56,26 +56,46 @@ export default function ProfilePage() {
       let { data: visitsData } = await supabase
         .from('profile_visits')
         .select('*')
-        .or(`visited_id.eq.${currentUserId},profile_user_id.eq.${currentUserId}`)
-        .order('created_at', { ascending: false });
+        .eq('profile_user_id', currentUserId)
+        .order('last_visited_at', { ascending: false });
 
       if (visitsData && visitsData.length > 0) {
         const visitorIds = Array.from(new Set(visitsData.map(v => v.visitor_user_id || v.visitor_id).filter(Boolean)));
         
         if (visitorIds.length > 0) {
-          const { data: usersData } = await supabase
-            .from('users')
-            .select('id, firstName, lastName, username, profileImage')
-            .in('id', visitorIds);
+          const [{ data: usersData }, { data: companiesData }] = await Promise.all([
+            supabase
+              .from('users')
+              .select('id, firstName, lastName, username, profileImage')
+              .in('id', visitorIds),
+            supabase
+              .from('companies')
+              .select('owner_user_id, name, logo_url')
+              .in('owner_user_id', visitorIds)
+          ]);
 
-          const userMap = new Map(usersData?.map(u => [u.id, u]) || []);
+          const compMap = new Map((companiesData || []).map(c => [c.owner_user_id, c]));
+          const userMap = new Map((usersData || []).map(u => {
+            const comp = compMap.get(u.id);
+            return [u.id, {
+              ...u,
+              companyName: comp?.name || null,
+              profileImage: u.profileImage || comp?.logo_url || null
+            }];
+          }));
+
           const formatted = visitsData.map(v => {
             const vId = v.visitor_user_id || v.visitor_id;
+            const usr = userMap.get(vId) || (compMap.has(vId) ? {
+              id: vId,
+              companyName: compMap.get(vId)?.name,
+              profileImage: compMap.get(vId)?.logo_url
+            } : null);
             return {
               ...v,
               visitor_id: vId,
-              created_at: v.first_visited_at || v.created_at || v.last_visited_at,
-              user: userMap.get(vId)
+              created_at: v.last_visited_at || v.first_visited_at || v.created_at,
+              user: usr
             };
           });
           setVisitors(formatted);
@@ -100,25 +120,45 @@ export default function ProfilePage() {
       let { data: likesData } = await supabase
         .from('profile_likes')
         .select('*')
-        .or(`liked_id.eq.${currentUserId},profile_user_id.eq.${currentUserId}`)
+        .eq('profile_user_id', currentUserId)
         .order('created_at', { ascending: false });
 
       if (likesData && likesData.length > 0) {
         const likerIds = Array.from(new Set(likesData.map(l => l.liker_user_id || l.liker_id).filter(Boolean)));
         
         if (likerIds.length > 0) {
-          const { data: usersData } = await supabase
-            .from('users')
-            .select('id, firstName, lastName, username, profileImage')
-            .in('id', likerIds);
+          const [{ data: usersData }, { data: companiesData }] = await Promise.all([
+            supabase
+              .from('users')
+              .select('id, firstName, lastName, username, profileImage')
+              .in('id', likerIds),
+            supabase
+              .from('companies')
+              .select('owner_user_id, name, logo_url')
+              .in('owner_user_id', likerIds)
+          ]);
 
-          const userMap = new Map(usersData?.map(u => [u.id, u]) || []);
+          const compMap = new Map((companiesData || []).map(c => [c.owner_user_id, c]));
+          const userMap = new Map((usersData || []).map(u => {
+            const comp = compMap.get(u.id);
+            return [u.id, {
+              ...u,
+              companyName: comp?.name || null,
+              profileImage: u.profileImage || comp?.logo_url || null
+            }];
+          }));
+
           const formatted = likesData.map(l => {
             const lId = l.liker_user_id || l.liker_id;
+            const usr = userMap.get(lId) || (compMap.has(lId) ? {
+              id: lId,
+              companyName: compMap.get(lId)?.name,
+              profileImage: compMap.get(lId)?.logo_url
+            } : null);
             return {
               ...l,
               liker_id: lId,
-              user: userMap.get(lId)
+              user: usr
             };
           });
           setLikers(formatted);
@@ -545,93 +585,152 @@ export default function ProfilePage() {
           )}
         </div>
 
-        {/* Visitors Modal */}
+        {/* Visitors Screen View */}
         {showVisitorsModal && (
-          <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl relative max-h-[80vh] flex flex-col">
+          <div className="fixed inset-0 z-50 bg-[#f8f9fa] flex flex-col w-full h-full max-w-lg mx-auto">
+            {/* Top Header Bar */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200/60 relative bg-white shrink-0 shadow-sm">
               <button 
                 onClick={() => setShowVisitorsModal(false)}
-                className="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-600 rounded-full"
+                className="w-10 h-10 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-700 transition-colors shrink-0 cursor-pointer"
               >
-                <X className="w-5 h-5" />
+                <ChevronLeft className="w-5 h-5" />
               </button>
-              <h3 className="font-bold text-lg text-gray-900 mb-4 flex items-center gap-2">
-                <Eye className="w-5 h-5 text-blue-600" />
+              <h1 className="font-bold text-[18px] text-gray-900 absolute left-1/2 -translate-x-1/2">
                 Profile Visitors
-              </h3>
-              <div className="overflow-y-auto flex-1 space-y-3 pr-1">
-                {loadingVisitors ? (
-                  <div className="py-8 text-center text-gray-400">Loading visitors...</div>
-                ) : visitors.length > 0 ? (
-                  visitors.map((v, i) => (
-                    <div key={i} className="flex items-center gap-3 p-2 rounded-xl hover:bg-gray-50 transition-colors">
-                      <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-100 shrink-0">
-                        {v.user?.profileImage ? (
-                          <img src={v.user.profileImage} alt="" className="w-full h-full object-cover" />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center bg-blue-50 text-blue-600 font-bold text-sm">
-                            {(v.user?.firstName || 'U')[0]}
+              </h1>
+              <div className="w-10 h-10 opacity-0 pointer-events-none" />
+            </div>
+
+            {/* Body Content */}
+            <div className="flex-1 overflow-y-auto p-6 flex flex-col">
+              {loadingVisitors ? (
+                <div className="flex-1 flex items-center justify-center text-gray-400 text-sm">
+                  Loading profile visitors...
+                </div>
+              ) : visitors.length === 0 ? (
+                <div className="flex-1 flex items-center justify-center text-gray-500 text-[15px] font-normal">
+                  No profile visitors yet
+                </div>
+              ) : (
+                <div className="flex flex-col gap-3">
+                  {visitors.map((visit, index) => {
+                    const visitorUser = visit.user;
+                    const name = visitorUser 
+                      ? (visitorUser.companyName || [visitorUser.firstName, visitorUser.lastName].filter(Boolean).join(' ').trim() || visitorUser.username || 'User')
+                      : 'User';
+                    
+                    return (
+                      <Link
+                        key={visit.id || index}
+                        href={`/profile/${visit.visitor_id || visit.visitor_user_id}`}
+                        onClick={() => setShowVisitorsModal(false)}
+                        className="flex items-center justify-between p-3.5 bg-white rounded-2xl hover:bg-gray-50 transition-colors border border-gray-200/70 shadow-sm group"
+                      >
+                        <div className="flex items-center gap-3.5 min-w-0">
+                          {visitorUser?.profileImage ? (
+                            <img 
+                              src={visitorUser.profileImage} 
+                              alt="" 
+                              className="w-12 h-12 rounded-full object-cover shrink-0 bg-gray-100 border border-gray-200"
+                            />
+                          ) : (
+                            <div className="w-12 h-12 rounded-full bg-blue-600 text-white font-bold flex items-center justify-center shrink-0 text-base shadow-sm">
+                              {name[0]?.toUpperCase() || 'U'}
+                            </div>
+                          )}
+                          <div className="flex flex-col min-w-0">
+                            <span className="text-[15px] font-bold text-gray-900 truncate group-hover:text-blue-600 transition-colors">
+                              {name}
+                            </span>
+                            <span className="text-xs text-gray-500">
+                              {visit.created_at || visit.last_visited_at 
+                                ? `Visited ${new Date(visit.created_at || visit.last_visited_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` 
+                                : 'Visited'}
+                            </span>
                           </div>
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-sm text-gray-900 truncate">
-                          {[v.user?.firstName, v.user?.lastName].filter(Boolean).join(' ') || v.user?.username || 'User'}
-                        </p>
-                        <p className="text-xs text-gray-400">
-                          {v.created_at ? new Date(v.created_at).toLocaleDateString() : 'Visited'}
-                        </p>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <div className="py-8 text-center text-gray-400 text-sm">No profile visitors yet</div>
-                )}
-              </div>
+                        </div>
+                        <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-blue-600 transition-colors shrink-0" />
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
         )}
 
-        {/* Likers Modal */}
+        {/* Likers Screen View */}
         {showLikersModal && (
-          <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl relative max-h-[80vh] flex flex-col">
+          <div className="fixed inset-0 z-50 bg-[#f8f9fa] flex flex-col w-full h-full max-w-lg mx-auto">
+            {/* Top Header Bar */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200/60 relative bg-white shrink-0 shadow-sm">
               <button 
                 onClick={() => setShowLikersModal(false)}
-                className="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-600 rounded-full"
+                className="w-10 h-10 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-700 transition-colors shrink-0 cursor-pointer"
               >
-                <X className="w-5 h-5" />
+                <ChevronLeft className="w-5 h-5" />
               </button>
-              <h3 className="font-bold text-lg text-gray-900 mb-4 flex items-center gap-2">
-                <Heart className="w-5 h-5 text-red-500 fill-red-500" />
-                Profile Likers
-              </h3>
-              <div className="overflow-y-auto flex-1 space-y-3 pr-1">
-                {loadingLikers ? (
-                  <div className="py-8 text-center text-gray-400">Loading likers...</div>
-                ) : likers.length > 0 ? (
-                  likers.map((l, i) => (
-                    <div key={i} className="flex items-center gap-3 p-2 rounded-xl hover:bg-gray-50 transition-colors">
-                      <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-100 shrink-0">
-                        {l.user?.profileImage ? (
-                          <img src={l.user.profileImage} alt="" className="w-full h-full object-cover" />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center bg-blue-50 text-blue-600 font-bold text-sm">
-                            {(l.user?.firstName || 'U')[0]}
+              <h1 className="font-bold text-[18px] text-gray-900 absolute left-1/2 -translate-x-1/2">
+                Profile Likes
+              </h1>
+              <div className="w-10 h-10 opacity-0 pointer-events-none" />
+            </div>
+
+            {/* Body Content */}
+            <div className="flex-1 overflow-y-auto p-6 flex flex-col">
+              {loadingLikers ? (
+                <div className="flex-1 flex items-center justify-center text-gray-400 text-sm">
+                  Loading profile likes...
+                </div>
+              ) : likers.length === 0 ? (
+                <div className="flex-1 flex items-center justify-center text-gray-500 text-[15px] font-normal">
+                  No profile likes yet
+                </div>
+              ) : (
+                <div className="flex flex-col gap-3">
+                  {likers.map((like, index) => {
+                    const likerUser = like.user;
+                    const name = likerUser 
+                      ? (likerUser.companyName || [likerUser.firstName, likerUser.lastName].filter(Boolean).join(' ').trim() || likerUser.username || 'User')
+                      : 'User';
+                    
+                    return (
+                      <Link
+                        key={like.id || index}
+                        href={`/profile/${like.liker_id || like.liker_user_id}`}
+                        onClick={() => setShowLikersModal(false)}
+                        className="flex items-center justify-between p-3.5 bg-white rounded-2xl hover:bg-gray-50 transition-colors border border-gray-200/70 shadow-sm group"
+                      >
+                        <div className="flex items-center gap-3.5 min-w-0">
+                          {likerUser?.profileImage ? (
+                            <img 
+                              src={likerUser.profileImage} 
+                              alt="" 
+                              className="w-12 h-12 rounded-full object-cover shrink-0 bg-gray-100 border border-gray-200"
+                            />
+                          ) : (
+                            <div className="w-12 h-12 rounded-full bg-blue-600 text-white font-bold flex items-center justify-center shrink-0 text-base shadow-sm">
+                              {name[0]?.toUpperCase() || 'U'}
+                            </div>
+                          )}
+                          <div className="flex flex-col min-w-0">
+                            <span className="text-[15px] font-bold text-gray-900 truncate group-hover:text-blue-600 transition-colors">
+                              {name}
+                            </span>
+                            <span className="text-xs text-gray-500">
+                              {like.created_at 
+                                ? `Liked ${new Date(like.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` 
+                                : 'Liked'}
+                            </span>
                           </div>
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-sm text-gray-900 truncate">
-                          {[l.user?.firstName, l.user?.lastName].filter(Boolean).join(' ') || l.user?.username || 'User'}
-                        </p>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <div className="py-8 text-center text-gray-400 text-sm">No profile likes yet</div>
-                )}
-              </div>
+                        </div>
+                        <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-blue-600 transition-colors shrink-0" />
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -860,150 +959,152 @@ export default function ProfilePage() {
         No more posts
       </div>
 
-      {/* Profile Visitors Modal (HU14.4) */}
+      {/* Profile Visitors Screen View */}
       {showVisitorsModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white rounded-[24px] w-full max-w-md p-6 shadow-2xl flex flex-col gap-4 max-h-[80vh]">
-            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600">
-                  <Eye className="w-5 h-5" />
-                </div>
-                <h2 className="text-lg font-bold text-gray-900">Profile Visitors</h2>
-              </div>
-              <button 
-                onClick={() => setShowVisitorsModal(false)}
-                className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-600 transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
+        <div className="fixed inset-0 z-50 bg-[#f8f9fa] flex flex-col w-full h-full max-w-lg mx-auto">
+          {/* Top Header Bar */}
+          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200/60 relative bg-white shrink-0 shadow-sm">
+            <button 
+              onClick={() => setShowVisitorsModal(false)}
+              className="w-10 h-10 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-700 transition-colors shrink-0 cursor-pointer"
+            >
+              <ChevronLeft className="w-5 h-5" />
+            </button>
+            <h1 className="font-bold text-[18px] text-gray-900 absolute left-1/2 -translate-x-1/2">
+              Profile Visitors
+            </h1>
+            <div className="w-10 h-10 opacity-0 pointer-events-none" />
+          </div>
 
-            <div className="flex-1 overflow-y-auto flex flex-col gap-3 pr-1">
-              {loadingVisitors ? (
-                <div className="flex items-center justify-center py-10">
-                  <div className="w-7 h-7 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                </div>
-              ) : visitors.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-10 text-center text-gray-500 gap-2">
-                  <User className="w-10 h-10 text-gray-300" />
-                  <p className="text-sm font-medium">No profile visits recorded yet.</p>
-                </div>
-              ) : (
-                visitors.map((visit, index) => {
+          {/* Body Content */}
+          <div className="flex-1 overflow-y-auto p-6 flex flex-col">
+            {loadingVisitors ? (
+              <div className="flex-1 flex items-center justify-center text-gray-400 text-sm">
+                Loading profile visitors...
+              </div>
+            ) : visitors.length === 0 ? (
+              <div className="flex-1 flex items-center justify-center text-gray-500 text-[15px] font-normal">
+                No profile visitors yet
+              </div>
+            ) : (
+              <div className="flex flex-col gap-3">
+                {visitors.map((visit, index) => {
                   const visitorUser = visit.user;
                   const name = visitorUser 
-                    ? ([visitorUser.firstName, visitorUser.lastName].filter(Boolean).join(' ').trim() || visitorUser.username || 'User')
-                    : 'Anonymous User';
+                    ? (visitorUser.companyName || [visitorUser.firstName, visitorUser.lastName].filter(Boolean).join(' ').trim() || visitorUser.username || 'User')
+                    : 'User';
                   
                   return (
                     <Link
                       key={visit.id || index}
-                      href={`/profile/${visit.visitor_id}`}
+                      href={`/profile/${visit.visitor_id || visit.visitor_user_id}`}
                       onClick={() => setShowVisitorsModal(false)}
-                      className="flex items-center justify-between p-3 rounded-2xl hover:bg-gray-50 transition-colors border border-gray-100 group"
+                      className="flex items-center justify-between p-3.5 bg-white rounded-2xl hover:bg-gray-50 transition-colors border border-gray-200/70 shadow-sm group"
                     >
-                      <div className="flex items-center gap-3 min-w-0">
+                      <div className="flex items-center gap-3.5 min-w-0">
                         {visitorUser?.profileImage ? (
                           <img 
                             src={visitorUser.profileImage} 
                             alt="" 
-                            className="w-11 h-11 rounded-full object-cover shrink-0 bg-gray-100"
+                            className="w-12 h-12 rounded-full object-cover shrink-0 bg-gray-100 border border-gray-200"
                           />
                         ) : (
-                          <div className="w-11 h-11 rounded-full bg-blue-600 text-white font-bold flex items-center justify-center shrink-0">
+                          <div className="w-12 h-12 rounded-full bg-blue-600 text-white font-bold flex items-center justify-center shrink-0 text-base shadow-sm">
                             {name[0]?.toUpperCase() || 'U'}
                           </div>
                         )}
                         <div className="flex flex-col min-w-0">
-                          <span className="text-sm font-bold text-gray-900 truncate group-hover:text-blue-600 transition-colors">
+                          <span className="text-[15px] font-bold text-gray-900 truncate group-hover:text-blue-600 transition-colors">
                             {name}
                           </span>
                           <span className="text-xs text-gray-500">
-                            Visited {new Date(visit.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                            {visit.created_at || visit.last_visited_at 
+                              ? `Visited ${new Date(visit.created_at || visit.last_visited_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` 
+                              : 'Visited'}
                           </span>
                         </div>
                       </div>
                       <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-blue-600 transition-colors shrink-0" />
                     </Link>
                   );
-                })
-              )}
-            </div>
+                })}
+              </div>
+            )}
           </div>
         </div>
       )}
 
-      {/* Profile Likers Modal (HU14.5) */}
+      {/* Profile Likers Screen View */}
       {showLikersModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white rounded-[24px] w-full max-w-md p-6 shadow-2xl flex flex-col gap-4 max-h-[80vh]">
-            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600">
-                  <Heart className="w-5 h-5 fill-blue-600 text-blue-600" />
-                </div>
-                <h2 className="text-lg font-bold text-gray-900">Profile Likes</h2>
-              </div>
-              <button 
-                onClick={() => setShowLikersModal(false)}
-                className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-600 transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
+        <div className="fixed inset-0 z-50 bg-[#f8f9fa] flex flex-col w-full h-full max-w-lg mx-auto">
+          {/* Top Header Bar */}
+          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200/60 relative bg-white shrink-0 shadow-sm">
+            <button 
+              onClick={() => setShowLikersModal(false)}
+              className="w-10 h-10 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-700 transition-colors shrink-0 cursor-pointer"
+            >
+              <ChevronLeft className="w-5 h-5" />
+            </button>
+            <h1 className="font-bold text-[18px] text-gray-900 absolute left-1/2 -translate-x-1/2">
+              Profile Likes
+            </h1>
+            <div className="w-10 h-10 opacity-0 pointer-events-none" />
+          </div>
 
-            <div className="flex-1 overflow-y-auto flex flex-col gap-3 pr-1">
-              {loadingLikers ? (
-                <div className="flex items-center justify-center py-10">
-                  <div className="w-7 h-7 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                </div>
-              ) : likers.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-10 text-center text-gray-500 gap-2">
-                  <Heart className="w-10 h-10 text-gray-300" />
-                  <p className="text-sm font-medium">No profile likes recorded yet.</p>
-                </div>
-              ) : (
-                likers.map((like, index) => {
+          {/* Body Content */}
+          <div className="flex-1 overflow-y-auto p-6 flex flex-col">
+            {loadingLikers ? (
+              <div className="flex-1 flex items-center justify-center text-gray-400 text-sm">
+                Loading profile likes...
+              </div>
+            ) : likers.length === 0 ? (
+              <div className="flex-1 flex items-center justify-center text-gray-500 text-[15px] font-normal">
+                No profile likes yet
+              </div>
+            ) : (
+              <div className="flex flex-col gap-3">
+                {likers.map((like, index) => {
                   const likerUser = like.user;
                   const name = likerUser 
-                    ? ([likerUser.firstName, likerUser.lastName].filter(Boolean).join(' ').trim() || likerUser.username || 'User')
-                    : 'Anonymous User';
+                    ? (likerUser.companyName || [likerUser.firstName, likerUser.lastName].filter(Boolean).join(' ').trim() || likerUser.username || 'User')
+                    : 'User';
                   
                   return (
                     <Link
                       key={like.id || index}
-                      href={`/profile/${like.liker_id}`}
+                      href={`/profile/${like.liker_id || like.liker_user_id}`}
                       onClick={() => setShowLikersModal(false)}
-                      className="flex items-center justify-between p-3 rounded-2xl hover:bg-gray-50 transition-colors border border-gray-100 group"
+                      className="flex items-center justify-between p-3.5 bg-white rounded-2xl hover:bg-gray-50 transition-colors border border-gray-200/70 shadow-sm group"
                     >
-                      <div className="flex items-center gap-3 min-w-0">
+                      <div className="flex items-center gap-3.5 min-w-0">
                         {likerUser?.profileImage ? (
                           <img 
                             src={likerUser.profileImage} 
                             alt="" 
-                            className="w-11 h-11 rounded-full object-cover shrink-0 bg-gray-100"
+                            className="w-12 h-12 rounded-full object-cover shrink-0 bg-gray-100 border border-gray-200"
                           />
                         ) : (
-                          <div className="w-11 h-11 rounded-full bg-blue-600 text-white font-bold flex items-center justify-center shrink-0">
+                          <div className="w-12 h-12 rounded-full bg-blue-600 text-white font-bold flex items-center justify-center shrink-0 text-base shadow-sm">
                             {name[0]?.toUpperCase() || 'U'}
                           </div>
                         )}
                         <div className="flex flex-col min-w-0">
-                          <span className="text-sm font-bold text-gray-900 truncate group-hover:text-blue-600 transition-colors">
+                          <span className="text-[15px] font-bold text-gray-900 truncate group-hover:text-blue-600 transition-colors">
                             {name}
                           </span>
                           <span className="text-xs text-gray-500">
-                            Liked {new Date(like.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                            {like.created_at 
+                              ? `Liked ${new Date(like.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` 
+                              : 'Liked'}
                           </span>
                         </div>
                       </div>
                       <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-blue-600 transition-colors shrink-0" />
                     </Link>
                   );
-                })
-              )}
-            </div>
+                })}
+              </div>
+            )}
           </div>
         </div>
       )}
