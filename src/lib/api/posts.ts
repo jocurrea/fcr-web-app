@@ -223,22 +223,29 @@ async function buildPostsWithResumes(data: any[], mode?: string): Promise<Post[]
     }
 
     // Avatar priority:
-    // 1. Company Logo
-    // 2. Resume profilePhoto
-    // 3. users table profileImage (nested join or direct)
-    // 4. localStorage photo (current user only)
-    // 5. Dicebear shape
-    let authorAvatar = company?.avatar || resume?.avatar || u?.profileImage;
+    // 1. Company Logo (from companies table)
+    // 2. users table profileImage (nested join or direct)
+    // 3. Resume profilePhoto
+    // 4. localStorage photo / company_logo (current user only)
+    let authorAvatar = company?.avatar || u?.profileImage || resume?.avatar;
 
     if (!authorAvatar && post.userId === currentUserId) {
       try {
-        const savedPhoto = localStorage.getItem('userProfilePhoto');
+        const savedPhoto = localStorage.getItem('userProfilePhoto') || localStorage.getItem('company_logo');
         if (savedPhoto) authorAvatar = savedPhoto;
+
+        if (!authorAvatar) {
+          const savedBus = localStorage.getItem('business_profile');
+          if (savedBus) {
+            const parsed = JSON.parse(savedBus);
+            if (parsed.logo) authorAvatar = parsed.logo;
+          }
+        }
       } catch {}
     }
 
     if (!authorAvatar) {
-      authorAvatar = `https://api.dicebear.com/7.x/shapes/svg?seed=${encodeURIComponent(post.userId || 'user')}`;
+      authorAvatar = `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(authorName || post.userId || 'user')}`;
     }
 
     const likes = post.postLikes ? post.postLikes.length : (likesMap[post.id]?.count || 0);
@@ -439,9 +446,9 @@ export async function fetchPostComments(postId: string): Promise<Comment[]> {
       }
     }
 
-    let authorAvatar = company?.logo_url || resumeInfo?.avatar || comment.user?.profileImage;
+    let authorAvatar = company?.logo_url || comment.user?.profileImage || resumeInfo?.avatar;
     if (!authorAvatar) {
-      authorAvatar = `https://api.dicebear.com/7.x/shapes/svg?seed=${encodeURIComponent(comment.userId || 'user')}`;
+      authorAvatar = `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(authorName || comment.userId || 'user')}`;
     }
 
     return {

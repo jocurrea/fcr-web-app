@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, ChangeEvent } from "react";
 import { Upload, X, AlertCircle } from "lucide-react";
 import { useBusinessOnboarding } from "@/components/onboarding-business/business-onboarding-context";
+import { supabase } from "@/lib/supabase";
 
 interface CompanyProfileStepProps {
   onNext: () => void;
@@ -141,6 +142,14 @@ export function CompanyProfileStep({ onNext }: CompanyProfileStepProps) {
         const { uploadToStorage } = await import("@/lib/upload");
         const publicUrl = await uploadToStorage(file, "companies");
         setLogo(publicUrl);
+        try {
+          localStorage.setItem("userProfilePhoto", publicUrl);
+          localStorage.setItem("company_logo", publicUrl);
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) {
+            await supabase.from("users").update({ profileImage: publicUrl }).eq("id", user.id);
+          }
+        } catch (e) {}
       } catch (err: any) {
         setErrorMessage(err?.message || "Error al subir el logo");
         setShowErrorModal(true);

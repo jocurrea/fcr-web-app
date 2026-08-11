@@ -88,6 +88,8 @@ export function PostCard({ id, user, date, content, image, likes, liked, comment
     }
   };
 
+  const [imgError, setImgError] = useState(false);
+
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden w-full max-w-lg mx-auto">
       {/* Header */}
@@ -96,8 +98,19 @@ export function PostCard({ id, user, date, content, image, likes, liked, comment
           onClick={handleProfileClick}
           className={cn("flex items-center gap-3", user.id ? "cursor-pointer group" : "")}
         >
-          <div className="w-10 h-10 rounded-full overflow-hidden border border-gray-200 bg-gray-100 shrink-0">
-            <img src={user.avatar} alt={user.name} className="w-full h-full object-cover" />
+          <div className="w-10 h-10 rounded-full overflow-hidden border border-gray-200 bg-gray-100 shrink-0 flex items-center justify-center">
+            {user.avatar && !imgError ? (
+              <img 
+                src={user.avatar} 
+                alt={user.name} 
+                className="w-full h-full object-cover"
+                onError={() => setImgError(true)}
+              />
+            ) : (
+              <div className="w-full h-full bg-blue-600 text-white font-bold flex items-center justify-center text-sm uppercase shrink-0">
+                {user.name ? user.name[0] : 'U'}
+              </div>
+            )}
           </div>
           <div>
             <h3 className="font-semibold text-sm text-gray-900 leading-none group-hover:text-blue-600 transition-colors">{user.name}</h3>

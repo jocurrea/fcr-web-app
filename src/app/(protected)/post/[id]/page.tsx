@@ -279,12 +279,16 @@ function PostDetailContent() {
                 return (
                   <div key={c.id || i} className="flex gap-3 items-start">
                     {/* Avatar */}
-                    <Link href={`/profile/${c.user_id}`} className="w-10 h-10 rounded-full overflow-hidden border border-gray-200 bg-white flex-shrink-0 mt-1 hover:opacity-80 transition-opacity">
-                      <img 
-                        src={c.author.avatar || "https://api.dicebear.com/7.x/shapes/svg?seed=user"} 
-                        alt={c.author.name} 
-                        className="w-full h-full object-cover" 
-                      />
+                    <Link href={`/profile/${c.user_id}`} className="w-10 h-10 rounded-full overflow-hidden border border-gray-200 bg-blue-600 flex-shrink-0 mt-1 hover:opacity-80 transition-opacity flex items-center justify-center text-white font-bold text-sm uppercase">
+                      {c.author?.avatar && !c.author.avatar.includes('shapes') ? (
+                        <img 
+                          src={c.author.avatar} 
+                          alt={c.author.name} 
+                          className="w-full h-full object-cover" 
+                        />
+                      ) : (
+                        <span>{(c.author?.name || 'U')[0]?.toUpperCase()}</span>
+                      )}
                     </Link>
                     {/* Gray Box */}
                     <div className="flex-1 bg-[#f1f3f4] p-3 rounded-2xl rounded-tl-sm relative">

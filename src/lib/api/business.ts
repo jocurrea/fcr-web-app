@@ -239,13 +239,20 @@ export async function fetchBusinessOnboarding(): Promise<ApiResult<BusinessOnboa
       .filter((companyType) => selectedIds.has(companyType.id))
       .map((companyType) => companyType.key);
 
-    // Fallback: Check localStorage if company_type_selections only contains partial types due to DB reference constraints
-    if (typeof window !== 'undefined') {
+    // Check company.services if DB company_type_selections is empty
+    if (selectedCompanyTypeKeys.length === 0 && Array.isArray(company.services) && company.services.length > 0) {
+      selectedCompanyTypeKeys = mappedCompanyTypes
+        .filter((ct) => company.services.includes(ct.label) || company.services.includes(ct.key))
+        .map((ct) => ct.key);
+    }
+
+    // Fallback: Check localStorage strictly for this specific company.id
+    if (typeof window !== 'undefined' && company.id) {
       try {
-        const savedKeys = localStorage.getItem("company_type_keys_" + company.id) || localStorage.getItem("company_type_keys_latest");
+        const savedKeys = localStorage.getItem("company_type_keys_" + company.id);
         if (savedKeys) {
           const parsed = JSON.parse(savedKeys) as string[];
-          if (parsed.length > selectedCompanyTypeKeys.length) {
+          if (Array.isArray(parsed) && parsed.length > selectedCompanyTypeKeys.length) {
             selectedCompanyTypeKeys = parsed;
           }
         }
@@ -362,13 +369,11 @@ export async function saveCompanyTypeSelections(companyTypeKeys: string[]): Prom
       console.warn("Exception saving company_type_selections:", e);
     }
 
-    // Persist selected keys and labels to localStorage
-    if (typeof window !== 'undefined') {
+    // Persist selected keys and labels strictly for this company.id
+    if (typeof window !== 'undefined' && company.id) {
       try {
         localStorage.setItem("company_type_keys_" + company.id, JSON.stringify(companyTypeKeys));
-        localStorage.setItem("company_type_keys_latest", JSON.stringify(companyTypeKeys));
         localStorage.setItem("company_types_" + company.id, JSON.stringify(selectedLabels));
-        localStorage.setItem("company_types_latest", JSON.stringify(selectedLabels));
       } catch (e) {}
     }
 

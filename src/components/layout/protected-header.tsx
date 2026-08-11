@@ -148,7 +148,14 @@ export function ProtectedHeader() {
           onboarded = true;
           
           const companyLogo = companies[0].logo_url || localStorage.getItem("userProfilePhoto");
-          if (companyLogo) setProfilePhoto(companyLogo);
+          if (companyLogo) {
+            setProfilePhoto(companyLogo);
+            try {
+              localStorage.setItem("userProfilePhoto", companyLogo);
+              localStorage.setItem("company_logo", companyLogo);
+              supabase.from("users").update({ profileImage: companyLogo }).eq("id", session.user.id).then();
+            } catch (e) {}
+          }
           return;
         }
 
