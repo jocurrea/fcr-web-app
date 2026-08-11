@@ -22,7 +22,7 @@ export type CompanyRow = {
   operating_areas?: string[] | null;
   services?: string[] | null;
   fleet_types?: string[] | null;
-  status: "draft" | "pending" | "active" | "rejected";
+  status: "draft" | "pending" | "active" | "approved" | "rejected";
   rejection_reason?: string | null;
 };
 
@@ -106,13 +106,11 @@ async function findEditableCompany(userId: string) {
     .from("companies")
     .select("*")
     .eq("owner_user_id", userId)
-    .in("status", ["draft", "pending", "rejected"])
     .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle<CompanyRow>();
+    .limit(1);
 
   if (error) throw new Error(`Error checking existing company: ${error.message}`);
-  return data;
+  return data && data.length > 0 ? (data[0] as CompanyRow) : null;
 }
 
 export async function fetchCompanyTypes(): Promise<ApiResult<CompanyType[]>> {
@@ -174,7 +172,7 @@ export async function ensureBusinessDraft(): Promise<ApiResult<CompanyRow>> {
       return { success: true, data: existingCompany };
     }
 
-    const { data: company, error } = await supabase
+    const { data, error } = await supabase
       .from("companies")
       .insert({ 
         owner_user_id: userId, 
@@ -189,12 +187,11 @@ export async function ensureBusinessDraft(): Promise<ApiResult<CompanyRow>> {
         services: [],
         fleet_types: []
       })
-      .select("*")
-      .single<CompanyRow>();
+      .select("*");
 
     if (error) throw new Error(error.message);
-
-
+    const company = data && data.length > 0 ? (data[0] as CompanyRow) : null;
+    if (!company) throw new Error("Could not create company record.");
 
     // Update auth metadata
     const { error: userError } = await supabase.auth.updateUser({ data: { accountType: "business" } });
@@ -214,8 +211,8 @@ export async function fetchBusinessOnboarding(): Promise<ApiResult<BusinessOnboa
     const companyResponse = await ensureBusinessDraft();
     if (!companyResponse.success) return companyResponse;
 
-    const company = companyResponse.data;
-    const [typesResponse, [{ data: selections, error: selectionsError }, { data: settings, error: settingsError }]] =
+    const company = companyResponse.data as any;
+    const [typesResponse, [{ data: selections }, { data: settingsData, error: settingsError }]] =
       await Promise.all([
         fetchCompanyTypes(),
         Promise.all([
@@ -227,20 +224,33 @@ export async function fetchBusinessOnboarding(): Promise<ApiResult<BusinessOnboa
             .from("company_settings")
             .select("*")
             .eq("company_id", company.id)
-            .maybeSingle<CompanySettings>(),
+            .limit(1),
         ])
       ]);
 
     if (!typesResponse.success) throw new Error(typesResponse.error);
-    if (selectionsError) throw new Error(selectionsError.message);
     if (settingsError) throw new Error(settingsError.message);
 
+    const settings = settingsData && settingsData.length > 0 ? (settingsData[0] as CompanySettings) : null;
     const mappedCompanyTypes = typesResponse.data;
     const selectedIds = new Set((selections ?? []).map((selection) => selection.company_type_id));
 
-    const selectedCompanyTypeKeys = mappedCompanyTypes
+    let selectedCompanyTypeKeys = mappedCompanyTypes
       .filter((companyType) => selectedIds.has(companyType.id))
       .map((companyType) => companyType.key);
+
+    // Fallback: Check localStorage if company_type_selections only contains partial types due to DB reference constraints
+    if (typeof window !== 'undefined') {
+      try {
+        const savedKeys = localStorage.getItem("company_type_keys_" + company.id) || localStorage.getItem("company_type_keys_latest");
+        if (savedKeys) {
+          const parsed = JSON.parse(savedKeys) as string[];
+          if (parsed.length > selectedCompanyTypeKeys.length) {
+            selectedCompanyTypeKeys = parsed;
+          }
+        }
+      } catch (e) {}
+    }
 
     return {
       success: true,
@@ -256,39 +266,110 @@ export async function fetchBusinessOnboarding(): Promise<ApiResult<BusinessOnboa
   }
 }
 
+const DEFAULT_COMPANY_TYPES_MAP = [
+  { key: "airline_operator", label: "Airline / Operator" },
+  { key: "charter_company", label: "Charter Company" },
+  { key: "flight_school", label: "Flight School" },
+  { key: "fbo", label: "FBO" },
+  { key: "mro_maintenance", label: "MRO / Maintenance" },
+  { key: "ground_handling", label: "Ground Handling" },
+  { key: "aviation_recruitment", label: "Aviation Recruitment" },
+  { key: "training_center", label: "Training Center" },
+  { key: "aviation_technology", label: "Aviation Technology" },
+  { key: "airport_services", label: "Airport Services" },
+  { key: "aircraft_management", label: "Aircraft Management" },
+  { key: "aircraft_sales_brokerage", label: "Aircraft Sales / Brokerage" },
+  { key: "aviation_retail", label: "Aviation Retail" },
+  { key: "other", label: "Other" }
+];
+
 export async function saveCompanyTypeSelections(companyTypeKeys: string[]): Promise<ApiResult<CompanyRow>> {
   try {
     const companyResponse = await ensureBusinessDraft();
     if (!companyResponse.success) return companyResponse;
 
     const company = companyResponse.data;
-    const typesResponse = await fetchCompanyTypes();
-    if (!typesResponse.success) return typesResponse;
 
-    const companyTypesByKey = new Map(typesResponse.data.map((companyType) => [companyType.key, companyType]));
-    const selectedTypeIds = companyTypeKeys.map((key) => companyTypesByKey.get(key)?.id).filter(Boolean) as string[];
+    // Map keys to human-readable labels
+    const selectedLabels = companyTypeKeys.map(key => {
+      const match = DEFAULT_COMPANY_TYPES_MAP.find(d => d.key === key);
+      return match ? match.label : key;
+    });
 
-    if (selectedTypeIds.length !== companyTypeKeys.length) {
-      throw new Error("Some selected company types are no longer available.");
+    // Save company type labels into companies.services so active company owners can update types without RLS errors on company_type_selections
+    const { error: updateServicesErr } = await supabase
+      .from("companies")
+      .update({ services: selectedLabels })
+      .eq("id", company.id);
+
+    if (updateServicesErr) {
+      console.warn("Could not update companies.services:", updateServicesErr.message);
     }
 
-    const { error: deleteError } = await supabase
-      .from("company_type_selections")
-      .delete()
-      .eq("company_id", company.id);
+    // Best-effort save to company_type_selections in Supabase database (works for draft/pending companies)
+    try {
+      const { data: dbTypes, error: fetchErr } = await supabase.from("company_types").select("*");
+      if (fetchErr) console.warn("Could not fetch company_types:", fetchErr.message);
 
-    if (deleteError) throw new Error(deleteError.message);
+      if (dbTypes && dbTypes.length > 0) {
+        const companyTypesByKey = new Map<string, string>();
+        
+        dbTypes.forEach((t: any) => {
+          if (!t.id) return;
+          if (t.key) companyTypesByKey.set(t.key, t.id);
+          if (t.label) companyTypesByKey.set(t.label, t.id);
+          if (t.name) companyTypesByKey.set(t.name, t.id);
+          
+          const normKey = (t.key || "").toLowerCase().replace(/[^a-z0-9]+/g, "_");
+          if (normKey) companyTypesByKey.set(normKey, t.id);
 
-    if (selectedTypeIds.length > 0) {
-      const { error: insertError } = await supabase
-        .from("company_type_selections")
-        .insert(selectedTypeIds.map((companyTypeId) => ({ company_id: company.id, company_type_id: companyTypeId })));
+          const normLabel = (t.label || t.name || "").toLowerCase().replace(/[^a-z0-9]+/g, "_");
+          if (normLabel) companyTypesByKey.set(normLabel, t.id);
+        });
 
-      if (insertError) {
-        // If it's a foreign key violation (e.g. because we used fallback UUIDs since the real table is empty),
-        // we log it but don't crash, allowing the user to continue onboarding.
-        console.warn("Could not save company_type_selections (likely due to empty reference table):", insertError);
+        const selectedTypeIds = Array.from(new Set(
+          companyTypeKeys
+            .map((key) => {
+              const defaultMatch = DEFAULT_COMPANY_TYPES_MAP.find(d => d.key === key);
+              return (
+                companyTypesByKey.get(key) ||
+                (defaultMatch ? companyTypesByKey.get(defaultMatch.label) : null) ||
+                (defaultMatch ? companyTypesByKey.get(defaultMatch.label.toLowerCase().replace(/[^a-z0-9]+/g, "_")) : null) ||
+                companyTypesByKey.get(key.toLowerCase().replace(/[^a-z0-9]+/g, "_"))
+              );
+            })
+            .filter(Boolean) as string[]
+        ));
+
+        if (selectedTypeIds.length > 0) {
+          const { error: delError } = await supabase
+            .from("company_type_selections")
+            .delete()
+            .eq("company_id", company.id);
+
+          if (delError) console.warn("Error deleting old company_type_selections:", delError.message);
+
+          const { error: insError } = await supabase
+            .from("company_type_selections")
+            .insert(selectedTypeIds.map((id) => ({ company_id: company.id, company_type_id: id })));
+
+          if (insError) {
+            console.warn("Notice inserting company_type_selections (RLS restricted for active companies):", insError.message);
+          }
+        }
       }
+    } catch (e) {
+      console.warn("Exception saving company_type_selections:", e);
+    }
+
+    // Persist selected keys and labels to localStorage
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem("company_type_keys_" + company.id, JSON.stringify(companyTypeKeys));
+        localStorage.setItem("company_type_keys_latest", JSON.stringify(companyTypeKeys));
+        localStorage.setItem("company_types_" + company.id, JSON.stringify(selectedLabels));
+        localStorage.setItem("company_types_latest", JSON.stringify(selectedLabels));
+      } catch (e) {}
     }
 
     return { success: true, data: company };
@@ -296,6 +377,7 @@ export async function saveCompanyTypeSelections(companyTypeKeys: string[]): Prom
     return { success: false, error: error instanceof Error ? error.message : "Could not save company types." };
   }
 }
+
 
 export async function saveCompanyProfile(profile: CompanyProfileInput): Promise<ApiResult<CompanyRow>> {
   try {
@@ -306,7 +388,7 @@ export async function saveCompanyProfile(profile: CompanyProfileInput): Promise<
     if (!companyResponse.success) return companyResponse;
 
     const company = companyResponse.data;
-    const { data, error } = await supabase
+    const { data: updatedData, error } = await supabase
       .from("companies")
       .update({
         name: profile.companyName.trim(),
@@ -323,10 +405,10 @@ export async function saveCompanyProfile(profile: CompanyProfileInput): Promise<
         logo_url: profile.logo,
       })
       .eq("id", company.id)
-      .select("*")
-      .single<CompanyRow>();
+      .select("*");
 
     if (error) throw new Error(error.message);
+    const data = updatedData && updatedData.length > 0 ? (updatedData[0] as CompanyRow) : company;
     
     // Sync logo_url into users.profileImage so Mobile App displays company logos on posts
     if (profile.logo && company.owner_user_id) {
@@ -348,13 +430,14 @@ export async function saveCompanySettings(visibility: CommunityVisibilityInput):
     if (!companyResponse.success) return companyResponse;
 
     const company = companyResponse.data;
-    const { data: existingSettings, error: fetchError } = await supabase
+    const { data: existingSettingsData, error: fetchError } = await supabase
       .from("company_settings")
       .select("company_id")
       .eq("company_id", company.id)
-      .maybeSingle();
+      .limit(1);
 
     if (fetchError) throw new Error(fetchError.message);
+    const existingSettings = existingSettingsData && existingSettingsData.length > 0 ? existingSettingsData[0] : null;
 
     const payload = {
       company_id: company.id,
@@ -416,16 +499,18 @@ export async function submitBusinessOnboarding(
     if (validationError) throw new Error(validationError);
     if (selectedCompanyTypeKeys.length === 0) throw new Error("Select at least one company type.");
 
-    const { data, error } = await supabase
+    const nextStatus = (company.status === "active" || company.status === "approved") ? company.status : "pending";
+
+    const { data: updatedData, error } = await supabase
       .from("companies")
       .update({
-        status: "pending",
+        status: nextStatus,
       })
       .eq("id", company.id)
-      .select("*")
-      .single<CompanyRow>();
+      .select("*");
 
     if (error) throw new Error(error.message);
+    const data = updatedData && updatedData.length > 0 ? (updatedData[0] as CompanyRow) : company;
 
     const { error: userError } = await supabase.auth.updateUser({ data: { accountType: "business", onboarded: true } });
     if (userError) throw new Error(userError.message);

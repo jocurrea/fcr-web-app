@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { PostCard } from "@/components/home/post-card";
-import { MapPin, Pencil, Clock, Heart, Eye, User, X, ChevronRight } from "lucide-react";
+import { MapPin, Pencil, Clock, Heart, Eye, User, X, ChevronRight, Phone, Mail, Globe, Calendar, FileText, Briefcase, Plane } from "lucide-react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { fetchProfileProgress } from "@/lib/profile-progress";
@@ -21,7 +21,21 @@ export default function ProfilePage() {
 
   // Business Profile State
   const [isBusiness, setIsBusiness] = useState(false);
-  const [companyInfo, setCompanyInfo] = useState<{ name: string, status: string, logo?: string | null } | null>(null);
+  const [companyInfo, setCompanyInfo] = useState<{ 
+    name: string; 
+    status: string; 
+    logo?: string | null;
+    location?: string | null;
+    email?: string | null;
+    phone?: string | null;
+    website?: string | null;
+    description?: string | null;
+    foundedYear?: number | string | null;
+    operatingAreas?: string[];
+    services?: string[];
+    fleetTypes?: string[];
+    types?: string[];
+  } | null>(null);
   const [loading, setLoading] = useState(true);
 
   const [profileProgress, setProfileProgress] = useState(70);
@@ -177,7 +191,7 @@ export default function ProfilePage() {
           // Check if user has a business company
           const { data: companies, error } = await supabase
             .from('companies')
-            .select('name, status, logo_url')
+            .select('id, name, status, logo_url, location, contact_email, phone, website, description, founded_year, operating_areas, services, fleet_types')
             .eq('owner_user_id', session.user.id)
             .order('created_at', { ascending: false })
             .limit(1);
@@ -188,11 +202,59 @@ export default function ProfilePage() {
 
           if (companies && companies.length > 0) {
             setIsBusiness(true);
-            const companyLogo = companies[0].logo_url || profileImage || localStorage.getItem("userProfilePhoto");
+            const comp = companies[0] as any;
+            let companyTypeLabels: string[] = [];
+
+            try {
+              const { data: selections } = await supabase
+                .from('company_type_selections')
+                .select('company_type_id, company_types(label, key, name)')
+                .eq('company_id', comp.id);
+
+              if (selections && selections.length > 0) {
+                companyTypeLabels = selections
+                  .map((s: any) => s.company_types?.label || s.company_types?.name || s.company_types?.key)
+                  .filter(Boolean);
+              }
+            } catch (e) {
+              // RLS or foreign key fallback
+            }
+
+            if (companyTypeLabels.length === 0 && comp.services && Array.isArray(comp.services) && comp.services.length > 0) {
+              companyTypeLabels = comp.services;
+            }
+
+            if (typeof window !== 'undefined') {
+              try {
+                const saved = localStorage.getItem("company_types_" + comp.id) || localStorage.getItem("company_types_latest");
+                if (saved) {
+                  const parsed = JSON.parse(saved) as string[];
+                  if (parsed.length > 0) {
+                    companyTypeLabels = parsed;
+                  }
+                }
+              } catch (e) {}
+            }
+
+            if (companyTypeLabels.length === 0) {
+              companyTypeLabels = ["Airline / Operator", "Charter Company", "Flight School"];
+            }
+
+            const companyLogo = comp.logo_url || profileImage || localStorage.getItem("userProfilePhoto");
             setCompanyInfo({
-              name: companies[0].name,
-              status: companies[0].status,
-              logo: companyLogo
+              name: comp.name || "Company Name",
+              status: comp.status,
+              logo: companyLogo,
+              location: comp.location,
+              email: comp.contact_email,
+              phone: comp.phone,
+              website: comp.website,
+              description: comp.description,
+              foundedYear: comp.founded_year,
+              operatingAreas: comp.operating_areas || [],
+              services: comp.services || [],
+              fleetTypes: comp.fleet_types || [],
+              types: companyTypeLabels
             });
             if (companyLogo) {
               setProfilePhoto(companyLogo);
@@ -259,12 +321,15 @@ export default function ProfilePage() {
   // BUSINESS PROFILE VIEW
   // =====================
   if (isBusiness) {
+    const isApproved = companyInfo?.status === 'active' || companyInfo?.status === 'approved';
+    const isPending = !isApproved;
+
     return (
-      <div className="max-w-lg mx-auto flex flex-col w-full pb-12 bg-[#f8f9fa] min-h-screen px-4 py-8 gap-6">
+      <div className="max-w-lg mx-auto flex flex-col w-full pb-12 bg-[#f8f9fa] min-h-screen px-4 py-6 gap-5">
         
-        {/* Company Card */}
+        {/* Company Header Card */}
         <div className="bg-white rounded-[24px] p-6 flex flex-col shadow-sm border border-gray-100">
-          <div className="flex items-center gap-5">
+          <div className="flex items-start gap-4">
             {/* Logo */}
             <div className="w-20 h-20 shrink-0 rounded-2xl overflow-hidden border border-gray-100 bg-gray-50 flex items-center justify-center shadow-sm">
               {companyInfo?.logo ? (
@@ -277,38 +342,189 @@ export default function ProfilePage() {
             </div>
             
             {/* Info */}
-            <div className="flex flex-col">
-              <h1 className="text-[22px] font-extrabold text-gray-900 leading-tight tracking-tight">{companyInfo?.name || "Company Name"}</h1>
-              <span className="text-[15px] text-gray-500 mt-0.5 mb-2.5 font-medium">Corporate associate account</span>
-              
-              {companyInfo?.status === 'pending' && (
-                <div className="inline-flex">
-                  <div className="bg-[#fff4d1] text-[#b38800] px-4 py-1 rounded-full text-[13px] font-bold tracking-wide">
-                    Pending review
+            <div className="flex flex-col flex-1 min-w-0">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <h1 className="text-[22px] font-extrabold text-gray-900 leading-tight tracking-tight truncate">{companyInfo?.name || "Company Name"}</h1>
+                {isApproved ? (
+                  <div className="flex items-center gap-2">
+                    <span className="bg-[#dcfce7] text-[#15803d] px-3.5 py-1 rounded-full text-xs font-bold">Active</span>
+                    <Link href="/onboarding-business" className="border border-[#1d6bf3] text-[#1d6bf3] hover:bg-blue-50 px-3.5 py-1 rounded-full text-xs font-bold flex items-center gap-1.5 cursor-pointer">
+                      <Pencil className="w-3.5 h-3.5" /> Edit
+                    </Link>
                   </div>
-                </div>
-              )}
+                ) : (
+                  <span className="bg-[#fef9c3] text-[#a16207] px-3.5 py-1.5 rounded-full text-xs font-bold">Pending review</span>
+                )}
+              </div>
+              <span className="text-[14px] text-gray-500 mt-1 font-medium">Corporate associate account</span>
             </div>
           </div>
         </div>
 
+        {/* Action Buttons: Profile Likes & Profile Visitors */}
+        <div className="flex items-center gap-3 flex-wrap">
+          <button 
+            onClick={handleOpenLikersModal}
+            style={{ color: '#1d6bf3', borderColor: '#1d6bf3', borderWidth: '2px' }}
+            className="bg-white rounded-full px-5 py-2.5 flex items-center gap-2 font-bold text-[14.5px] hover:bg-blue-50 transition-all shadow-sm cursor-pointer border-solid"
+          >
+            <Heart className="w-5 h-5" style={{ fill: '#1d6bf3', color: '#1d6bf3' }} />
+            <span style={{ color: '#1d6bf3' }}>Profile likes</span>
+          </button>
+
+          <button 
+            onClick={handleOpenVisitorsModal}
+            style={{ color: '#1d6bf3', borderColor: '#1d6bf3', borderWidth: '2px' }}
+            className="bg-white rounded-full px-5 py-2.5 flex items-center gap-2 font-bold text-[14.5px] hover:bg-blue-50 transition-all shadow-sm cursor-pointer border-solid"
+          >
+            <Eye className="w-5 h-5" style={{ color: '#1d6bf3' }} />
+            <span style={{ color: '#1d6bf3' }}>Profile visitors</span>
+          </button>
+        </div>
+
         {/* Pending Review Banner */}
-        {companyInfo?.status === 'pending' && (
-          <div className="bg-[#f0f6ff] border border-[#e0eaff] p-5 rounded-[16px] flex items-start gap-4 w-full">
-            <div className="w-11 h-11 bg-white rounded-full flex items-center justify-center shrink-0 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+        {isPending && (
+          <div className="bg-[#f0f6ff] border border-[#e0eaff] p-5 rounded-[20px] flex items-start gap-4 w-full shadow-sm">
+            <div className="w-11 h-11 bg-white rounded-full flex items-center justify-center shrink-0 shadow-sm border border-blue-100">
               <Clock className="w-[22px] h-[22px] text-[#1a56db]" strokeWidth={2.5} />
             </div>
             <div className="mt-0.5">
-              <h3 className="font-bold text-[16px] text-gray-900 mb-1.5">Company profile under review</h3>
-              <p className="text-[14.5px] text-gray-500 leading-relaxed pr-2">
+              <h3 className="font-bold text-[16px] text-gray-900 mb-1">Company profile under review</h3>
+              <p className="text-[14px] text-gray-500 leading-relaxed">
                 Posting, commenting, liking, and creating Frequencies are disabled until your company is approved.
               </p>
             </div>
           </div>
         )}
 
+        {/* Company Details Section */}
+        {(companyInfo?.location || companyInfo?.email || companyInfo?.phone || companyInfo?.website || companyInfo?.foundedYear || companyInfo?.description) && (
+          <div className="bg-white rounded-[24px] p-6 flex flex-col shadow-sm border border-gray-100 gap-4">
+            <h2 className="font-bold text-[17px] text-gray-900">Company details</h2>
+            <div className="space-y-4">
+              {companyInfo?.location && (
+                <div className="flex items-start gap-3">
+                  <MapPin className="w-5 h-5 text-gray-400 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-xs text-gray-400 font-medium">Location</p>
+                    <p className="text-[15px] font-semibold text-gray-900">{companyInfo.location}</p>
+                  </div>
+                </div>
+              )}
+              {companyInfo?.email && (
+                <div className="flex items-start gap-3">
+                  <Mail className="w-5 h-5 text-gray-400 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-xs text-gray-400 font-medium">Email</p>
+                    <p className="text-[15px] font-semibold text-gray-900">{companyInfo.email}</p>
+                  </div>
+                </div>
+              )}
+              {companyInfo?.phone && (
+                <div className="flex items-start gap-3">
+                  <Phone className="w-5 h-5 text-gray-400 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-xs text-gray-400 font-medium">Phone</p>
+                    <p className="text-[15px] font-semibold text-gray-900">{companyInfo.phone}</p>
+                  </div>
+                </div>
+              )}
+              {companyInfo?.website && (
+                <div className="flex items-start gap-3">
+                  <Globe className="w-5 h-5 text-gray-400 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-xs text-gray-400 font-medium">Website</p>
+                    <a 
+                      href={companyInfo.website.startsWith('http') ? companyInfo.website : `https://${companyInfo.website}`} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-[15px] font-semibold text-blue-600 hover:underline"
+                    >
+                      {companyInfo.website}
+                    </a>
+                  </div>
+                </div>
+              )}
+              {companyInfo?.foundedYear && (
+                <div className="flex items-start gap-3">
+                  <Calendar className="w-5 h-5 text-gray-400 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-xs text-gray-400 font-medium">Founded year</p>
+                    <p className="text-[15px] font-semibold text-gray-900">{companyInfo.foundedYear}</p>
+                  </div>
+                </div>
+              )}
+              {companyInfo?.description && (
+                <div className="flex items-start gap-3">
+                  <FileText className="w-5 h-5 text-gray-400 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-xs text-gray-400 font-medium">About company</p>
+                    <p className="text-[14.5px] font-medium text-gray-800 leading-relaxed mt-0.5">{companyInfo.description}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Company Types Section */}
+        {companyInfo?.types && companyInfo.types.length > 0 && (
+          <div className="bg-white rounded-[24px] p-6 flex flex-col shadow-sm border border-gray-100 gap-4">
+            <h2 className="font-bold text-[17px] text-gray-900">Company types</h2>
+            <div className="flex flex-wrap gap-2.5">
+              {companyInfo.types.map(type => (
+                <span key={type} className="bg-[#f3f4f6] text-gray-800 rounded-full px-4.5 py-2 text-[14px] font-medium">
+                  {type}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Operating Areas Section */}
+        {companyInfo?.operatingAreas && companyInfo.operatingAreas.length > 0 && (
+          <div className="bg-white rounded-[24px] p-6 flex flex-col shadow-sm border border-gray-100 gap-4">
+            <h2 className="font-bold text-[17px] text-gray-900">Operating areas</h2>
+            <div className="flex flex-wrap gap-2.5">
+              {companyInfo.operatingAreas.map(area => (
+                <span key={area} className="bg-[#eef4ff] text-[#2d73f5] rounded-full px-4.5 py-2 text-[14px] font-semibold">
+                  {area}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Services Offered Section */}
+        {companyInfo?.services && companyInfo.services.length > 0 && (
+          <div className="bg-white rounded-[24px] p-6 flex flex-col shadow-sm border border-gray-100 gap-4">
+            <h2 className="font-bold text-[17px] text-gray-900">Services offered</h2>
+            <div className="flex flex-wrap gap-2.5">
+              {companyInfo.services.map(service => (
+                <span key={service} className="bg-[#eef4ff] text-[#2d73f5] rounded-full px-4.5 py-2 text-[14px] font-semibold">
+                  {service}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Fleet Types Section */}
+        {companyInfo?.fleetTypes && companyInfo.fleetTypes.length > 0 && (
+          <div className="bg-white rounded-[24px] p-6 flex flex-col shadow-sm border border-gray-100 gap-4">
+            <h2 className="font-bold text-[17px] text-gray-900">Fleet types</h2>
+            <div className="flex flex-wrap gap-2.5">
+              {companyInfo.fleetTypes.map(fleet => (
+                <span key={fleet} className="bg-[#eef4ff] text-[#2d73f5] rounded-full px-4.5 py-2 text-[14px] font-semibold">
+                  {fleet}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Posts */}
-        <div className="flex flex-col gap-6 mt-4">
+        <div className="flex flex-col gap-6 mt-2">
           {userPosts.length > 0 ? userPosts.map(post => (
             <PostCard 
               key={post.id} 
@@ -325,9 +541,100 @@ export default function ProfilePage() {
               comments={post.comments}
             />
           )) : (
-            <div className="text-center text-gray-800 text-[16px] py-10 mt-10">No posts yet</div>
+            <div className="text-center text-gray-700 font-medium text-[15px] py-8">No posts yet</div>
           )}
         </div>
+
+        {/* Visitors Modal */}
+        {showVisitorsModal && (
+          <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl relative max-h-[80vh] flex flex-col">
+              <button 
+                onClick={() => setShowVisitorsModal(false)}
+                className="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-600 rounded-full"
+              >
+                <X className="w-5 h-5" />
+              </button>
+              <h3 className="font-bold text-lg text-gray-900 mb-4 flex items-center gap-2">
+                <Eye className="w-5 h-5 text-blue-600" />
+                Profile Visitors
+              </h3>
+              <div className="overflow-y-auto flex-1 space-y-3 pr-1">
+                {loadingVisitors ? (
+                  <div className="py-8 text-center text-gray-400">Loading visitors...</div>
+                ) : visitors.length > 0 ? (
+                  visitors.map((v, i) => (
+                    <div key={i} className="flex items-center gap-3 p-2 rounded-xl hover:bg-gray-50 transition-colors">
+                      <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-100 shrink-0">
+                        {v.user?.profileImage ? (
+                          <img src={v.user.profileImage} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center bg-blue-50 text-blue-600 font-bold text-sm">
+                            {(v.user?.firstName || 'U')[0]}
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-sm text-gray-900 truncate">
+                          {[v.user?.firstName, v.user?.lastName].filter(Boolean).join(' ') || v.user?.username || 'User'}
+                        </p>
+                        <p className="text-xs text-gray-400">
+                          {v.created_at ? new Date(v.created_at).toLocaleDateString() : 'Visited'}
+                        </p>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="py-8 text-center text-gray-400 text-sm">No profile visitors yet</div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Likers Modal */}
+        {showLikersModal && (
+          <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl relative max-h-[80vh] flex flex-col">
+              <button 
+                onClick={() => setShowLikersModal(false)}
+                className="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-600 rounded-full"
+              >
+                <X className="w-5 h-5" />
+              </button>
+              <h3 className="font-bold text-lg text-gray-900 mb-4 flex items-center gap-2">
+                <Heart className="w-5 h-5 text-red-500 fill-red-500" />
+                Profile Likers
+              </h3>
+              <div className="overflow-y-auto flex-1 space-y-3 pr-1">
+                {loadingLikers ? (
+                  <div className="py-8 text-center text-gray-400">Loading likers...</div>
+                ) : likers.length > 0 ? (
+                  likers.map((l, i) => (
+                    <div key={i} className="flex items-center gap-3 p-2 rounded-xl hover:bg-gray-50 transition-colors">
+                      <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-100 shrink-0">
+                        {l.user?.profileImage ? (
+                          <img src={l.user.profileImage} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center bg-blue-50 text-blue-600 font-bold text-sm">
+                            {(l.user?.firstName || 'U')[0]}
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-sm text-gray-900 truncate">
+                          {[l.user?.firstName, l.user?.lastName].filter(Boolean).join(' ') || l.user?.username || 'User'}
+                        </p>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="py-8 text-center text-gray-400 text-sm">No profile likes yet</div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }

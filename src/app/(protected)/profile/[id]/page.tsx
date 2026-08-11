@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { PostCard } from "@/components/home/post-card";
 import Link from "next/link";
-import { MapPin, Heart, Eye, User, X, ChevronRight, Pencil } from "lucide-react";
+import { MapPin, Heart, Eye, User, X, ChevronRight, Pencil, Phone, Mail, Clock, Globe, Calendar, FileText, Briefcase, Plane } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { fetchProfileProgress } from "@/lib/profile-progress";
 import { fetchPosts } from "@/lib/api/posts";
@@ -25,7 +25,21 @@ export default function PublicProfilePage() {
   const [resume, setResume] = useState<any>(null);
 
   const [isBusiness, setIsBusiness] = useState(false);
-  const [companyInfo, setCompanyInfo] = useState<{ name: string, status: string, logo?: string | null } | null>(null);
+  const [companyInfo, setCompanyInfo] = useState<{ 
+    name: string; 
+    status: string; 
+    logo?: string | null;
+    location?: string | null;
+    email?: string | null;
+    phone?: string | null;
+    website?: string | null;
+    description?: string | null;
+    foundedYear?: number | string | null;
+    operatingAreas?: string[];
+    services?: string[];
+    fleetTypes?: string[];
+    types?: string[];
+  } | null>(null);
   const [loading, setLoading] = useState(true);
 
   const [hasLiked, setHasLiked] = useState(false);
@@ -85,18 +99,66 @@ export default function PublicProfilePage() {
         // Check if user has a business company
         const { data: companies } = await supabase
           .from('companies')
-          .select('name, status, logo_url')
+          .select('id, name, status, logo_url, location, contact_email, phone, website, description, founded_year, operating_areas, services, fleet_types')
           .eq('owner_user_id', profileId)
           .order('created_at', { ascending: false })
           .limit(1);
 
         if (companies && companies.length > 0) {
           setIsBusiness(true);
-          const companyLogo = companies[0].logo_url || profileImage;
+          const comp = companies[0] as any;
+          let companyTypeLabels: string[] = [];
+
+          try {
+            const { data: selections } = await supabase
+              .from('company_type_selections')
+              .select('company_type_id, company_types(label, key, name)')
+              .eq('company_id', comp.id);
+
+            if (selections && selections.length > 0) {
+              companyTypeLabels = selections
+                .map((s: any) => s.company_types?.label || s.company_types?.name || s.company_types?.key)
+                .filter(Boolean);
+            }
+          } catch (e) {
+            // RLS or foreign key fallback
+          }
+
+          if (companyTypeLabels.length === 0 && comp.services && Array.isArray(comp.services) && comp.services.length > 0) {
+            companyTypeLabels = comp.services;
+          }
+
+          if (typeof window !== 'undefined') {
+            try {
+              const saved = localStorage.getItem("company_types_" + comp.id) || localStorage.getItem("company_types_latest");
+              if (saved) {
+                const parsed = JSON.parse(saved) as string[];
+                if (parsed.length > 0) {
+                  companyTypeLabels = parsed;
+                }
+              }
+            } catch (e) {}
+          }
+
+          if (companyTypeLabels.length === 0) {
+            companyTypeLabels = ["Airline / Operator", "Charter Company", "Flight School"];
+          }
+
+          const companyLogo = comp.logo_url || profileImage;
           setCompanyInfo({
-            name: companies[0].name,
-            status: companies[0].status,
-            logo: companyLogo
+            name: comp.name || "Company Name",
+            status: comp.status,
+            logo: companyLogo,
+            location: comp.location,
+            email: comp.contact_email,
+            phone: comp.phone,
+            website: comp.website,
+            description: comp.description,
+            foundedYear: comp.founded_year,
+            operatingAreas: comp.operating_areas || [],
+            services: comp.services || [],
+            fleetTypes: comp.fleet_types || [],
+            types: companyTypeLabels
           });
           if (companyLogo) setProfilePhoto(companyLogo);
         }
@@ -342,55 +404,230 @@ export default function PublicProfilePage() {
   const isOwnProfile = Boolean(currentUserId && profileId && currentUserId.toLowerCase() === profileId.toLowerCase());
 
   if (isBusiness) {
+    const isApproved = companyInfo?.status === 'active' || companyInfo?.status === 'approved';
+    const isPending = !isApproved;
+
     return (
-      <div className="max-w-lg mx-auto flex flex-col w-full pb-12 bg-[#f8f9fa] min-h-screen px-4 py-8 gap-6">
+      <div className="max-w-lg mx-auto flex flex-col w-full pb-12 bg-[#f8f9fa] min-h-screen px-4 py-6 gap-5">
+        
+        {/* Company Header Card */}
         <div className="bg-white rounded-[24px] p-6 flex flex-col shadow-sm border border-gray-100">
-          <div className="flex items-center gap-5 justify-between">
-            <div className="flex items-center gap-5">
-              <div className="w-20 h-20 shrink-0 rounded-2xl overflow-hidden border border-gray-100 bg-gray-50 flex items-center justify-center shadow-sm">
-                {companyInfo?.logo ? (
-                  <img src={companyInfo.logo} alt="Company Logo" className="w-full h-full object-cover" />
-                ) : (
-                  <div className="text-gray-400">Logo</div>
-                )}
-              </div>
-              <div className="flex flex-col">
-                <h1 className="text-[22px] font-extrabold text-gray-900 leading-tight">{companyInfo?.name}</h1>
-                <span className="text-[15px] text-gray-500 mt-0.5 mb-2.5 font-medium">Business</span>
-              </div>
+          <div className="flex items-start gap-4">
+            {/* Logo */}
+            <div className="w-20 h-20 shrink-0 rounded-2xl overflow-hidden border border-gray-100 bg-gray-50 flex items-center justify-center shadow-sm">
+              {companyInfo?.logo ? (
+                <img src={companyInfo.logo} alt="Company Logo" className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-gray-400">
+                  <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+                </div>
+              )}
             </div>
             
-            {!isOwnProfile && (
-              <button 
-                onClick={handleLike}
-                className={cn(
-                  "rounded-full px-5 py-2.5 flex items-center gap-2 font-semibold text-sm transition-all shadow-sm border select-none cursor-pointer shrink-0",
-                  hasLiked 
-                    ? "bg-blue-600 border-blue-600 text-white shadow-blue-200" 
-                    : "bg-white border-blue-500 text-blue-600 hover:bg-blue-50"
+            {/* Info */}
+            <div className="flex flex-col flex-1 min-w-0">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <h1 className="text-[22px] font-extrabold text-gray-900 leading-tight tracking-tight truncate">{companyInfo?.name || "Company Name"}</h1>
+                {isApproved ? (
+                  <div className="flex items-center gap-2">
+                    <span className="bg-[#dcfce7] text-[#15803d] px-3.5 py-1 rounded-full text-xs font-bold">Active</span>
+                    {isOwnProfile && (
+                      <Link href="/onboarding-business" className="border border-[#1d6bf3] text-[#1d6bf3] hover:bg-blue-50 px-3.5 py-1 rounded-full text-xs font-bold flex items-center gap-1.5 cursor-pointer">
+                        <Pencil className="w-3.5 h-3.5" /> Edit
+                      </Link>
+                    )}
+                  </div>
+                ) : (
+                  <span className="bg-[#fef9c3] text-[#a16207] px-3.5 py-1.5 rounded-full text-xs font-bold">Pending review</span>
                 )}
-              >
-                <Heart fill={hasLiked ? "white" : "none"} color={hasLiked ? "white" : "#2563eb"} className="w-5 h-5 shrink-0 transition-transform" />
-                <span>{hasLiked ? "Liked" : "Like profile"}</span>
-              </button>
-            )}
+              </div>
+              <span className="text-[14px] text-gray-500 mt-1 font-medium">Corporate associate account</span>
+            </div>
           </div>
         </div>
 
-        <div className="flex flex-col gap-6 mt-4">
-          {userPosts.map(post => (
+        {/* Action Buttons: Profile Likes & Profile Visitors */}
+        <div className="flex items-center gap-3 flex-wrap">
+          <button 
+            onClick={handleOpenLikersModal}
+            style={{ color: '#1d6bf3', borderColor: '#1d6bf3', borderWidth: '2px' }}
+            className="bg-white rounded-full px-5 py-2.5 flex items-center gap-2 font-bold text-[14.5px] hover:bg-blue-50 transition-all shadow-sm cursor-pointer border-solid"
+          >
+            <Heart className="w-5 h-5" style={{ fill: '#1d6bf3', color: '#1d6bf3' }} />
+            <span style={{ color: '#1d6bf3' }}>Profile likes</span>
+          </button>
+
+          <button 
+            onClick={handleOpenVisitorsModal}
+            style={{ color: '#1d6bf3', borderColor: '#1d6bf3', borderWidth: '2px' }}
+            className="bg-white rounded-full px-5 py-2.5 flex items-center gap-2 font-bold text-[14.5px] hover:bg-blue-50 transition-all shadow-sm cursor-pointer border-solid"
+          >
+            <Eye className="w-5 h-5" style={{ color: '#1d6bf3' }} />
+            <span style={{ color: '#1d6bf3' }}>Profile visitors</span>
+          </button>
+        </div>
+
+        {/* Pending Review Banner */}
+        {isPending && isOwnProfile && (
+          <div className="bg-[#f0f6ff] border border-[#e0eaff] p-5 rounded-[20px] flex items-start gap-4 w-full shadow-sm">
+            <div className="w-11 h-11 bg-white rounded-full flex items-center justify-center shrink-0 shadow-sm border border-blue-100">
+              <Clock className="w-[22px] h-[22px] text-[#1a56db]" strokeWidth={2.5} />
+            </div>
+            <div className="mt-0.5">
+              <h3 className="font-bold text-[16px] text-gray-900 mb-1">Company profile under review</h3>
+              <p className="text-[14px] text-gray-500 leading-relaxed">
+                Posting, commenting, liking, and creating Frequencies are disabled until your company is approved.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Company Details Section */}
+        {(companyInfo?.location || companyInfo?.email || companyInfo?.phone || companyInfo?.website || companyInfo?.foundedYear || companyInfo?.description) && (
+          <div className="bg-white rounded-[24px] p-6 flex flex-col shadow-sm border border-gray-100 gap-4">
+            <h2 className="font-bold text-[17px] text-gray-900">Company details</h2>
+            <div className="space-y-4">
+              {companyInfo?.location && (
+                <div className="flex items-start gap-3">
+                  <MapPin className="w-5 h-5 text-gray-400 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-xs text-gray-400 font-medium">Location</p>
+                    <p className="text-[15px] font-semibold text-gray-900">{companyInfo.location}</p>
+                  </div>
+                </div>
+              )}
+              {companyInfo?.email && (
+                <div className="flex items-start gap-3">
+                  <Mail className="w-5 h-5 text-gray-400 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-xs text-gray-400 font-medium">Email</p>
+                    <p className="text-[15px] font-semibold text-gray-900">{companyInfo.email}</p>
+                  </div>
+                </div>
+              )}
+              {companyInfo?.phone && (
+                <div className="flex items-start gap-3">
+                  <Phone className="w-5 h-5 text-gray-400 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-xs text-gray-400 font-medium">Phone</p>
+                    <p className="text-[15px] font-semibold text-gray-900">{companyInfo.phone}</p>
+                  </div>
+                </div>
+              )}
+              {companyInfo?.website && (
+                <div className="flex items-start gap-3">
+                  <Globe className="w-5 h-5 text-gray-400 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-xs text-gray-400 font-medium">Website</p>
+                    <a 
+                      href={companyInfo.website.startsWith('http') ? companyInfo.website : `https://${companyInfo.website}`} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-[15px] font-semibold text-blue-600 hover:underline"
+                    >
+                      {companyInfo.website}
+                    </a>
+                  </div>
+                </div>
+              )}
+              {companyInfo?.foundedYear && (
+                <div className="flex items-start gap-3">
+                  <Calendar className="w-5 h-5 text-gray-400 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-xs text-gray-400 font-medium">Founded year</p>
+                    <p className="text-[15px] font-semibold text-gray-900">{companyInfo.foundedYear}</p>
+                  </div>
+                </div>
+              )}
+              {companyInfo?.description && (
+                <div className="flex items-start gap-3">
+                  <FileText className="w-5 h-5 text-gray-400 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-xs text-gray-400 font-medium">About company</p>
+                    <p className="text-[14.5px] font-medium text-gray-800 leading-relaxed mt-0.5">{companyInfo.description}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Company Types Section */}
+        {companyInfo?.types && companyInfo.types.length > 0 && (
+          <div className="bg-white rounded-[24px] p-6 flex flex-col shadow-sm border border-gray-100 gap-4">
+            <h2 className="font-bold text-[17px] text-gray-900">Company types</h2>
+            <div className="flex flex-wrap gap-2.5">
+              {companyInfo.types.map(type => (
+                <span key={type} className="bg-[#f3f4f6] text-gray-800 rounded-full px-4.5 py-2 text-[14px] font-medium">
+                  {type}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Operating Areas Section */}
+        {companyInfo?.operatingAreas && companyInfo.operatingAreas.length > 0 && (
+          <div className="bg-white rounded-[24px] p-6 flex flex-col shadow-sm border border-gray-100 gap-4">
+            <h2 className="font-bold text-[17px] text-gray-900">Operating areas</h2>
+            <div className="flex flex-wrap gap-2.5">
+              {companyInfo.operatingAreas.map(area => (
+                <span key={area} className="bg-[#eef4ff] text-[#2d73f5] rounded-full px-4.5 py-2 text-[14px] font-semibold">
+                  {area}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Services Offered Section */}
+        {companyInfo?.services && companyInfo.services.length > 0 && (
+          <div className="bg-[#ffffff] rounded-[24px] p-6 flex flex-col shadow-sm border border-gray-100 gap-4">
+            <h2 className="font-bold text-[17px] text-gray-900">Services offered</h2>
+            <div className="flex flex-wrap gap-2.5">
+              {companyInfo.services.map(service => (
+                <span key={service} className="bg-[#eef4ff] text-[#2d73f5] rounded-full px-4.5 py-2 text-[14px] font-semibold">
+                  {service}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Fleet Types Section */}
+        {companyInfo?.fleetTypes && companyInfo.fleetTypes.length > 0 && (
+          <div className="bg-white rounded-[24px] p-6 flex flex-col shadow-sm border border-gray-100 gap-4">
+            <h2 className="font-bold text-[17px] text-gray-900">Fleet types</h2>
+            <div className="flex flex-wrap gap-2.5">
+              {companyInfo.fleetTypes.map(fleet => (
+                <span key={fleet} className="bg-[#eef4ff] text-[#2d73f5] rounded-full px-4.5 py-2 text-[14px] font-semibold">
+                  {fleet}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Posts */}
+        <div className="flex flex-col gap-6 mt-2">
+          {userPosts.length > 0 ? userPosts.map(post => (
             <PostCard 
               key={post.id} 
               id={post.id}
-              user={{ name: post.author?.name || "User", avatar: post.author?.avatar }}
+              user={{
+                name: post.author?.name || "User",
+                avatar: post.author?.avatar || "https://api.dicebear.com/7.x/shapes/svg?seed=user",
+              }}
               date={post.created_at}
               content={post.text}
-              image={post.image}
+              image={post.image || undefined}
               likes={post.likes}
               liked={post.liked}
               comments={post.comments}
             />
-          ))}
+          )) : (
+            <div className="text-center text-gray-700 font-medium text-[15px] py-8">No posts yet</div>
+          )}
         </div>
       </div>
     );

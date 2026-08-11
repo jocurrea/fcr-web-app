@@ -19,7 +19,7 @@ export default function OnboardingBusinessPage() {
   useEffect(() => {
     let isMounted = true;
     const params = new URLSearchParams(window.location.search);
-    const isExplicitEdit = params.get("edit") === "company" || params.get("from") === "profile";
+    const isExplicitEdit = params.get("edit") === "true" || params.get("edit") === "company" || params.get("from") === "profile";
 
     async function redirectCompletedUsers() {
       const { data: { session } } = await supabase.auth.getSession();
@@ -33,7 +33,7 @@ export default function OnboardingBusinessPage() {
         .from("users")
         .select("onboarded, accountType")
         .eq("id", session.user.id)
-        .single();
+        .maybeSingle();
 
       if (!isMounted) return;
 
@@ -48,6 +48,11 @@ export default function OnboardingBusinessPage() {
 
       const hasCompany = companies && companies.length > 0;
 
+      if (userRecord?.accountType === "business" || hasCompany || isExplicitEdit) {
+        setIsCheckingAccess(false);
+        return;
+      }
+
       if (!userRecord?.onboarded) {
         if (userRecord?.accountType === "flight_crew") {
           router.replace("/onboarding");
@@ -59,14 +64,6 @@ export default function OnboardingBusinessPage() {
           return;
         }
 
-        setIsCheckingAccess(false);
-        return;
-      }
-
-      if (!isMounted) return;
-
-      const companyStatus = companies?.[0]?.status;
-      if (userRecord.accountType === "business" && companyStatus === "rejected" && isExplicitEdit) {
         setIsCheckingAccess(false);
         return;
       }
@@ -86,7 +83,7 @@ export default function OnboardingBusinessPage() {
     if (step < 4) {
       setStep(step + 1);
     } else {
-      router.push("/home?registered=true");
+      router.push("/profile");
     }
   };
 

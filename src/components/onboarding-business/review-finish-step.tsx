@@ -250,9 +250,13 @@ export function ReviewFinishStep({ onNext }: ReviewFinishStepProps) {
         <button
           onClick={handleCreateAccount}
           disabled={isSubmitting}
-          className="w-full py-4 rounded-full font-bold text-white transition-colors bg-[#2d73f5] hover:bg-[#2d73f5]/90 disabled:opacity-70 flex items-center justify-center"
+          className="w-full py-4 rounded-full font-bold text-white transition-colors bg-[#2d73f5] hover:bg-[#2d73f5]/90 disabled:opacity-70 flex items-center justify-center cursor-pointer"
         >
-          {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : "Create account"}
+          {isSubmitting ? (
+            <Loader2 className="w-5 h-5 animate-spin" />
+          ) : (
+            onboarding?.company?.status === "active" || onboarding?.company?.status === "approved" || onboarding?.company?.name ? "Update profile" : "Create account"
+          )}
         </button>
       </div>
 
@@ -260,14 +264,18 @@ export function ReviewFinishStep({ onNext }: ReviewFinishStepProps) {
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-6">
           <div className="bg-[#383838] rounded-lg p-6 w-full max-w-sm shadow-2xl">
-            <h3 className="text-white font-semibold text-lg mb-3">Request Submitted</h3>
+            <h3 className="text-white font-semibold text-lg mb-3">
+              {onboarding?.company?.status === "active" || onboarding?.company?.status === "approved" || onboarding?.company?.name ? "Profile Updated" : "Request Submitted"}
+            </h3>
             <p className="text-gray-300 text-[15px] leading-snug mb-8">
-              Your company account request has been submitted for platform approval.
+              {onboarding?.company?.status === "active" || onboarding?.company?.status === "approved" || onboarding?.company?.name 
+                ? "Your company profile has been updated successfully." 
+                : "Your company account request has been submitted for platform approval."}
             </p>
             <div className="flex justify-end">
               <button
                 onClick={handleModalOk}
-                className="text-[#5eead4] font-semibold tracking-wide hover:text-[#2dd4bf] transition-colors uppercase text-[15px]"
+                className="text-[#5eead4] font-semibold tracking-wide hover:text-[#2dd4bf] transition-colors uppercase text-[15px] cursor-pointer"
               >
                 OK
               </button>

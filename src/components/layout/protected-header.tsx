@@ -23,6 +23,7 @@ export function ProtectedHeader() {
   const router = useRouter();
   const [profilePhoto, setProfilePhoto] = useState<string | null>(null);
   const [profileProgress, setProfileProgress] = useState(70);
+  const [companyStatus, setCompanyStatus] = useState<string>('pending');
   const [accountTypeState, setAccountTypeState] = useState<string>('');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -45,11 +46,15 @@ export function ProtectedHeader() {
             .maybeSingle(),
           supabase
             .from('companies')
-            .select('logo_url')
+            .select('logo_url, status')
             .eq('owner_user_id', userId)
             .order('created_at', { ascending: false })
             .maybeSingle()
         ]);
+
+        if (companyData?.status) {
+          setCompanyStatus(companyData.status);
+        }
 
         // Step 2: Merge — prefer company logo_url if business, then localStorage photo, then dbUser
         const firstName = localPersonal?.firstName || dbUser?.firstName || '';
@@ -127,9 +132,28 @@ export function ProtectedHeader() {
         let onboarded = false;
         let accountType = '';
 
+        // 1. Check if user owns a company first (Business Account)
+        const { data: companies } = await supabase
+          .from('companies')
+          .select('status, logo_url')
+          .eq('owner_user_id', session.user.id)
+          .order('created_at', { ascending: false })
+          .limit(1);
+
+        if (companies && companies.length > 0) {
+          accountType = 'business';
+          setAccountTypeState('business');
+          const status = companies[0].status;
+          setCompanyStatus(status || 'pending');
+          onboarded = true;
+          
+          const companyLogo = companies[0].logo_url || localStorage.getItem("userProfilePhoto");
+          if (companyLogo) setProfilePhoto(companyLogo);
+          return;
+        }
+
         // ============================================================
-        // FAST PATH: Check client-side signals FIRST (no DB needed)
-        // These are set by ResumeStep when user clicks Finish
+        // FAST PATH: Check client-side signals FIRST for Flight Crew
         // ============================================================
         const hasCookie = typeof document !== 'undefined' && document.cookie.includes('flightcrew_onboarded=true');
         const hasMetadata = session.user.user_metadata?.onboarded === true && session.user.user_metadata?.accountType === 'flight_crew';
@@ -137,15 +161,16 @@ export function ProtectedHeader() {
         const hasSessionStorage = typeof window !== 'undefined' && sessionStorage.getItem('flightcrew_onboarded') === 'true';
         const hasLocalStorageNew = typeof window !== 'undefined' && localStorage.getItem('flightcrew_onboarded') === 'true';
 
-        console.log('[ProtectedHeader] Fast path checks:', { hasCookie, hasMetadata, hasLocalStorageLegacy, hasSessionStorage, hasLocalStorageNew, pathname });
-
         if (hasCookie || hasMetadata || hasSessionStorage || hasLocalStorageNew) {
           onboarded = true;
           accountType = 'flight_crew';
           setAccountTypeState('flight_crew');
-          // Still load the profile photo and progress in background
-          supabase.from('users').select('profileImage').eq('id', session.user.id).maybeSingle()
+          
+          supabase.from('users').select('profileImage, accountType').eq('id', session.user.id).maybeSingle()
             .then(({ data }) => { 
+              if (data?.accountType === 'business') {
+                setAccountTypeState('business');
+              }
               if (data?.profileImage) {
                 setProfilePhoto(data.profileImage); 
               } else {
@@ -155,8 +180,6 @@ export function ProtectedHeader() {
             });
 
           fetchProfileProgress(session.user.id).then((progress) => setProfileProgress(progress));
-
-          // No need for redirect checks — user is onboarded
           return;
         }
 
@@ -174,7 +197,7 @@ export function ProtectedHeader() {
 
           if (userRecord) {
             onboarded = !!userRecord.onboarded;
-            accountType = userRecord.accountType || '';
+            accountType = userRecord.accountType || 'flight_crew';
             setAccountTypeState(accountType);
             if (userRecord.profileImage) {
               setProfilePhoto(userRecord.profileImage);
@@ -182,46 +205,20 @@ export function ProtectedHeader() {
               const savedPhoto = localStorage.getItem("userProfilePhoto");
               if (savedPhoto) setProfilePhoto(savedPhoto);
             }
+          } else {
+            setAccountTypeState('flight_crew');
           }
 
-          // Calculate progress using standardized fetchProfileProgress
           const progress = await fetchProfileProgress(session.user.id);
           setProfileProgress(progress);
 
           if (resumeFallback?.data && !onboarded) {
             accountType = 'flight_crew';
+            setAccountTypeState('flight_crew');
             onboarded = true;
           }
         } catch (e) {
           console.error("Failed to fetch from users/resumes", e);
-        }
-
-        // Fallback: If the database trigger failed to create the users row, check if they have a company
-        // Also use this query to fetch the logo_url if they are a business
-        let companyLogo = null;
-        if (!onboarded || accountType === 'business') {
-          const { data: companies } = await supabase
-            .from('companies')
-            .select('status, logo_url')
-            .eq('owner_user_id', session.user.id)
-            .order('created_at', { ascending: false })
-            .limit(1);
-
-          if (companies && companies.length > 0) {
-            accountType = 'business';
-            setAccountTypeState('business');
-            const status = companies[0].status;
-            if (status === 'approved' || status === 'pending') {
-              onboarded = true;
-            }
-            if (companies[0].logo_url) {
-              companyLogo = companies[0].logo_url;
-            }
-          }
-        }
-        
-        if (companyLogo) {
-          setProfilePhoto(companyLogo);
         }
 
         // localStorage fallback: user filled step 1 but cookie wasn't set
@@ -371,6 +368,18 @@ export function ProtectedHeader() {
               >
                 {profileProgress}%
               </div>
+            )}
+
+            {/* Status Dot Badge - Only for Business Accounts */}
+            {accountTypeState === 'business' && (
+              <div 
+                className={`absolute bottom-0 right-1 w-3.5 h-3.5 rounded-full border-2 border-white z-20 ${
+                  companyStatus === 'active' || companyStatus === 'approved' 
+                    ? 'bg-[#10b981]' 
+                    : 'bg-[#f59e0b]'
+                }`}
+                title={companyStatus === 'active' || companyStatus === 'approved' ? 'Active' : 'Pending review'}
+              />
             )}
           </div>
 
