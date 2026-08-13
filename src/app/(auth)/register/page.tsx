@@ -2,38 +2,63 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, Lock, EyeOff, Eye } from "lucide-react";
+import { ChevronLeft, Lock, EyeOff, Eye, AlertCircle } from "lucide-react";
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 
 export default function RegisterPage() {
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isDuplicateEmail, setIsDuplicateEmail] = useState(false);
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setError(null);
+    setIsDuplicateEmail(false);
+
+    if (password !== confirmPassword) {
+      setError("Passwords do not match. Please ensure both passwords are identical.");
+      setIsLoading(false);
+      return;
+    }
 
     try {
       const { data, error: authError } = await supabase.auth.signUp({
         email: email.trim().toLowerCase(),
         password,
+        options: {
+          data: {
+            accountType: "individual",
+            professionalRole: "Aviation Professional",
+            platformRole: "user",
+          },
+        },
       });
 
-      if (authError) throw authError;
+      if (authError) {
+        const msg = authError.message.toLowerCase();
+        if (msg.includes("already registered") || msg.includes("already exists") || authError.status === 422) {
+          setIsDuplicateEmail(true);
+          setError("This email address is already registered in our platform.");
+          return;
+        }
+        throw authError;
+      }
 
       if (data.session) {
         localStorage.setItem("current_user_id", data.session.user.id);
       }
 
-      // Successful registration
+      // Successful individual registration - proceed to onboarding/role selection
       router.push("/role-selection");
     } catch (err: any) {
       setError(err.message || "An error occurred during registration");
@@ -55,16 +80,33 @@ export default function RegisterPage() {
       </div>
 
       {/* Titles */}
-      <div className="mt-8 mb-8">
+      <div className="mt-8 mb-6">
         <h1 className="text-3xl font-extrabold text-gray-900 leading-tight">
-          Lets's<br />
+          Let's<br />
           Get Started
         </h1>
-        <p className="text-xs text-gray-500 mt-2">Please fill the details to create an account</p>
+        <p className="text-xs text-gray-500 mt-2">
+          Create your individual account as an <span className="font-semibold text-gray-700">Aviation Professional</span>
+        </p>
         
         {error && (
-          <div className="mt-4 p-3 bg-red-50 border border-red-200 text-red-600 text-sm rounded-lg">
-            {error}
+          <div className="mt-4 p-3.5 bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl flex flex-col gap-2">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+              <span>{error}</span>
+            </div>
+            {isDuplicateEmail && (
+              <div className="mt-1 pt-2 border-t border-red-200 text-xs text-gray-700 flex flex-wrap gap-2 items-center">
+                <span>Already have an account?</span>
+                <Link href="/login" className="font-bold text-[#2d73f5] hover:underline">
+                  Log in here
+                </Link>
+                <span>or</span>
+                <Link href="/reset" className="font-bold text-[#2d73f5] hover:underline">
+                  Restore Password
+                </Link>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -86,28 +128,12 @@ export default function RegisterPage() {
               value={email}
               onChange={(e) => {
                 setEmail(e.target.value);
-                const target = e.target as HTMLInputElement;
-                if (target.value === '') {
-                  target.setCustomValidity('Please fill out this field.');
-                } else if (!target.value.includes('@')) {
-                  target.setCustomValidity(`Please include an '@' in the email address. '${target.value}' is missing an '@'.`);
-                } else {
-                  target.setCustomValidity('');
-                }
+                setError(null);
+                setIsDuplicateEmail(false);
               }}
               placeholder="email@example.com" 
               className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-full text-sm text-gray-900 focus:outline-none focus:border-[#2d73f5] focus:ring-1 focus:ring-[#2d73f5] bg-white"
               required
-              onInvalid={(e) => {
-                const target = e.target as HTMLInputElement;
-                if (target.value === '') {
-                  target.setCustomValidity('Please fill out this field.');
-                } else if (!target.value.includes('@')) {
-                  target.setCustomValidity(`Please include an '@' in the email address. '${target.value}' is missing an '@'.`);
-                } else {
-                  target.setCustomValidity('');
-                }
-              }}
             />
           </div>
         </div>
@@ -122,18 +148,10 @@ export default function RegisterPage() {
             <input 
               type={showPassword ? "text" : "password"} 
               value={password}
-              onChange={(e) => {
-                setPassword(e.target.value);
-                const target = e.target as HTMLInputElement;
-                target.setCustomValidity(target.value === '' ? 'Please fill out this field.' : '');
-              }}
+              onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••" 
               className="w-full pl-12 pr-12 py-3 border border-gray-300 rounded-full text-sm text-gray-900 focus:outline-none focus:border-[#2d73f5] focus:ring-1 focus:ring-[#2d73f5] bg-white"
               required
-              onInvalid={(e) => {
-                const target = e.target as HTMLInputElement;
-                target.setCustomValidity(target.value === '' ? 'Please fill out this field.' : '');
-              }}
             />
             <button 
               type="button"
@@ -149,23 +167,44 @@ export default function RegisterPage() {
           </div>
         </div>
 
+        {/* Confirm Password */}
+        <div className="flex flex-col">
+          <label className="text-sm text-gray-600 mb-1.5 ml-1">Confirm Password</label>
+          <div className="relative">
+            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+              <Lock className="w-5 h-5 text-gray-400" />
+            </div>
+            <input 
+              type={showConfirmPassword ? "text" : "password"} 
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              placeholder="••••••••" 
+              className="w-full pl-12 pr-12 py-3 border border-gray-300 rounded-full text-sm text-gray-900 focus:outline-none focus:border-[#2d73f5] focus:ring-1 focus:ring-[#2d73f5] bg-white"
+              required
+            />
+            <button 
+              type="button"
+              className="absolute inset-y-0 right-0 pr-4 flex items-center"
+              onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+            >
+              {showConfirmPassword ? (
+                <Eye className="w-5 h-5 text-gray-400" />
+              ) : (
+                <EyeOff className="w-5 h-5 text-gray-400" />
+              )}
+            </button>
+          </div>
+        </div>
+
         {/* Terms */}
-        <div className="mt-8 flex items-start gap-2">
+        <div className="mt-4 flex items-start gap-2">
           <input 
             type="checkbox" 
             id="terms" 
             checked={termsAccepted}
-            onChange={(e) => {
-              setTermsAccepted(e.target.checked);
-              const target = e.target as HTMLInputElement;
-              target.setCustomValidity(target.checked ? '' : 'Please check this box if you want to proceed.');
-            }}
+            onChange={(e) => setTermsAccepted(e.target.checked)}
             className="mt-1 w-4 h-4 rounded border-gray-300 text-[#2d73f5] focus:ring-[#2d73f5]" 
             required
-            onInvalid={(e) => {
-              const target = e.target as HTMLInputElement;
-              target.setCustomValidity(target.checked ? '' : 'Please check this box if you want to proceed.');
-            }}
           />
           <label htmlFor="terms" className="text-[10px] text-gray-600">
             I agree to the <Link href="#" className="text-[#2d73f5] hover:underline">Terms & Conditions</Link>, <Link href="#" className="text-[#2d73f5] hover:underline">Community Guidelines</Link> and <Link href="#" className="text-[#2d73f5] hover:underline">Privacy Policy</Link>
@@ -184,9 +223,9 @@ export default function RegisterPage() {
         </div>
 
         <div className="text-center mt-2">
-          <span className="text-xs text-gray-500">Already have an account! </span>
+          <span className="text-xs text-gray-500">Already have an account? </span>
           <Link href="/login" className="text-xs text-[#0f172a] font-bold hover:underline">
-            Login
+            Log in
           </Link>
         </div>
 
@@ -194,3 +233,4 @@ export default function RegisterPage() {
     </div>
   );
 }
+
