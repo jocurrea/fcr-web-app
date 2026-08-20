@@ -201,7 +201,7 @@ export function AddLicenseModal({ open, onOpenChange, onAddLicense, editingLicen
               <Label>License</Label>
               <Select 
                 name="licenseVal" 
-                value={selectedLicense || undefined}
+                value={selectedLicense}
                 onValueChange={(val) => {
                   if (val) setSelectedLicense(val);
                   setImageError(null);
@@ -224,7 +224,7 @@ export function AddLicenseModal({ open, onOpenChange, onAddLicense, editingLicen
               <Label>License Type</Label>
               <Select
                 name="licenseTypeVal"
-                value={selectedLicenseType || undefined}
+                value={selectedLicenseType}
                 onValueChange={(val) => {
                   if (val) setSelectedLicenseType(val);
                 }}

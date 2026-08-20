@@ -1,14 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { LogOut, ChevronRight, Users, Building2 } from "lucide-react";
+import { LogOut, ChevronRight, Users, Building2, User, Check } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { ensureBusinessDraft } from "@/lib/api/business";
 
 export default function RoleSelectionPage() {
   const router = useRouter();
-  const [selectedType, setSelectedType] = useState<"flight_crew" | "business" | null>(null);
+  const [selectedType, setSelectedType] = useState<"flight_crew" | "business" | "aviation_professional" | null>(null);
   const [isContinuing, setIsContinuing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isCheckingAccess, setIsCheckingAccess] = useState(true);
@@ -17,9 +17,14 @@ export default function RoleSelectionPage() {
     let isMounted = true;
 
     const params = new URLSearchParams(window.location.search);
-    const isExplicitEdit = params.get("edit") === "company" || params.get("from") === "profile";
+    const isExplicitEdit = params.get("edit") === "true" || params.get("edit") === "company" || params.get("from") === "profile" || params.get("from") === "onboarding" || typeof window !== "undefined" && window.location.search.includes("edit=");
 
     async function redirectCompletedUsers() {
+      if (isExplicitEdit) {
+        setIsCheckingAccess(false);
+        return;
+      }
+
       const { data: { session } } = await supabase.auth.getSession();
 
       if (!session) {
@@ -57,35 +62,9 @@ export default function RoleSelectionPage() {
         }
       }
 
-      // Fallback for Flight Crew if database trigger failed
-      if (!onboarded || accountType === 'flight_crew') {
-        const { data: resumeFallback } = await supabase
-          .from('resumes')
-          .select('data')
-          .eq('userId', session.user.id)
-          .maybeSingle();
-
-        if (resumeFallback?.data) {
-          accountType = 'flight_crew';
-          onboarded = true;
-        } else if (session.user.user_metadata?.onboarded === true && session.user.user_metadata?.accountType === 'flight_crew') {
-          accountType = 'flight_crew';
-          onboarded = true;
-        }
-        // Do NOT check localStorage/cookie here — they indicate mid-flow, not completed
-      }
-
       if (!isMounted) return;
 
       if (!onboarded) {
-        // We DO NOT auto-redirect to /onboarding-business or /onboarding here.
-        // Let the user click it themselves so they can go back if they want.
-
-        // We DO NOT auto-redirect to /onboarding for flight_crew here, 
-        // because the database trigger might set accountType = 'flight_crew' by default, 
-        // which causes the role-selection page to be completely skipped for new users.
-        // Let the user click it themselves.
-
         setIsCheckingAccess(false);
         return;
       }
@@ -93,7 +72,7 @@ export default function RoleSelectionPage() {
       if (accountType === "business") {
         if (!isMounted) return;
 
-        if (companies?.[0]?.status === "rejected" && isExplicitEdit) {
+        if (companies?.[0]?.status === "rejected") {
           setIsCheckingAccess(false);
           return;
         }
@@ -115,15 +94,27 @@ export default function RoleSelectionPage() {
     setIsContinuing(true);
     setError(null);
 
-    if (selectedType === "flight_crew") {
+    if (selectedType === "flight_crew" || selectedType === "aviation_professional") {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        // Reset accountType to flight_crew just in case they previously clicked Business
-        await supabase.auth.updateUser({ data: { accountType: "flight_crew" } });
-        await supabase.from("users").update({ accountType: "flight_crew" }).eq("id", user.id);
+        await Promise.allSettled([
+          supabase.auth.updateUser({ data: { accountType: selectedType } }),
+          supabase.from("users").update({ accountType: selectedType }).eq("id", user.id),
+          supabase.from("users").upsert({ id: user.id, accountType: selectedType }, { onConflict: "id" })
+        ]);
       }
+
+      try {
+        const existing = localStorage.getItem("onboarding_personal");
+        const parsed = existing ? JSON.parse(existing) : {};
+        localStorage.setItem("onboarding_personal", JSON.stringify({
+          ...parsed,
+          category: selectedType,
+          role: selectedType === "aviation_professional" ? "aviation_professional" : (parsed.role || "pilot")
+        }));
+      } catch (e) {}
       
-      router.push("/onboarding");
+      router.push(`/onboarding?category=${selectedType}`);
       return;
     }
 
@@ -154,72 +145,125 @@ export default function RoleSelectionPage() {
   return (
     <div className="min-h-screen bg-white">
       <div className="flex flex-col mx-auto max-w-xl min-h-[100dvh] px-6 py-8">
-        {/* Header */}
-        <div className="flex items-center w-full mb-8">
+        {/* Top Header with Left Back Button & Centered Logo */}
+        <div className="relative flex items-center justify-center w-full pt-2 pb-6">
           <button 
             onClick={handleLogout}
-            className="w-10 h-10 border border-gray-200 rounded-full flex items-center justify-center transition-colors hover:bg-gray-50"
+            className="absolute left-0 w-10 h-10 border border-gray-200 rounded-full flex items-center justify-center transition-colors hover:bg-gray-50 cursor-pointer"
+            title="Back / Logout"
           >
             <LogOut className="w-5 h-5 text-gray-700 rotate-180" />
           </button>
+
+          <img 
+            src="/img/FCRlogo2.png" 
+            alt="Flight Crew Ranked" 
+            className="w-[215px] sm:w-[245px] h-auto object-contain" 
+          />
         </div>
 
         {/* Titles */}
-        <div className="mb-10">
+        <div className="mb-8">
           <h1 className="text-3xl font-extrabold text-gray-900 leading-tight mb-2">
-            I want to join as
+            Create Account
           </h1>
           <p className="text-sm text-gray-500">
-            Select the option that best describes you to personalize your experience.
+            Choose how you want to join Flight Crew Ranked
           </p>
         </div>
 
         {/* Options */}
         <div className="flex flex-col gap-4 flex-1">
-          {/* Flight Crew Option */}
+          {/* 1. Flight Crew Option */}
           <button
+            type="button"
             onClick={() => setSelectedType("flight_crew")}
-            className={`flex items-center p-5 rounded-2xl border ${
+            className={`flex items-center p-5 rounded-2xl border transition-all text-left group cursor-pointer ${
               selectedType === "flight_crew" 
-                ? "border-[#2d73f5] bg-[#f0f5ff]" 
-                : "border-gray-100 hover:border-gray-200 bg-white"
-            } shadow-sm transition-all text-left group`}
+                ? "border-[#1d4ed8] bg-[#f0f5ff] ring-2 ring-[#1d4ed8]/20 shadow-sm" 
+                : "border-gray-100 hover:border-gray-200 bg-white shadow-xs"
+            }`}
           >
-            <div className={`w-14 h-14 rounded-full flex items-center justify-center shrink-0 mr-4 transition-colors ${
-              selectedType === "flight_crew" ? "bg-white text-[#2d73f5] shadow-sm" : "bg-[#f8fafc] text-gray-700"
-            }`}>
-              <Users className="w-6 h-6" />
+            <div className="shrink-0 mr-4 flex items-center justify-center">
+              <Users className="w-7 h-7 text-[#1d4ed8] fill-[#1d4ed8]" />
             </div>
-            <div className="flex-1">
-              <h2 className="text-lg font-bold text-gray-900 mb-0.5">Flight Crew</h2>
-              <p className="text-xs text-gray-500 leading-snug">
-                I am a pilot, cabin crew member or aviation professional.
+            <div className="flex-1 min-w-0 pr-2">
+              <div className="flex items-center gap-2">
+                <h2 className="text-lg font-bold text-gray-900">Flight Crew</h2>
+              </div>
+              <p className="text-xs text-gray-500 leading-snug mt-0.5">
+                For pilots and cabin crew members.
               </p>
             </div>
-            <ChevronRight className={`w-5 h-5 shrink-0 ml-2 transition-colors ${selectedType === "flight_crew" ? "text-[#2d73f5]" : "text-gray-400"}`} />
+            <div className={`w-5 h-5 rounded-[4px] flex items-center justify-center shrink-0 ml-2 transition-all ${
+              selectedType === "flight_crew" 
+                ? "bg-[#1d4ed8] text-white shadow-xs" 
+                : "border-2 border-gray-300 group-hover:border-gray-400 bg-white"
+            }`}>
+              {selectedType === "flight_crew" ? <Check className="w-3.5 h-3.5 stroke-[3]" /> : null}
+            </div>
           </button>
 
-          {/* Business Option */}
+          {/* 2. Business Option */}
           <button
+            type="button"
             onClick={() => setSelectedType("business")}
-            className={`flex items-center p-5 rounded-2xl border ${
+            className={`flex items-center p-5 rounded-2xl border transition-all text-left group cursor-pointer ${
               selectedType === "business" 
-                ? "border-[#2d73f5] bg-[#f0f5ff]" 
-                : "border-gray-100 hover:border-gray-200 bg-white"
-            } shadow-sm transition-all text-left group`}
+                ? "border-[#1d4ed8] bg-[#f0f5ff] ring-2 ring-[#1d4ed8]/20 shadow-sm" 
+                : "border-gray-100 hover:border-gray-200 bg-white shadow-xs"
+            }`}
           >
-            <div className={`w-14 h-14 rounded-full flex items-center justify-center shrink-0 mr-4 transition-colors ${
-              selectedType === "business" ? "bg-[#d0e1ff] text-[#2d73f5]" : "bg-[#f8fafc] text-gray-700"
-            }`}>
-              <Building2 className="w-6 h-6" />
+            <div className="shrink-0 mr-4 flex items-center justify-center">
+              <svg className="w-7 h-7 text-[#1d4ed8]" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M4 21V9l6-4v16H4zm8 0V3l8 4v14h-8zm-6-4h2v-2H6v2zm0-4h2v-2H6v2zm8 4h2v-2h-2v2zm0-4h2v-2h-2v2zm0-4h2V7h-2v2z" />
+              </svg>
             </div>
-            <div className="flex-1">
-              <h2 className="text-lg font-bold text-gray-900 mb-0.5">Business</h2>
-              <p className="text-xs text-gray-500 leading-snug">
-                I represent a company or organization in aviation.
+            <div className="flex-1 min-w-0 pr-2">
+              <div className="flex items-center gap-2">
+                <h2 className="text-lg font-bold text-gray-900">Company / Business</h2>
+              </div>
+              <p className="text-xs text-gray-500 leading-snug mt-0.5">
+                For aviation companies and organizations.
               </p>
             </div>
-            <ChevronRight className={`w-5 h-5 shrink-0 ml-2 transition-colors ${selectedType === "business" ? "text-[#2d73f5]" : "text-gray-400"}`} />
+            <div className={`w-5 h-5 rounded-[4px] flex items-center justify-center shrink-0 ml-2 transition-all ${
+              selectedType === "business" 
+                ? "bg-[#1d4ed8] text-white shadow-xs" 
+                : "border-2 border-gray-300 group-hover:border-gray-400 bg-white"
+            }`}>
+              {selectedType === "business" ? <Check className="w-3.5 h-3.5 stroke-[3]" /> : null}
+            </div>
+          </button>
+
+          {/* 3. Aviation Professional Option */}
+          <button
+            type="button"
+            onClick={() => setSelectedType("aviation_professional")}
+            className={`flex items-center p-5 rounded-2xl border transition-all text-left group cursor-pointer ${
+              selectedType === "aviation_professional" 
+                ? "border-[#1d4ed8] bg-[#f0f5ff] ring-2 ring-[#1d4ed8]/20 shadow-sm" 
+                : "border-gray-100 hover:border-gray-200 bg-white shadow-xs"
+            }`}
+          >
+            <div className="shrink-0 mr-4 flex items-center justify-center">
+              <User className="w-7 h-7 text-[#1d4ed8] fill-[#1d4ed8]" />
+            </div>
+            <div className="flex-1 min-w-0 pr-2">
+              <div className="flex items-center gap-2">
+                <h2 className="text-lg font-bold text-gray-900">Aviation Professional</h2>
+              </div>
+              <p className="text-xs text-gray-500 leading-snug mt-0.5">
+                For aviation professionals and specialists.
+              </p>
+            </div>
+            <div className={`w-5 h-5 rounded-[4px] flex items-center justify-center shrink-0 ml-2 transition-all ${
+              selectedType === "aviation_professional" 
+                ? "bg-[#1d4ed8] text-white shadow-xs" 
+                : "border-2 border-gray-300 group-hover:border-gray-400 bg-white"
+            }`}>
+              {selectedType === "aviation_professional" ? <Check className="w-3.5 h-3.5 stroke-[3]" /> : null}
+            </div>
           </button>
         </div>
 
@@ -234,9 +278,13 @@ export default function RoleSelectionPage() {
           <button
             onClick={handleContinue}
             disabled={!selectedType || isContinuing}
-            className="w-full py-4 rounded-full font-bold text-white transition-colors bg-[#2d73f5] hover:bg-[#2d73f5]/90 disabled:bg-[#85b0fa] disabled:cursor-not-allowed"
+            className={`w-full py-4 rounded-full font-bold text-white transition-all shadow-md ${
+              selectedType && !isContinuing
+                ? "bg-[#1d4ed8] hover:bg-[#1e40af] cursor-pointer" 
+                : "bg-[#85b0fa] cursor-not-allowed opacity-90"
+            }`}
           >
-            {isContinuing ? "Please wait..." : "Continue"}
+            {isContinuing ? "Please wait..." : "Next"}
           </button>
         </div>
       </div>

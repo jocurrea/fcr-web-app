@@ -1,13 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { ChevronLeft, Lock, EyeOff, Eye, AlertCircle } from "lucide-react";
-import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { ChevronLeft, Lock, EyeOff, Eye, AlertCircle, Building2, CheckCircle2 } from "lucide-react";
+import { useState, useEffect, Suspense } from "react";
 import { supabase } from "@/lib/supabase";
 
-export default function RegisterPage() {
+function RegisterForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  const inviteToken = searchParams.get("invite") || searchParams.get("code");
+  const companyParam = searchParams.get("company");
+
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
@@ -18,6 +23,49 @@ export default function RegisterPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isDuplicateEmail, setIsDuplicateEmail] = useState(false);
+
+  // Corporate invite state
+  const [invitedCompany, setInvitedCompany] = useState<{ id: string; name: string } | null>(null);
+  const [inviteError, setInviteError] = useState<string | null>(null);
+  const [isCheckingInvite, setIsCheckingInvite] = useState(false);
+
+  useEffect(() => {
+    async function checkInvite() {
+      if (!inviteToken && !companyParam) return;
+
+      setIsCheckingInvite(true);
+      setInviteError(null);
+
+      try {
+        const queryTarget = companyParam || inviteToken;
+        // Attempt to find company by ID or slug
+        const { data: company, error: companyErr } = await supabase
+          .from("companies")
+          .select("id, name")
+          .or(`id.eq.${queryTarget},slug.eq.${queryTarget}`)
+          .maybeSingle();
+
+        if (companyErr || !company) {
+          // If token looks like a mock invite or expired token
+          if (queryTarget === "expired" || queryTarget === "invalid") {
+            setInviteError("This invitation link is invalid or has expired. You can still create a standard account.");
+          } else {
+            // Default fallback if not found directly
+            setInviteError("The corporate invitation link could not be verified or has expired.");
+          }
+          setInvitedCompany(null);
+        } else {
+          setInvitedCompany({ id: company.id, name: company.name });
+        }
+      } catch {
+        setInviteError("The invitation link is invalid or has expired.");
+      } finally {
+        setIsCheckingInvite(false);
+      }
+    }
+
+    checkInvite();
+  }, [inviteToken, companyParam]);
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,14 +80,19 @@ export default function RegisterPage() {
     }
 
     try {
+      const accountType = invitedCompany ? "corporate_member" : "individual";
+      const employerName = invitedCompany ? invitedCompany.name : undefined;
+
       const { data, error: authError } = await supabase.auth.signUp({
         email: email.trim().toLowerCase(),
         password,
         options: {
           data: {
-            accountType: "individual",
+            accountType,
             professionalRole: "Aviation Professional",
             platformRole: "user",
+            employer: employerName,
+            invited_by_company_id: invitedCompany?.id,
           },
         },
       });
@@ -54,11 +107,26 @@ export default function RegisterPage() {
         throw authError;
       }
 
-      if (data.session) {
-        localStorage.setItem("current_user_id", data.session.user.id);
+      const userId = data.session?.user.id || data.user?.id;
+
+      if (userId) {
+        localStorage.setItem("current_user_id", userId);
+
+        // Scenario 2: Bind user profile to invited Business entity with Pre-linked status
+        if (invitedCompany?.id) {
+          try {
+            await supabase.from("company_members").insert({
+              company_id: invitedCompany.id,
+              user_id: userId,
+              role: "member",
+            });
+          } catch (err) {
+            console.warn("Could not insert company member association directly:", err);
+          }
+        }
       }
 
-      // Successful individual registration - proceed to onboarding/role selection
+      // Successful registration - proceed to onboarding
       router.push("/role-selection");
     } catch (err: any) {
       setError(err.message || "An error occurred during registration");
@@ -79,16 +147,46 @@ export default function RegisterPage() {
         </button>
       </div>
 
-      {/* Titles */}
+      {/* Titles & Invite Banner */}
       <div className="mt-8 mb-6">
         <h1 className="text-3xl font-extrabold text-gray-900 leading-tight">
           Let's<br />
           Get Started
         </h1>
-        <p className="text-xs text-gray-500 mt-2">
-          Create your individual account as an <span className="font-semibold text-gray-700">Aviation Professional</span>
-        </p>
         
+        {/* Scenario 1: Corporate Invitation Notice */}
+        {invitedCompany ? (
+          <div className="mt-3 p-3.5 bg-blue-50 border border-blue-200 rounded-xl flex items-center gap-3">
+            <Building2 className="w-5 h-5 text-[#2d73f5] shrink-0" />
+            <div className="text-xs text-blue-900">
+              <span className="font-bold">Corporate Invitation:</span> Registering as a pre-linked member of{" "}
+              <span className="font-extrabold text-[#2d73f5]">{invitedCompany.name}</span>.
+            </div>
+          </div>
+        ) : (
+          <p className="text-xs text-gray-500 mt-2">
+            Create your account as an <span className="font-semibold text-gray-700">Aviation Professional</span>
+          </p>
+        )}
+
+        {/* Scenario 3: Expired or Invalid Link Notice */}
+        {inviteError && (
+          <div className="mt-3 p-3.5 bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded-xl flex items-start gap-2">
+            <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-medium">{inviteError}</p>
+              <button 
+                type="button" 
+                onClick={() => setInviteError(null)}
+                className="mt-1 text-[#2d73f5] font-bold underline"
+              >
+                Continue with standard registration
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* General & Duplicate Email Errors */}
         {error && (
           <div className="mt-4 p-3.5 bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl flex flex-col gap-2">
             <div className="flex items-start gap-2">
@@ -218,7 +316,7 @@ export default function RegisterPage() {
             disabled={isLoading || !termsAccepted}
             className={`w-full text-white font-bold text-lg py-3.5 rounded-full transition-colors ${(isLoading || !termsAccepted) ? 'bg-[#85b0fa] cursor-not-allowed' : 'bg-[#2d73f5] hover:bg-[#2d73f5]/90'}`}
           >
-            {isLoading ? 'Registering...' : 'Signup'}
+            {isLoading ? 'Registering...' : invitedCompany ? 'Join Company & Register' : 'Signup'}
           </button>
         </div>
 
@@ -233,4 +331,13 @@ export default function RegisterPage() {
     </div>
   );
 }
+
+export default function RegisterPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center text-sm text-gray-500">Loading signup...</div>}>
+      <RegisterForm />
+    </Suspense>
+  );
+}
+
 

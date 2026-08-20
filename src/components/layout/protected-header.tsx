@@ -4,8 +4,10 @@ import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Bell, Plus, User, Search, Users, Bot, LogOut, Mail, FileText, Lock, ShieldCheck, Ban, Trash2, FileDown } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
 import { fetchProfileProgress } from "@/lib/profile-progress";
+import { ProgressAvatar } from "@/components/profile/progress-avatar";
 import { NotificationsBell } from "./notifications-bell";
 
 const hasValue = (obj: any) => {
@@ -25,17 +27,26 @@ export function ProtectedHeader() {
   const [profileProgress, setProfileProgress] = useState(70);
   const [companyStatus, setCompanyStatus] = useState<string>('pending');
   const [accountTypeState, setAccountTypeState] = useState<string>('');
+  const [userStatus, setUserStatus] = useState<string>('active');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    async function syncLocalProfileToDatabase(userId: string) {
+    async function syncLocalProfileToDatabase(session: any) {
       try {
+        const userId = session?.user?.id;
+        if (!userId) return;
+
         const savedPhoto = localStorage.getItem("userProfilePhoto");
         const savedPersonal = localStorage.getItem("onboarding_personal");
         const localPersonal = savedPersonal ? JSON.parse(savedPersonal) : null;
+
+        // Sync status (active vs pending)
+        const rawStatus = localPersonal?.status || localPersonal?.approvalStatus || localPersonal?.availabilityStatus || 'active';
+        const isApproved = rawStatus === 'active' || rawStatus === 'approved';
+        setUserStatus(isApproved ? 'active' : 'pending');
 
         // Step 1: Read own users row & company row
         const [{ data: dbUser }, { data: companyData }] = await Promise.all([
@@ -65,11 +76,18 @@ export function ProtectedHeader() {
         if (!firstName && !lastName && !profilePhoto) return;
 
         // Step 3: Save to users table
+        const effectiveAccountType = (session?.user?.user_metadata?.accountType === 'aviation_professional' || localPersonal?.category === 'aviation_professional' || localPersonal?.role === 'aviation_professional')
+          ? 'aviation_professional'
+          : (session?.user?.user_metadata?.accountType === 'business' || localPersonal?.category === 'business')
+            ? 'business'
+            : (localPersonal?.category || dbUser?.accountType || session?.user?.user_metadata?.accountType);
+
         const userPayload: any = { id: userId, onboarded: 1 };
         if (firstName) userPayload.firstName = firstName;
         if (middleName) userPayload.middleName = middleName;
         if (lastName) userPayload.lastName = lastName;
         if (profilePhoto) userPayload.profileImage = profilePhoto;
+        if (effectiveAccountType) userPayload.accountType = effectiveAccountType;
 
         const savedLicenses = localStorage.getItem("onboarding_licenses");
         const savedRatings = localStorage.getItem("onboarding_ratings");
@@ -127,56 +145,81 @@ export function ProtectedHeader() {
         }
 
         // Always sync local profile to Supabase DB so other users can see name & photo
-        syncLocalProfileToDatabase(session.user.id);
+        syncLocalProfileToDatabase(session);
 
         let onboarded = false;
         let accountType = '';
 
-        // 1. Check if user owns a company first (Business Account)
-        const { data: companies } = await supabase
-          .from('companies')
-          .select('status, logo_url')
-          .eq('owner_user_id', session.user.id)
-          .order('created_at', { ascending: false })
-          .limit(1);
+        // 1. Check accountType from users table first to avoid misclassifying Flight Crew
+        const { data: userTypeData } = await supabase
+          .from('users')
+          .select('accountType')
+          .eq('id', session.user.id)
+          .maybeSingle();
 
-        if (companies && companies.length > 0) {
-          accountType = 'business';
-          setAccountTypeState('business');
-          const status = companies[0].status;
-          setCompanyStatus(status || 'pending');
-          onboarded = true;
-          
-          const companyLogo = companies[0].logo_url || localStorage.getItem("userProfilePhoto");
-          if (companyLogo) {
-            setProfilePhoto(companyLogo);
-            try {
-              localStorage.setItem("userProfilePhoto", companyLogo);
-              localStorage.setItem("company_logo", companyLogo);
-              supabase.from("users").update({ profileImage: companyLogo }).eq("id", session.user.id).then();
-            } catch (e) {}
+        const dbAccountType = userTypeData?.accountType || '';
+
+        // Only treat as business if accountType is explicitly 'business'
+        if (dbAccountType === 'business') {
+          const { data: companies } = await supabase
+            .from('companies')
+            .select('status, logo_url')
+            .eq('owner_user_id', session.user.id)
+            .order('created_at', { ascending: false })
+            .limit(1);
+
+          if (companies && companies.length > 0) {
+            accountType = 'business';
+            setAccountTypeState('business');
+            const status = companies[0].status;
+            setCompanyStatus(status || 'pending');
+            onboarded = true;
+
+            const companyLogo = companies[0].logo_url || localStorage.getItem("userProfilePhoto");
+            if (companyLogo) {
+              setProfilePhoto(companyLogo);
+              try {
+                localStorage.setItem("userProfilePhoto", companyLogo);
+                localStorage.setItem("company_logo", companyLogo);
+                supabase.from("users").update({ profileImage: companyLogo }).eq("id", session.user.id).then();
+              } catch (e) {}
+            }
+            return;
           }
-          return;
         }
 
         // ============================================================
         // FAST PATH: Check client-side signals FIRST for Flight Crew
         // ============================================================
         const hasCookie = typeof document !== 'undefined' && document.cookie.includes('flightcrew_onboarded=true');
-        const hasMetadata = session.user.user_metadata?.onboarded === true && session.user.user_metadata?.accountType === 'flight_crew';
+        const hasMetadata = session.user.user_metadata?.onboarded === true;
         const hasLocalStorageLegacy = typeof window !== 'undefined' && !!localStorage.getItem('onboarding_personal');
         const hasSessionStorage = typeof window !== 'undefined' && sessionStorage.getItem('flightcrew_onboarded') === 'true';
         const hasLocalStorageNew = typeof window !== 'undefined' && localStorage.getItem('flightcrew_onboarded') === 'true';
 
         if (hasCookie || hasMetadata || hasSessionStorage || hasLocalStorageNew) {
           onboarded = true;
-          accountType = 'flight_crew';
-          setAccountTypeState('flight_crew');
+          const metaType = session.user.user_metadata?.accountType;
+          const localPersonalRaw = typeof window !== 'undefined' ? localStorage.getItem('onboarding_personal') : null;
+          const localPersonal = localPersonalRaw ? JSON.parse(localPersonalRaw) : null;
+          const localCategory = localPersonal?.category || localPersonal?.role;
+
+          let effectiveType = 'flight_crew';
+          if (metaType === 'aviation_professional' || localCategory === 'aviation_professional' || dbAccountType === 'aviation_professional') {
+            effectiveType = 'aviation_professional';
+          } else if (metaType === 'business' || dbAccountType === 'business') {
+            effectiveType = 'business';
+          }
+
+          accountType = effectiveType;
+          setAccountTypeState(effectiveType);
           
           supabase.from('users').select('profileImage, accountType').eq('id', session.user.id).maybeSingle()
             .then(({ data }) => { 
               if (data?.accountType === 'business') {
                 setAccountTypeState('business');
+              } else if (data?.accountType === 'aviation_professional') {
+                setAccountTypeState('aviation_professional');
               }
               if (data?.profileImage) {
                 setProfilePhoto(data.profileImage); 
@@ -327,65 +370,64 @@ export function ProtectedHeader() {
           <Link href="/new-post" className="text-gray-600 hover:text-black transition-colors">
             <Plus className="w-[26px] h-[26px]" />
           </Link>
-          <div className="relative inline-flex items-center justify-center" style={{ width: '52px', height: '52px' }}>
-            {/* SVG Progress Ring - Only for Flight Crew */}
-            {accountTypeState === 'flight_crew' && (
-              <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 52 52">
-                <circle cx="26" cy="26" r="24" fill="none" stroke="#e5e7eb" strokeWidth="3" />
-                <circle
-                  cx="26"
-                  cy="26"
-                  r="24"
-                  fill="none"
-                  stroke={profileProgress === 100 ? "#059669" : "#f97316"}
-                  strokeWidth="3"
-                  strokeDasharray={`${2 * Math.PI * 24}`}
-                  strokeDashoffset={`${2 * Math.PI * 24 - (2 * Math.PI * 24 * profileProgress) / 100}`}
-                  strokeLinecap="round"
-                  className="transition-all duration-500 ease-out"
-                  style={{ transform: 'rotate(-90deg)', transformOrigin: '50% 50%' }}
-                />
-              </svg>
-            )}
-
-            {/* Avatar Button */}
-            <button 
-              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-              className="rounded-full cursor-pointer overflow-hidden bg-white z-10 hover:opacity-90 transition-opacity"
-              style={{ width: '42px', height: '42px', border: '2px solid white', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}
-            >
-              {profilePhoto ? (
-                <img 
-                  src={profilePhoto} 
-                  alt="Avatar" 
-                  className="w-full h-full object-cover" 
-                />
-              ) : (
-                <span className="w-full h-full flex items-center justify-center text-gray-500 font-medium bg-gray-100" style={{ fontSize: '10px' }}>
-                  Me
-                </span>
-              )}
-            </button>
-
-            {/* Percentage Badge - Only for Flight Crew */}
-            {accountTypeState === 'flight_crew' && (
-              <div 
-                className={`absolute left-1/2 -translate-x-1/2 bg-white px-2 py-[1px] rounded-full text-[10px] font-bold ${profileProgress === 100 ? 'text-[#059669]' : 'text-[#f97316]'} border border-gray-100 shadow-sm z-20`}
-                style={{ bottom: '-6px' }}
+          <div className="relative inline-flex items-center justify-center" style={{ width: '56px', height: '56px' }}>
+            {accountTypeState === 'aviation_professional' ? (
+              /* Aviation Professional: simple avatar with status dot (Green for Active, Orange for Pending), NO progress ring or percentage */
+              <button
+                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                className="relative rounded-full cursor-pointer bg-white z-10 hover:opacity-90 transition-opacity flex items-center justify-center"
+                style={{ width: '44px', height: '44px', border: '2px solid white', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}
+                title="Profile"
               >
-                {profileProgress}%
-              </div>
-            )}
+                <div className="w-full h-full rounded-full overflow-hidden bg-gray-100 flex items-center justify-center">
+                  {profilePhoto ? (
+                    <img 
+                      src={profilePhoto} 
+                      alt="Avatar" 
+                      className="w-full h-full object-cover" 
+                    />
+                  ) : (
+                    <span className="w-full h-full flex items-center justify-center text-[#1d4ed8] font-extrabold bg-blue-50 text-sm">
+                      A
+                    </span>
+                  )}
+                </div>
 
-            {/* Status Dot Badge - Only for Business Accounts */}
-            {accountTypeState === 'business' && (
-              <div 
-                className={`absolute bottom-0 right-1 w-3.5 h-3.5 rounded-full border-2 border-white z-20 ${
-                  companyStatus === 'active' || companyStatus === 'approved' 
-                    ? 'bg-[#10b981]' 
-                    : 'bg-[#f59e0b]'
-                }`}
-                title={companyStatus === 'active' || companyStatus === 'approved' ? 'Active' : 'Pending review'}
+                {/* Status Dot: Green (bg-emerald-500) if Active, Orange (bg-orange-500) if Pending */}
+                <span
+                  className={cn(
+                    "absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-white shadow-xs",
+                    userStatus === 'active' ? "bg-emerald-500" : "bg-orange-500"
+                  )}
+                />
+              </button>
+            ) : accountTypeState === 'business' ? (
+              /* Business: simple avatar button, no ring */
+              <button 
+                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                className="rounded-full cursor-pointer overflow-hidden bg-white z-10 hover:opacity-90 transition-opacity"
+                style={{ width: '42px', height: '42px', border: '2px solid white', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}
+              >
+                {profilePhoto ? (
+                  <img 
+                    src={profilePhoto} 
+                    alt="Avatar" 
+                    className="w-full h-full object-cover" 
+                  />
+                ) : (
+                  <span className="w-full h-full flex items-center justify-center text-gray-500 font-medium bg-gray-100" style={{ fontSize: '10px' }}>
+                    Me
+                  </span>
+                )}
+              </button>
+            ) : (
+              /* Flight Crew: show progress ring and percentage */
+              <ProgressAvatar 
+                size={48} 
+                percentage={profileProgress} 
+                imageUrl={profilePhoto} 
+                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                className="cursor-pointer"
               />
             )}
           </div>
