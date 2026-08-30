@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ChevronLeft, Plus, X, Search, Check } from "lucide-react";
+import { ChevronLeft, Search, Plus, Check, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
 
 export interface SkillItem {
   id: string;
@@ -17,7 +18,7 @@ interface SkillsStepProps {
   onBack?: () => void;
 }
 
-const PREDEFINED_SKILLS = [
+const AVIATION_SKILLS = [
   "Flight Operations",
   "Safety Management",
   "Compliance",
@@ -26,16 +27,26 @@ const PREDEFINED_SKILLS = [
   "Aerodynamics",
   "Aircraft Maintenance",
   "CAD / Technical Design",
-  "EASA / FAA Compliance",
+  "EASA / FAA Regulations",
   "Quality Assurance",
   "Turbine Engines",
-  "Fleet Planning"
+  "Fleet Planning",
+  "Navigation Systems",
+  "Ground Handling",
+  "Air Traffic Control",
+  "Fuel Management",
+  "Aviation Security",
+  "Flight Dispatch",
+  "Meteorology",
+  "Risk Assessment"
 ];
+
+const MAX_SKILLS = 20;
 
 export function SkillsStep({ onNext, onBack }: SkillsStepProps) {
   const router = useRouter();
 
-  const [selectedSkills, setSelectedSkills] = useState<SkillItem[]>([]);
+  const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [isSaving, setIsSaving] = useState(false);
 
@@ -45,14 +56,8 @@ export function SkillsStep({ onNext, onBack }: SkillsStepProps) {
       if (savedPersonal) {
         const parsed = JSON.parse(savedPersonal);
         if (parsed.skills && Array.isArray(parsed.skills)) {
-          // Normalize to SkillItem[] if stored as string[] or SkillItem[]
-          const normalized: SkillItem[] = parsed.skills.map((s: any, idx: number) => {
-            if (typeof s === "string") {
-              return { id: `skill-${idx}-${Date.now()}`, name: s };
-            }
-            return s;
-          });
-          setSelectedSkills(normalized);
+          const list = parsed.skills.map((s: any) => (typeof s === "string" ? s : s.name));
+          setSelectedSkills(list);
         }
       }
     } catch (e) {
@@ -60,37 +65,42 @@ export function SkillsStep({ onNext, onBack }: SkillsStepProps) {
     }
   }, []);
 
-  const handleAddSkill = (skillName: string) => {
+  const toggleSkill = (skillName: string) => {
     const trimmed = skillName.trim();
     if (!trimmed) return;
 
-    const alreadyExists = selectedSkills.some(
-      s => s.name.toLowerCase() === trimmed.toLowerCase()
-    );
-
-    if (!alreadyExists) {
-      const newSkill: SkillItem = {
-        id: `skill-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-        name: trimmed
-      };
-      setSelectedSkills(prev => [...prev, newSkill]);
+    if (selectedSkills.includes(trimmed)) {
+      setSelectedSkills(prev => prev.filter(s => s !== trimmed));
+    } else {
+      if (selectedSkills.length < MAX_SKILLS) {
+        setSelectedSkills(prev => [...prev, trimmed]);
+      }
     }
-    setSearchQuery("");
   };
 
-  const handleRemoveSkill = (idToRemove: string) => {
-    setSelectedSkills(prev => prev.filter(s => s.id !== idToRemove));
+  const handleAddCustomSkill = () => {
+    const trimmed = searchQuery.trim();
+    if (trimmed && !selectedSkills.includes(trimmed) && selectedSkills.length < MAX_SKILLS) {
+      setSelectedSkills(prev => [...prev, trimmed]);
+      setSearchQuery("");
+    }
   };
 
-  const filteredSuggestions = PREDEFINED_SKILLS.filter(sugg => {
-    const matchesSearch = sugg.toLowerCase().includes(searchQuery.toLowerCase());
-    const notAlreadySelected = !selectedSkills.some(
-      s => s.name.toLowerCase() === sugg.toLowerCase()
-    );
-    return matchesSearch && notAlreadySelected;
-  });
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleAddCustomSkill();
+    }
+  };
 
-  const handleCompleteSetup = async () => {
+  const filteredSkills = AVIATION_SKILLS.filter(skill =>
+    skill.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  // Combine custom added skills with predefined ones for display
+  const allDisplaySkills = Array.from(new Set([...selectedSkills, ...filteredSkills]));
+
+  const handleContinue = async () => {
     if (isSaving) return;
 
     setIsSaving(true);
@@ -98,16 +108,21 @@ export function SkillsStep({ onNext, onBack }: SkillsStepProps) {
       const existing = localStorage.getItem("onboarding_personal");
       const parsed = existing ? JSON.parse(existing) : {};
 
+      const skillItems: SkillItem[] = selectedSkills.map((name, idx) => ({
+        id: `skill-${idx + 1}-${Date.now()}`,
+        name,
+      }));
+
       const updated = {
         ...parsed,
-        skills: selectedSkills.map(s => s.name),
-        structuredSkills: selectedSkills,
+        skills: selectedSkills,
+        structuredSkills: skillItems,
         category: "aviation_professional",
-        role: "aviation_professional"
+        role: "aviation_professional",
       };
 
       localStorage.setItem("onboarding_personal", JSON.stringify(updated));
-      localStorage.setItem("onboarding_skills", JSON.stringify(selectedSkills));
+      localStorage.setItem("onboarding_skills", JSON.stringify(skillItems));
 
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
@@ -121,42 +136,28 @@ export function SkillsStep({ onNext, onBack }: SkillsStepProps) {
         const resumeData = (currentResume?.data as any) || {};
         const updatedPersonal = {
           ...(resumeData.personal || {}),
-          ...updated
+          ...updated,
         };
 
         await supabase.from("resumes").upsert({
           userId: session.user.id,
           data: {
             ...resumeData,
-            personal: updatedPersonal
-          }
+            personal: updatedPersonal,
+            skills: selectedSkills,
+          },
         }, { onConflict: "userId" });
-
-        // Update users table onboarded status
-        await supabase.from("users").upsert({
-          id: session.user.id,
-          onboarded: 1,
-          accountType: "aviation_professional"
-        }, { onConflict: "id" });
-
-        await supabase.auth.updateUser({
-          data: {
-            onboarded: true,
-            accountType: "aviation_professional",
-            crew_data_saved: true
-          }
-        });
       }
 
       if (onNext) {
-        onNext(selectedSkills);
+        onNext(skillItems);
       } else {
         router.push("/onboarding-complete");
       }
     } catch (err) {
-      console.error("Error saving skills and completing setup:", err);
+      console.error("Error saving skills:", err);
       if (onNext) {
-        onNext(selectedSkills);
+        onNext([]);
       }
     } finally {
       setIsSaving(false);
@@ -201,43 +202,36 @@ export function SkillsStep({ onNext, onBack }: SkillsStepProps) {
             <div className="h-1.5 rounded-full bg-[#1d4ed8]" />
           </div>
 
-          <p className="text-sm text-gray-500">
-            Select your technical skills and engineering competencies.
+          <h2 className="text-base font-bold text-gray-900 mt-1">
+            Select your skills
+          </h2>
+
+          <p className="text-sm text-gray-500 mt-1 leading-relaxed">
+            Choose the aviation and technical skills that best describe your expertise.
           </p>
         </div>
 
-        {/* 3. Skills Selection Component (AC 1, AC 2 & AC 3) */}
-        <div className="flex flex-col gap-4 flex-1">
+        {/* 3. Skills Selection Component */}
+        <div className="flex flex-col gap-5 flex-1">
           
-          {/* Search / Add Input */}
+          {/* Rounded Search Input with Magnifying Glass */}
           <div className="space-y-1.5">
-            <Label htmlFor="skillSearch" className="font-semibold text-gray-900 text-sm">
-              Skills
-            </Label>
-            <div className="relative flex gap-2">
-              <div className="relative flex-1">
-                <Search className="w-4 h-4 text-gray-400 absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" />
-                <Input
-                  id="skillSearch"
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      handleAddSkill(searchQuery);
-                    }
-                  }}
-                  placeholder="Search or add skills (e.g., Flight Operations)..."
-                  className="w-full rounded-2xl py-6 pl-11 pr-4 text-sm bg-white border border-gray-200 focus:border-[#1d4ed8] focus:ring-2 focus:ring-[#1d4ed8]/20"
-                />
-              </div>
+            <div className="relative flex items-center">
+              <Search className="w-4 h-4 text-gray-400 absolute left-4 pointer-events-none" />
+              <Input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="Search skills"
+                className="w-full rounded-2xl py-6 pl-11 pr-14 text-sm bg-white border border-gray-200 focus:border-[#1d4ed8] focus:ring-2 focus:ring-[#1d4ed8]/20 transition-all"
+              />
 
               {searchQuery.trim() && (
                 <button
                   type="button"
-                  onClick={() => handleAddSkill(searchQuery)}
-                  className="px-4 py-2 bg-[#1d4ed8] hover:bg-[#1e40af] text-white text-xs font-bold rounded-2xl transition-colors cursor-pointer shrink-0"
+                  onClick={handleAddCustomSkill}
+                  className="absolute right-2 px-3 py-1.5 bg-[#1d4ed8] hover:bg-[#1e40af] text-white text-xs font-bold rounded-xl transition-colors cursor-pointer"
                 >
                   Add
                 </button>
@@ -245,64 +239,53 @@ export function SkillsStep({ onNext, onBack }: SkillsStepProps) {
             </div>
           </div>
 
-          {/* Selected Skills (Pill Tags - AC 2) */}
-          {selectedSkills.length > 0 && (
-            <div className="space-y-2">
-              <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">
-                Selected Skills ({selectedSkills.length})
+          {/* Skills & Expertise Header + Counter */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between px-0.5">
+              <span className="text-sm font-extrabold text-gray-900">
+                Skills & Expertise
               </span>
-              <div className="flex flex-wrap gap-2 pt-1 pb-1">
-                {selectedSkills.map((skill) => (
-                  <span
-                    key={skill.id}
-                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-blue-50 text-blue-700 text-xs sm:text-sm font-semibold border border-blue-200 shadow-xs animate-in fade-in zoom-in-95 duration-150"
-                  >
-                    {skill.name}
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveSkill(skill.id)}
-                      className="hover:text-blue-950 p-0.5 rounded-full hover:bg-blue-100/80 transition-colors cursor-pointer"
-                      title={`Remove ${skill.name}`}
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  </span>
-                ))}
-              </div>
+              <span className="text-xs font-medium text-gray-400">
+                {selectedSkills.length} / {MAX_SKILLS}
+              </span>
             </div>
-          )}
 
-          {/* Suggested Skills (Mock Data - AC 1) */}
-          <div className="space-y-2 pt-2">
-            <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">
-              Suggested Competencies
-            </span>
+            {/* Selectable Skill Pills Grid */}
             <div className="flex flex-wrap gap-2 pt-1">
-              {filteredSuggestions.map((sugg) => (
-                <button
-                  key={sugg}
-                  type="button"
-                  onClick={() => handleAddSkill(sugg)}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gray-100 hover:bg-blue-50 text-gray-700 hover:text-blue-700 text-xs font-medium border border-gray-200/60 hover:border-blue-200 transition-all cursor-pointer group"
-                >
-                  <Plus className="w-3.5 h-3.5 text-gray-400 group-hover:text-blue-600" />
-                  {sugg}
-                </button>
-              ))}
+              {allDisplaySkills.map((skill) => {
+                const isSelected = selectedSkills.includes(skill);
+
+                return (
+                  <button
+                    key={skill}
+                    type="button"
+                    onClick={() => toggleSkill(skill)}
+                    className={cn(
+                      "px-4 py-2 rounded-full text-xs font-semibold transition-all cursor-pointer border flex items-center gap-1.5 active:scale-95 shadow-2xs",
+                      isSelected
+                        ? "bg-blue-50 border-[#1d4ed8] text-[#1d4ed8] font-bold ring-1 ring-[#1d4ed8]/30"
+                        : "bg-white border-gray-300 text-gray-800 hover:border-gray-400 hover:bg-gray-50"
+                    )}
+                  >
+                    {isSelected && <Check className="w-3.5 h-3.5 stroke-[2.5]" />}
+                    <span>{skill}</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
         </div>
 
-        {/* 4. Bottom Button ("Complete Setup" / "Finish") */}
+        {/* 4. Bottom Button: Continue */}
         <div className="pb-8 pt-6">
           <button
             type="button"
-            onClick={handleCompleteSetup}
+            onClick={handleContinue}
             disabled={isSaving}
-            className="w-full py-4 rounded-full font-bold text-white transition-all shadow-md bg-[#1d4ed8] hover:bg-[#1e40af] cursor-pointer"
+            className="w-full py-4 rounded-full font-bold text-white bg-[#1d4ed8] hover:bg-[#1e40af] transition-all shadow-md cursor-pointer text-center text-sm"
           >
-            {isSaving ? "Finalizing setup..." : "Complete Setup"}
+            {isSaving ? "Please wait..." : "Continue"}
           </button>
         </div>
 

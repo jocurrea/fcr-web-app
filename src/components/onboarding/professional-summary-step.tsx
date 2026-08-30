@@ -94,7 +94,7 @@ export function ProfessionalSummaryStep({ onNext, onBack }: ProfessionalSummaryS
         router.push("/onboarding-complete");
       }
     } catch (err) {
-      console.error("Error saving professional summary:", err);
+      console.error("Error saving about me summary:", err);
     } finally {
       setIsSaving(false);
     }
@@ -122,10 +122,10 @@ export function ProfessionalSummaryStep({ onNext, onBack }: ProfessionalSummaryS
           />
         </div>
 
-        {/* 2. Title, 6-Segment Progress Bar (3 segments blue) & Subtitle */}
+        {/* 2. Title, 6-Segment Progress Bar (3 segments blue), Subtitle & Description */}
         <div className="mb-6">
           <h1 className="text-3xl font-extrabold text-gray-900 leading-tight mb-2">
-            Professional Summary
+            About Me
           </h1>
 
           {/* 6-Segment Progress Bar: Segments 1, 2 & 3 blue, 4, 5 & 6 gray */}
@@ -138,17 +138,33 @@ export function ProfessionalSummaryStep({ onNext, onBack }: ProfessionalSummaryS
             <div className="h-1.5 rounded-full bg-gray-200" />
           </div>
 
-          <p className="text-sm text-gray-500">
-            Describe your qualifications, expertise, and career background.
+          <h2 className="text-base font-bold text-gray-900 mt-1">
+            Share your professional story
+          </h2>
+
+          <p className="text-sm text-gray-500 mt-1 leading-relaxed">
+            Summarize your qualifications, expertise, and career background so others can understand what you bring to aviation.
           </p>
         </div>
 
-        {/* 3. Text Area Component (AC 1, AC 2 & AC 3) */}
+        {/* 3. Text Area Component with Top Counter and Bottom Helper Text */}
         <div className="flex flex-col gap-2 flex-1">
-          <div className="flex items-center justify-between">
+          {/* Label + Top-Aligned Character Counter in the same row */}
+          <div className="flex items-center justify-between px-0.5">
             <Label htmlFor="aboutMe" className="font-semibold text-gray-900 text-sm">
               About Me <span className="text-red-500">*</span>
             </Label>
+
+            <span
+              className={cn(
+                "text-xs font-medium",
+                aboutMe.length >= MAX_CHARACTERS
+                  ? "text-amber-600 font-bold"
+                  : "text-gray-400"
+              )}
+            >
+              {aboutMe.length} / {MAX_CHARACTERS}
+            </span>
           </div>
 
           <div className="relative">
@@ -159,7 +175,7 @@ export function ProfessionalSummaryStep({ onNext, onBack }: ProfessionalSummaryS
               value={aboutMe}
               onChange={handleChange}
               onBlur={() => setTouched(true)}
-              placeholder="I am an experienced aviation professional with a strong background in..."
+              placeholder="Write a short overview of your professional background"
               className={cn(
                 "w-full rounded-2xl p-4 text-sm bg-white border transition-all resize-none min-h-[160px] leading-relaxed",
                 touched && !isAboutMeValid
@@ -169,28 +185,18 @@ export function ProfessionalSummaryStep({ onNext, onBack }: ProfessionalSummaryS
             />
           </div>
 
-          {/* Error message (Left) & Real-time Character Counter (Right) */}
-          <div className="flex items-center justify-between pt-1 px-1">
-            <div>
-              {touched && !isAboutMeValid ? (
-                <p className="text-xs text-red-600 font-medium flex items-center gap-1">
-                  <AlertCircle className="w-3.5 h-3.5" />
-                  This field is required.
-                </p>
-              ) : null}
-            </div>
+          {/* Helper Text below textarea in faint gray */}
+          <p className="text-xs text-gray-400 mt-0.5 px-0.5">
+            Keep it focused and relevant to your aviation experience.
+          </p>
 
-            <p
-              className={cn(
-                "text-xs font-medium ml-auto",
-                aboutMe.length >= MAX_CHARACTERS
-                  ? "text-amber-600 font-bold"
-                  : "text-gray-400"
-              )}
-            >
-              {aboutMe.length} / {MAX_CHARACTERS}
+          {/* Validation Error Message */}
+          {touched && !isAboutMeValid && (
+            <p className="text-xs text-red-600 font-medium flex items-center gap-1 mt-1 px-0.5">
+              <AlertCircle className="w-3.5 h-3.5" />
+              This field is required.
             </p>
-          </div>
+          )}
         </div>
 
         {/* 4. Bottom Next Button */}

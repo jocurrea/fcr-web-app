@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 
 export type Notification = {
-  id: number;
+  id: string | number;
   created_at: string;
   title: string;
   senderId: string;
@@ -10,6 +10,10 @@ export type Notification = {
   data: string;
   read: number;
   type: string;
+  archivedAt?: string | null;
+  archived_at?: string | null;
+  deletedAt?: string | null;
+  deleted_at?: string | null;
   sender?: {
     id: string;
     firstName?: string | null;
@@ -173,7 +177,7 @@ export function useNotifications(userId?: string) {
     setUnreadCount(notifications.filter((n) => n.read === 0 || (n.read as any) === false).length);
   }, [notifications]);
 
-  const markAsRead = async (notificationId: number) => {
+  const markAsRead = async (notificationId: string | number) => {
     // Optimistic update for better UX
     setNotifications((prev) =>
       prev.map((n) => (n.id === notificationId ? { ...n, read: 1 } : n))
@@ -199,7 +203,7 @@ export function useNotifications(userId?: string) {
       .eq('read', 0);
   };
 
-  const deleteNotification = async (notificationId: number) => {
+  const deleteNotification = async (notificationId: string | number) => {
     // Optimistic update
     setNotifications((prev) => prev.filter((n) => n.id !== notificationId));
     await supabase
@@ -222,6 +226,7 @@ export function useNotifications(userId?: string) {
 
   return {
     notifications,
+    setNotifications,
     unreadCount,
     errorMsg,
     markAsRead,

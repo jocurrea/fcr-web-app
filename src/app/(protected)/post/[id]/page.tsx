@@ -7,6 +7,7 @@ import { ChevronLeft, Edit2, Trash2, Send, X, Check, Flag, Forward, Info, Clock 
 import { PostCard } from "@/components/home/post-card";
 import { fetchPostById, fetchPostComments, createComment, deleteComment, deletePost, updateComment, Post, Comment } from "@/lib/api/posts";
 import { supabase } from "@/lib/supabase";
+import { ConfirmationModal } from "@/components/ui/confirmation-modal";
 
 import { Suspense } from "react";
 
@@ -22,7 +23,8 @@ function PostDetailContent() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   
   const [commentText, setCommentText] = useState("");
-  const [commentToDelete, setCommentToDelete] = useState<string | null>(null);
+  const [commentToDelete, setCommentToDelete] = useState<string | number | null>(null);
+  const [isDeletingComment, setIsDeletingComment] = useState(false);
   const [showDeletePostModal, setShowDeletePostModal] = useState(false);
 
   // Edit comment state
@@ -103,20 +105,27 @@ function PostDetailContent() {
     }
   };
 
-  const handleDeleteCommentClick = (commentId: string) => {
-    setCommentToDelete(commentId);
-  };
+  const handleDeleteCommentOptimistic = async (commentId: string | number) => {
+    const previousComments = [...comments];
+    // Optimistic UI: remove comment immediately from local state
+    setComments((prev) => prev.filter((c) => String(c.id) !== String(commentId)));
 
-  const confirmDeleteComment = async () => {
-    if (!commentToDelete) return;
-    
-    const success = await deleteComment(commentToDelete);
-    if (success) {
-      setComments(comments.filter(c => c.id !== commentToDelete));
-    } else {
-      alert("Error deleting comment");
+    try {
+      const { error } = await supabase
+        .from('comments')
+        .delete()
+        .eq('id', commentId);
+
+      if (error) {
+        console.error("Error deleting comment from Supabase:", error);
+        setComments(previousComments);
+        alert("Error deleting comment. Please try again.");
+      }
+    } catch (error) {
+      console.error("Error deleting comment:", error);
+      setComments(previousComments);
+      alert("Error deleting comment. Please try again.");
     }
-    setCommentToDelete(null);
   };
 
   const startEditingComment = (comment: Comment) => {
@@ -273,7 +282,9 @@ function PostDetailContent() {
           ) : (
             <div className="flex flex-col gap-4 mt-2">
               {comments.map((c, i) => {
-                const isCommentOwner = currentUserId === c.user_id;
+                const isCommentOwner = Boolean(currentUserId && (currentUserId === c.user_id || currentUserId === (c as any)?.userId));
+                const isPostOwner = Boolean(currentUserId && (currentUserId === post?.user_id || currentUserId === (post as any)?.userId));
+                const canDeleteComment = isCommentOwner || isPostOwner;
                 const isEditing = editingCommentId === c.id;
 
                 return (
@@ -300,22 +311,39 @@ function PostDetailContent() {
                           <span className="text-gray-400 text-[10px]">●</span>
                           <span className="text-[12px] text-gray-500 font-medium">{c.created_at}</span>
                         </div>
-                        {/* Actions */}
-                        <div className="flex items-center gap-2.5 text-gray-400 ml-2">
+                        {/* Actions: Report flag first (left), Edit, then Trash icon (right), gap-3 */}
+                        <div className="flex items-center gap-3 text-gray-400 ml-2">
                           {!isCommentOwner && (
-                            <Link href={`/report-comment/${c.id}?returnTo=${encodeURIComponent(pathname)}`} className="text-gray-400 hover:text-red-500 transition-colors" title="Report">
+                            <Link 
+                              href={`/report-comment/${c.id}?returnTo=${encodeURIComponent(pathname)}`} 
+                              className="text-gray-400 hover:text-red-500 transition-colors cursor-pointer" 
+                              title="Report comment"
+                            >
                               <Flag className="w-3.5 h-3.5" />
                             </Link>
                           )}
                           {isCommentOwner && !isEditing && (
-                            <>
-                              <button onClick={() => startEditingComment(c)} className="text-gray-400 hover:text-gray-600 transition-colors">
-                                <Edit2 className="w-3.5 h-3.5" />
-                              </button>
-                              <button onClick={() => handleDeleteCommentClick(c.id)} className="text-red-400 hover:text-red-500 transition-colors">
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </>
+                            <button 
+                              type="button"
+                              onClick={() => startEditingComment(c)} 
+                              className="text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+                              title="Edit comment"
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                          {canDeleteComment && !isEditing && (
+                            <button 
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setCommentToDelete(c.id);
+                              }} 
+                              className="text-gray-400 hover:text-red-500 transition-colors cursor-pointer"
+                              title="Delete comment"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
                           )}
                         </div>
                       </div>
@@ -350,29 +378,26 @@ function PostDetailContent() {
 
       </div>
 
-      {/* Delete Comment Modal */}
-      {commentToDelete && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[100] p-4 animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl p-6 max-w-[320px] w-full shadow-2xl animate-in zoom-in-95 duration-200">
-            <h3 className="text-[18px] font-bold text-gray-900 mb-2">Delete Comment</h3>
-            <p className="text-gray-500 text-[14px] leading-relaxed mb-6">Are you sure you want to delete this comment?</p>
-            <div className="flex gap-3 justify-end">
-              <button 
-                onClick={() => setCommentToDelete(null)}
-                className="px-5 py-2.5 rounded-full font-semibold text-[14px] text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors"
-              >
-                Cancel
-              </button>
-              <button 
-                onClick={confirmDeleteComment}
-                className="px-5 py-2.5 rounded-full font-semibold text-[14px] text-white bg-red-500 hover:bg-red-600 transition-colors shadow-sm"
-              >
-                Delete
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Confirmation Modal for Comment Deletion */}
+      <ConfirmationModal
+        isOpen={Boolean(commentToDelete)}
+        onClose={() => setCommentToDelete(null)}
+        onConfirm={async () => {
+          if (!commentToDelete) return;
+          setIsDeletingComment(true);
+          const targetId = commentToDelete;
+          setCommentToDelete(null);
+          await handleDeleteCommentOptimistic(targetId);
+          setIsDeletingComment(false);
+        }}
+        title="Delete comment"
+        description="Are you sure you want to delete this comment? This action cannot be undone."
+        confirmText="Delete"
+        cancelText="Cancel"
+        isDestructive={true}
+        isLoading={isDeletingComment}
+        icon="trash"
+      />
 
       {/* Delete Post Modal */}
       {showDeletePostModal && (

@@ -21,6 +21,7 @@ import {
 import { Search, Check, ChevronDown, Upload, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
+import { WorkAvailabilityStatus } from "@/components/profile/work-availability-status";
 
 const COUNTRIES = [
   { id: "ar", label: "Argentina" },
@@ -218,9 +219,26 @@ export function PersonalInfoForm({ onNext }: PersonalInfoFormProps) {
   };
 
   useEffect(() => {
-    localStorage.setItem("onboarding_personal", JSON.stringify({
-      role, selectedCountry, firstName, middleName, lastName, description, currentEmployer, totalFlightHours
-    }));
+    try {
+      const prev = localStorage.getItem("onboarding_personal");
+      const parsed = prev ? JSON.parse(prev) : {};
+      localStorage.setItem(
+        "onboarding_personal",
+        JSON.stringify({
+          ...parsed,
+          role,
+          selectedCountry,
+          firstName,
+          middleName,
+          lastName,
+          description,
+          currentEmployer,
+          totalFlightHours,
+        })
+      );
+    } catch (e) {
+      console.error("Error writing to onboarding_personal:", e);
+    }
   }, [role, selectedCountry, firstName, middleName, lastName, description, currentEmployer, totalFlightHours]);
 
   const filteredCountries = COUNTRIES.filter(country => 
@@ -403,6 +421,11 @@ export function PersonalInfoForm({ onNext }: PersonalInfoFormProps) {
                 <Upload className="w-8 h-8 text-gray-400 stroke-[1.5]" />
               </div>
             )}
+          </div>
+
+          {/* Professional Status (Work Availability - E01-HU09) */}
+          <div className="pt-2 border-t border-gray-100">
+            <WorkAvailabilityStatus showCardWrapper={false} />
           </div>
         </form>
       </div>

@@ -6,9 +6,9 @@ export default async function ProtectedLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <main className="min-h-screen bg-[#f8f9fa] flex flex-col">
+    <main className="min-h-screen bg-[#f8f9fa] flex flex-col overflow-x-hidden">
       <ProtectedHeader />
-      <div className="flex-1 w-full mx-auto">{children}</div>
+      <div className="flex-1 w-full">{children}</div>
     </main>
   );
 }

@@ -35,6 +35,13 @@ export default function PublicProfilePage() {
   const [loading, setLoading] = useState(true);
   const [profileData, setProfileData] = useState<any>(null);
   const [isOwnProfile, setIsOwnProfile] = useState(false);
+  // E01-HU11: Company affiliation state from get_public_profile RPC
+  const [affiliationInfo, setAffiliationInfo] = useState<{
+    name: string;
+    id: string | null;
+    status: string;
+    logo?: string | null;
+  } | null>(null);
 
   useEffect(() => {
     async function loadData() {
@@ -62,6 +69,63 @@ export default function PublicProfilePage() {
           personal: dbResume?.personal || {},
           work: dbResume?.work || dbResume?.personal?.workExperience || [],
         });
+
+        // E01-HU11: Read company affiliation using get_public_profile RPC
+        try {
+          let publicProfileRpc: any = null;
+          const { data: d1, error: e1 } = await supabase.rpc("get_public_profile", {
+            user_id: profileId,
+          });
+          if (!e1 && d1) {
+            publicProfileRpc = d1;
+          } else {
+            const { data: d2 } = await supabase.rpc("get_public_profile", {
+              profile_id: profileId,
+            });
+            if (d2) publicProfileRpc = d2;
+          }
+
+          if (publicProfileRpc) {
+            const aff =
+              publicProfileRpc.affiliation ||
+              publicProfileRpc.company_affiliation ||
+              (Array.isArray(publicProfileRpc.affiliations) ? publicProfileRpc.affiliations[0] : null) ||
+              (publicProfileRpc.company_name || publicProfileRpc.company ? publicProfileRpc : null);
+
+            const compName =
+              aff?.company_name ||
+              aff?.company?.name ||
+              aff?.name ||
+              publicProfileRpc.company_name ||
+              publicProfileRpc.company?.name ||
+              null;
+
+            const compId =
+              aff?.company_id ||
+              aff?.company?.id ||
+              aff?.id ||
+              publicProfileRpc.company_id ||
+              null;
+
+            const affStatus =
+              aff?.status ||
+              aff?.affiliation_status ||
+              publicProfileRpc.affiliation_status ||
+              publicProfileRpc.company_link_status ||
+              (compId ? "pending" : "active");
+
+            if (compName) {
+              setAffiliationInfo({
+                name: compName,
+                id: compId,
+                status: affStatus,
+                logo: aff?.logo_url || aff?.company?.logo_url || null,
+              });
+            }
+          }
+        } catch (rpcErr) {
+          console.warn("Could not load affiliation from get_public_profile:", rpcErr);
+        }
       } catch (err) {
         console.error("Error loading public profile:", err);
       } finally {
@@ -124,27 +188,14 @@ export default function PublicProfilePage() {
 
   const statusDotStyle = isPending ? "bg-orange-500" : "bg-emerald-500";
 
-  // 6. Linked Company (Corporate Account / Employer Link)
-  const linkedCompany =
-    personal.linkedCompany ||
-    personal.companyName ||
-    personal.companyLink ||
-    user.companyName ||
-    user.company_name ||
-    user.linkedCompany ||
-    "Global Airways";
+  // 6. Linked Company (Corporate Account / Employer Link — E01-HU11 & E01-HU12 via get_public_profile RPC)
+  const companyName = affiliationInfo?.name || "Global Airways";
+  const hasCompanyId = Boolean(affiliationInfo?.id);
+  const affiliationStatus = affiliationInfo?.status?.toLowerCase();
 
-  const companyName =
-    typeof linkedCompany === "string"
-      ? linkedCompany
-      : linkedCompany?.name || "Global Airways";
-
-  const companyHref =
-    typeof linkedCompany === "object" && linkedCompany?.id
-      ? `/profile/${linkedCompany.id}`
-      : typeof linkedCompany === "string" && linkedCompany.startsWith("http")
-      ? linkedCompany
-      : "#";
+  const isCompanyPending = hasCompanyId && affiliationStatus === "pending";
+  const isCompanyVerified = hasCompanyId && (affiliationStatus === "active" || affiliationStatus === "verified" || affiliationStatus === "approved");
+  const companyHref = (isCompanyVerified && affiliationInfo?.id) ? `/profile/${affiliationInfo.id}` : "#";
 
   // 7. Professional Details Fields
   const locationValue =
@@ -249,16 +300,34 @@ export default function PublicProfilePage() {
                   </span>
                 </div>
 
-                {/* Company Link: Immediately below Role Pill and above Summary */}
+                {/* Company Display — E01-HU11 & E01-HU12 (AC 2) */}
                 <div className="mb-2">
-                  <Link
-                    href={companyHref}
-                    className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-700 text-xs sm:text-sm font-medium cursor-pointer hover:underline transition-colors w-fit"
-                    title={`View ${companyName} profile`}
-                  >
-                    <Building2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-500 shrink-0" />
-                    <span className="truncate">{companyName}</span>
-                  </Link>
+                  {isCompanyPending ? (
+                    <div className="inline-flex flex-col gap-0.5">
+                      <span className="inline-flex items-center gap-1 text-blue-600 text-xs sm:text-sm font-medium">
+                        <Building2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-500 shrink-0" />
+                        <span className="truncate">{companyName}</span>
+                      </span>
+                      <span className="text-orange-500 text-xs font-medium ml-[18px] sm:ml-[22px]">
+                        Pending Verification
+                      </span>
+                    </div>
+                  ) : isCompanyVerified ? (
+                    <Link
+                      href={companyHref}
+                      className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-700 text-xs sm:text-sm font-medium cursor-pointer hover:underline transition-colors w-fit"
+                      title={`View ${companyName} profile`}
+                    >
+                      <Building2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-500 shrink-0" />
+                      <span className="truncate">{companyName}</span>
+                    </Link>
+                  ) : (
+                    /* E01-HU12: Unregistered / Unverified company rendered strictly as plain text */
+                    <div className="inline-flex items-center gap-1 text-gray-600 text-xs sm:text-sm font-medium">
+                      <Building2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-400 shrink-0" />
+                      <span className="truncate">{companyName}</span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Professional Summary */}

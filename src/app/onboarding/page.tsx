@@ -20,6 +20,7 @@ import { ProfessionalSummaryStep } from "@/components/onboarding/professional-su
 import { ContactCredentialsStep } from "@/components/onboarding/contact-credentials-step";
 import { ComplementaryInfoStep } from "@/components/onboarding/complementary-info-step";
 import { SkillsStep } from "@/components/onboarding/skills-step";
+import { AvailabilityStep } from "@/components/onboarding/availability-step";
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -324,7 +325,11 @@ export default function OnboardingPage() {
   }
 
   if (step === 6) {
-    return <SkillsStep onBack={handleBack} onNext={handleFinish} />;
+    return <SkillsStep onBack={handleBack} onNext={() => setStep(7)} />;
+  }
+
+  if (step === 7) {
+    return <AvailabilityStep onBack={handleBack} onNext={handleFinish} />;
   }
 
   return null;

@@ -24,7 +24,7 @@ export function ProtectedHeader() {
   const pathname = usePathname();
   const router = useRouter();
   const [profilePhoto, setProfilePhoto] = useState<string | null>(null);
-  const [profileProgress, setProfileProgress] = useState(70);
+  const [profileProgress, setProfileProgress] = useState(0);
   const [companyStatus, setCompanyStatus] = useState<string>('pending');
   const [accountTypeState, setAccountTypeState] = useState<string>('');
   const [userStatus, setUserStatus] = useState<string>('active');
@@ -32,6 +32,19 @@ export function ProtectedHeader() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Listen to real-time progress updates dispatched across the app
+  useEffect(() => {
+    function handleProgressUpdate(e: any) {
+      if (typeof e.detail === "number") {
+        setProfileProgress(e.detail);
+      }
+    }
+    window.addEventListener("profile-progress-updated", handleProgressUpdate);
+    return () => {
+      window.removeEventListener("profile-progress-updated", handleProgressUpdate);
+    };
+  }, []);
 
   useEffect(() => {
     async function syncLocalProfileToDatabase(session: any) {
@@ -52,7 +65,7 @@ export function ProtectedHeader() {
         const [{ data: dbUser }, { data: companyData }] = await Promise.all([
           supabase
             .from('users')
-            .select('firstName, middleName, lastName, profileImage')
+            .select('firstName, middleName, lastName, profileImage, accountType')
             .eq('id', userId)
             .maybeSingle(),
           supabase
@@ -370,16 +383,43 @@ export function ProtectedHeader() {
           <Link href="/new-post" className="text-gray-600 hover:text-black transition-colors">
             <Plus className="w-[26px] h-[26px]" />
           </Link>
-          <div className="relative inline-flex items-center justify-center" style={{ width: '56px', height: '56px' }}>
-            {accountTypeState === 'aviation_professional' ? (
-              /* Aviation Professional: simple avatar with status dot (Green for Active, Orange for Pending), NO progress ring or percentage */
-              <button
-                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                className="relative rounded-full cursor-pointer bg-white z-10 hover:opacity-90 transition-opacity flex items-center justify-center"
-                style={{ width: '44px', height: '44px', border: '2px solid white', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}
-                title="Profile"
-              >
-                <div className="w-full h-full rounded-full overflow-hidden bg-gray-100 flex items-center justify-center">
+          {/* Avatar with Circular Green Progress Ring and Percentage Below */}
+          <div className="relative flex flex-col items-center justify-center shrink-0">
+            <button
+              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+              className="relative cursor-pointer group flex flex-col items-center justify-center focus:outline-none"
+              title="Profile"
+            >
+              <div className="relative w-11 h-11 flex items-center justify-center">
+                {/* SVG Green Progress Ring */}
+                <svg className="w-11 h-11 -rotate-90 pointer-events-none" viewBox="0 0 44 44">
+                  {/* Track */}
+                  <circle
+                    cx="22"
+                    cy="22"
+                    r="19"
+                    className="text-gray-200"
+                    strokeWidth="2.5"
+                    stroke="currentColor"
+                    fill="none"
+                  />
+                  {/* Progress Arc in Green */}
+                  <circle
+                    cx="22"
+                    cy="22"
+                    r="19"
+                    className="text-emerald-500 transition-all duration-500 ease-out"
+                    strokeWidth="2.5"
+                    strokeDasharray={2 * Math.PI * 19}
+                    strokeDashoffset={2 * Math.PI * 19 - (2 * Math.PI * 19 * Math.min(100, Math.max(0, profileProgress))) / 100}
+                    strokeLinecap="round"
+                    stroke="currentColor"
+                    fill="none"
+                  />
+                </svg>
+
+                {/* Avatar Photo */}
+                <div className="absolute inset-[3.5px] rounded-full overflow-hidden bg-gray-100 flex items-center justify-center">
                   {profilePhoto ? (
                     <img 
                       src={profilePhoto} 
@@ -387,49 +427,18 @@ export function ProtectedHeader() {
                       className="w-full h-full object-cover" 
                     />
                   ) : (
-                    <span className="w-full h-full flex items-center justify-center text-[#1d4ed8] font-extrabold bg-blue-50 text-sm">
+                    <span className="w-full h-full flex items-center justify-center text-[#1d4ed8] font-extrabold bg-blue-50 text-xs">
                       A
                     </span>
                   )}
                 </div>
+              </div>
 
-                {/* Status Dot: Green (bg-emerald-500) if Active, Orange (bg-orange-500) if Pending */}
-                <span
-                  className={cn(
-                    "absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-white shadow-xs",
-                    userStatus === 'active' ? "bg-emerald-500" : "bg-orange-500"
-                  )}
-                />
-              </button>
-            ) : accountTypeState === 'business' ? (
-              /* Business: simple avatar button, no ring */
-              <button 
-                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                className="rounded-full cursor-pointer overflow-hidden bg-white z-10 hover:opacity-90 transition-opacity"
-                style={{ width: '42px', height: '42px', border: '2px solid white', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}
-              >
-                {profilePhoto ? (
-                  <img 
-                    src={profilePhoto} 
-                    alt="Avatar" 
-                    className="w-full h-full object-cover" 
-                  />
-                ) : (
-                  <span className="w-full h-full flex items-center justify-center text-gray-500 font-medium bg-gray-100" style={{ fontSize: '10px' }}>
-                    Me
-                  </span>
-                )}
-              </button>
-            ) : (
-              /* Flight Crew: show progress ring and percentage */
-              <ProgressAvatar 
-                size={48} 
-                percentage={profileProgress} 
-                imageUrl={profilePhoto} 
-                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                className="cursor-pointer"
-              />
-            )}
+              {/* Percentage text in small size & green centered directly below the avatar ring */}
+              <span className="text-[10px] font-extrabold text-emerald-600 leading-none mt-0.5 tracking-tight">
+                {Math.min(100, Math.max(0, profileProgress))}%
+              </span>
+            </button>
           </div>
 
           {/* Dropdown Menu */}
