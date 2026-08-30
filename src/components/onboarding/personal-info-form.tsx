@@ -21,7 +21,6 @@ import {
 import { Search, Check, ChevronDown, Upload, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
-import { WorkAvailabilityStatus } from "@/components/profile/work-availability-status";
 
 const COUNTRIES = [
   { id: "ar", label: "Argentina" },
@@ -421,11 +420,6 @@ export function PersonalInfoForm({ onNext }: PersonalInfoFormProps) {
                 <Upload className="w-8 h-8 text-gray-400 stroke-[1.5]" />
               </div>
             )}
-          </div>
-
-          {/* Professional Status (Work Availability - E01-HU09) */}
-          <div className="pt-2 border-t border-gray-100">
-            <WorkAvailabilityStatus showCardWrapper={false} />
           </div>
         </form>
       </div>

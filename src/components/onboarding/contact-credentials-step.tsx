@@ -7,7 +7,6 @@ import { supabase } from "@/lib/supabase";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import { WorkAvailabilityStatus } from "@/components/profile/work-availability-status";
 import { CompanySearchAutocomplete, type CompanySelection } from "@/components/profile/company-search-autocomplete";
 
 interface ContactCredentialsStepProps {
