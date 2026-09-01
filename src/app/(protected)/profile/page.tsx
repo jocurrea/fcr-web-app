@@ -607,7 +607,7 @@ export default function ProfilePage() {
         : ["Airline / Operator"];
 
     return (
-      <div className="max-w-2xl mx-auto flex flex-col w-full pb-12 bg-[#f8f9fa] min-h-screen px-4 py-6 md:py-8 gap-5">
+      <div className="max-w-lg mx-auto flex flex-col w-full pb-12 bg-[#f8f9fa] min-h-screen px-4 sm:px-0 py-6 md:py-8 gap-5">
         {/* 1. Header Card */}
         <div className="bg-white rounded-3xl p-6 flex flex-col shadow-xs border border-gray-100">
           <div className="flex items-start gap-4">
