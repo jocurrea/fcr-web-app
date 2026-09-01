@@ -26,7 +26,7 @@ export default function BusinessRequestsPage() {
         </button>
         <div>
           <h1 className="text-xl sm:text-2xl font-extrabold text-gray-900 leading-tight">
-            Pending requests
+            Affiliation requests
           </h1>
           <p className="text-xs sm:text-sm text-gray-500 font-medium mt-0.5">
             Approve only professionals whose relationship with your company can verify.

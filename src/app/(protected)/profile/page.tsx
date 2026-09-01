@@ -694,7 +694,7 @@ export default function ProfilePage() {
                   <Users className="w-4 h-4" />
                 </div>
                 <span className="text-sm font-bold text-gray-900 group-hover:text-[#1d4ed8] transition-colors">
-                  Affiliated professionals
+                  Verified professionals
                 </span>
               </div>
               <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-[#1d4ed8] group-hover:translate-x-0.5 transition-all" />
