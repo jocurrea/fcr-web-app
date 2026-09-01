@@ -29,14 +29,14 @@ export default function BusinessRequestsPage() {
             Pending requests
           </h1>
           <p className="text-xs sm:text-sm text-gray-500 font-medium mt-0.5">
-            Review and manage requests from aviation professionals seeking affiliation.
+            Approve only professionals whose relationship with your company can verify.
           </p>
         </div>
       </div>
 
       {/* Manager Card Container */}
       <div className="bg-white rounded-3xl p-6 sm:p-7 border border-gray-100 shadow-xs">
-        <AffiliationRequestsManager />
+        <AffiliationRequestsManager hideHeader={true} />
       </div>
     </div>
   );

@@ -10,6 +10,7 @@ import {
   AlertCircle,
   Clock,
   User,
+  UserCheck,
   ShieldCheck,
   CheckCircle2,
   XCircle,
@@ -47,11 +48,13 @@ export interface AffiliationRequest {
 interface AffiliationRequestsManagerProps {
   className?: string;
   onCountChange?: (count: number) => void;
+  hideHeader?: boolean;
 }
 
 export function AffiliationRequestsManager({
   className = "",
   onCountChange,
+  hideHeader = false,
 }: AffiliationRequestsManagerProps) {
   const [requests, setRequests] = useState<AffiliationRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -249,39 +252,41 @@ export function AffiliationRequestsManager({
   return (
     <div className={cn("space-y-5", className)}>
       {/* Header Bar with Count and Refresh */}
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex items-center gap-2.5">
-          <div className="w-10 h-10 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shadow-2xs">
-            <Building2 className="w-5 h-5" />
+      {!hideHeader && (
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-2.5">
+            <div className="w-10 h-10 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shadow-2xs">
+              <Building2 className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="text-lg sm:text-xl font-extrabold text-gray-900 leading-tight">
+                Affiliation Requests
+              </h2>
+              <p className="text-xs text-gray-500 font-medium">
+                Review professionals requesting to link their profile with your business.
+              </p>
+            </div>
           </div>
-          <div>
-            <h2 className="text-lg sm:text-xl font-extrabold text-gray-900 leading-tight">
-              Affiliation Requests
-            </h2>
-            <p className="text-xs text-gray-500 font-medium">
-              Review professionals requesting to link their profile with your business.
-            </p>
+
+          <div className="flex items-center gap-2">
+            {requests.length > 0 && (
+              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-200/80">
+                {requests.length} Pending
+              </span>
+            )}
+
+            <button
+              type="button"
+              onClick={() => fetchRequests()}
+              disabled={isLoading}
+              className="w-9 h-9 rounded-xl bg-white hover:bg-gray-50 border border-gray-200 text-gray-600 hover:text-blue-600 flex items-center justify-center transition-colors shadow-2xs cursor-pointer disabled:opacity-50"
+              title="Refresh requests"
+            >
+              <RefreshCw className={cn("w-4 h-4", isLoading && "animate-spin text-blue-600")} />
+            </button>
           </div>
         </div>
-
-        <div className="flex items-center gap-2">
-          {requests.length > 0 && (
-            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-200/80">
-              {requests.length} Pending
-            </span>
-          )}
-
-          <button
-            type="button"
-            onClick={() => fetchRequests()}
-            disabled={isLoading}
-            className="w-9 h-9 rounded-xl bg-white hover:bg-gray-50 border border-gray-200 text-gray-600 hover:text-blue-600 flex items-center justify-center transition-colors shadow-2xs cursor-pointer disabled:opacity-50"
-            title="Refresh requests"
-          >
-            <RefreshCw className={cn("w-4 h-4", isLoading && "animate-spin text-blue-600")} />
-          </button>
-        </div>
-      </div>
+      )}
 
       {/* Feedback Banner */}
       {feedback && (
@@ -346,7 +351,7 @@ export function AffiliationRequestsManager({
       {!isLoading && !error && requests.length === 0 && (
         <div className="bg-white rounded-3xl p-8 sm:p-10 border border-gray-100 shadow-xs flex flex-col items-center justify-center text-center gap-3">
           <div className="w-16 h-16 rounded-full bg-blue-50 border border-blue-100/80 flex items-center justify-center text-[#1d4ed8] shadow-2xs mb-1">
-            <Building2 className="w-8 h-8 text-[#1d4ed8]" />
+            <UserCheck className="w-8 h-8 text-[#1d4ed8]" />
           </div>
           <div className="space-y-1 max-w-sm">
             <h3 className="text-base sm:text-lg font-bold text-gray-900">

@@ -181,13 +181,6 @@ export default function AffiliatedProfessionalsPage() {
               Approved requests and accepted company invitations will appear here.
             </p>
           </div>
-          <Link
-            href="/business/invitations"
-            className="mt-3 inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#1d4ed8] text-white text-xs font-bold hover:bg-[#1e40af] transition-all shadow-xs"
-          >
-            <Mail className="w-3.5 h-3.5" />
-            <span>Invite professionals</span>
-          </Link>
         </div>
       ) : (
         /* Populated List */

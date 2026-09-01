@@ -8,6 +8,7 @@ import {
   Mail,
   Send,
   Clock,
+  Lock,
   ShieldCheck,
   CheckCircle2,
   AlertCircle,
@@ -223,7 +224,7 @@ export default function BusinessInvitationsPage() {
             Invite professionals
           </h2>
           <p className="text-xs sm:text-sm text-gray-500 mt-1 leading-relaxed">
-            Send an official company invitation to link aviation crew members and specialists.
+            Invite a Pilot, Crew member, or Aviation Professional. Accepted invitations are verified automatically.
           </p>
         </div>
 
@@ -277,7 +278,7 @@ export default function BusinessInvitationsPage() {
         <form onSubmit={handleSendInvitation} className="flex flex-col gap-4">
           <div>
             <label className="block text-xs font-bold text-gray-700 mb-1.5 ml-1">
-              Professional email address
+              Email address
             </label>
             <div className="relative">
               <Mail className="w-4 h-4 text-gray-400 absolute left-4 top-1/2 -translate-y-1/2" />
@@ -295,12 +296,12 @@ export default function BusinessInvitationsPage() {
           {/* Info Badges */}
           <div className="flex items-center gap-2.5 flex-wrap">
             <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-blue-50 text-[#1d4ed8] text-[11px] font-semibold border border-blue-100/80">
-              <Clock className="w-3 h-3" />
-              Invitations expire in 7 days
+              <Lock className="w-3 h-3" />
+              Email must match
             </span>
-            <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-[11px] font-semibold border border-emerald-100/80">
-              <ShieldCheck className="w-3 h-3 text-emerald-600" />
-              Official verified link
+            <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-blue-50 text-[#1d4ed8] text-[11px] font-semibold border border-blue-100/80">
+              <Clock className="w-3 h-3" />
+              Expires in 7 days
             </span>
           </div>
 
