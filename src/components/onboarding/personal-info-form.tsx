@@ -409,14 +409,14 @@ export function PersonalInfoForm({ onNext }: PersonalInfoFormProps) {
           <div className="space-y-3 pt-2">
             <Label className="font-semibold text-gray-900">Profile Photo</Label>
             
-            {/* Hidden Inputs for Gallery and Camera */}
+            {/* Permanently Rendered Inputs for Gallery and Camera */}
             <input 
               id="flightcrew-gallery-input"
               type="file" 
               accept="image/*" 
               ref={galleryInputRef} 
               onChange={handlePhotoUpload} 
-              style={{ display: "none" }}
+              className="sr-only"
             />
             <input 
               id="flightcrew-camera-input"
@@ -425,41 +425,40 @@ export function PersonalInfoForm({ onNext }: PersonalInfoFormProps) {
               capture="user"
               ref={cameraInputRef} 
               onChange={handlePhotoUpload} 
-              style={{ display: "none" }}
+              className="sr-only"
             />
 
             <div className="flex flex-col items-center justify-center p-4 border border-gray-100 rounded-3xl bg-gray-50/50">
               {/* Circular Avatar */}
-              <div 
-                onClick={() => galleryInputRef.current?.click()}
+              <label 
+                htmlFor="flightcrew-gallery-input"
                 className="w-28 h-28 rounded-full bg-[#1e293b] flex items-center justify-center relative overflow-hidden shadow-sm transition-all cursor-pointer hover:opacity-90 border-2 border-transparent hover:border-[#1d4ed8]"
+                title="Click to upload photo"
               >
                 {photoPreview ? (
                   <img src={photoPreview} alt="Profile preview" className="w-full h-full object-cover" />
                 ) : (
                   <User className="w-12 h-12 text-white stroke-[1.5]" />
                 )}
-              </div>
+              </label>
 
-              {/* Camera & Gallery Buttons */}
+              {/* Camera & Gallery Buttons as native Labels */}
               <div className="flex items-center gap-3 mt-4 w-full max-w-xs justify-center">
-                <button
-                  type="button"
-                  onClick={() => cameraInputRef.current?.click()}
-                  className="flex-1 py-2.5 px-4 rounded-full border border-[#1d4ed8] text-[#1d4ed8] bg-transparent hover:bg-blue-50/60 font-semibold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer shadow-2xs active:scale-[0.98]"
+                <label
+                  htmlFor="flightcrew-camera-input"
+                  className="flex-1 py-2.5 px-4 rounded-full border border-[#1d4ed8] text-[#1d4ed8] bg-transparent hover:bg-blue-50/60 font-semibold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer shadow-2xs active:scale-[0.98] select-none text-center"
                 >
-                  <Camera className="w-4 h-4" />
+                  <Camera className="w-4 h-4 shrink-0" />
                   <span>Camera</span>
-                </button>
+                </label>
 
-                <button
-                  type="button"
-                  onClick={() => galleryInputRef.current?.click()}
-                  className="flex-1 py-2.5 px-4 rounded-full border border-[#1d4ed8] text-[#1d4ed8] bg-transparent hover:bg-blue-50/60 font-semibold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer shadow-2xs active:scale-[0.98]"
+                <label
+                  htmlFor="flightcrew-gallery-input"
+                  className="flex-1 py-2.5 px-4 rounded-full border border-[#1d4ed8] text-[#1d4ed8] bg-transparent hover:bg-blue-50/60 font-semibold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer shadow-2xs active:scale-[0.98] select-none text-center"
                 >
-                  <ImageIcon className="w-4 h-4" />
+                  <ImageIcon className="w-4 h-4 shrink-0" />
                   <span>Gallery</span>
-                </button>
+                </label>
               </div>
 
               <p className="text-xs text-gray-400 mt-2.5 text-center">

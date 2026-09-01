@@ -260,17 +260,17 @@ export function PersonalIdentificationStep({ onNext, onBack }: PersonalIdentific
           
           {/* Avatar Section & Action Buttons (Camera / Gallery) */}
           <div className="flex flex-col items-center justify-center py-2">
-            {/* Hidden File Input for Gallery */}
+            {/* Permanently Rendered File Input for Gallery */}
             <input
               id="personal-gallery-input"
               type="file"
               ref={galleryInputRef}
               onChange={handlePhotoSelect}
               accept="image/*"
-              style={{ display: "none" }}
+              className="sr-only"
             />
 
-            {/* Hidden File Input for Camera with capture attribute */}
+            {/* Permanently Rendered File Input for Camera with capture */}
             <input
               id="personal-camera-input"
               type="file"
@@ -278,19 +278,20 @@ export function PersonalIdentificationStep({ onNext, onBack }: PersonalIdentific
               onChange={handlePhotoSelect}
               accept="image/*"
               capture="user"
-              style={{ display: "none" }}
+              className="sr-only"
             />
 
-            {/* Solid Dark Gray Avatar Circle - Clickable */}
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => galleryInputRef.current?.click()}
+            {/* Solid Dark Gray Avatar Circle - Clickable via Label */}
+            <label
+              htmlFor="personal-gallery-input"
+              className="relative cursor-pointer group"
+              title="Click to upload photo"
+            >
+              <div
                 className={cn(
-                  "w-28 h-28 sm:w-32 sm:h-32 rounded-full bg-[#1e293b] flex items-center justify-center relative overflow-hidden shadow-sm transition-all cursor-pointer hover:opacity-90",
+                  "w-28 h-28 sm:w-32 sm:h-32 rounded-full bg-[#1e293b] flex items-center justify-center relative overflow-hidden shadow-sm transition-all group-hover:opacity-90",
                   photoPreview ? "border-2 border-[#1d4ed8]" : ""
                 )}
-                title="Click to upload photo"
               >
                 {photoPreview ? (
                   <img
@@ -308,30 +309,28 @@ export function PersonalIdentificationStep({ onNext, onBack }: PersonalIdentific
                     <Loader2 className="w-6 h-6 animate-spin" />
                   </div>
                 )}
-              </button>
-            </div>
+              </div>
+            </label>
 
-            {/* Two Outline Buttons: Camera & Gallery */}
+            {/* Two Outline Buttons: Camera & Gallery as native Labels */}
             <div className="flex items-center gap-3 mt-4 w-full max-w-xs justify-center">
               {/* Button 1: Camera */}
-              <button
-                type="button"
-                onClick={handleCameraClick}
-                className="flex-1 py-2.5 px-4 rounded-full border border-[#1d4ed8] text-[#1d4ed8] bg-transparent hover:bg-blue-50/60 font-semibold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer shadow-2xs active:scale-[0.98]"
+              <label
+                htmlFor="personal-camera-input"
+                className="flex-1 py-2.5 px-4 rounded-full border border-[#1d4ed8] text-[#1d4ed8] bg-transparent hover:bg-blue-50/60 font-semibold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer shadow-2xs active:scale-[0.98] select-none text-center"
               >
-                <Camera className="w-4 h-4" />
+                <Camera className="w-4 h-4 shrink-0" />
                 <span>Camera</span>
-              </button>
+              </label>
 
               {/* Button 2: Gallery */}
-              <button
-                type="button"
-                onClick={handleGalleryClick}
-                className="flex-1 py-2.5 px-4 rounded-full border border-[#1d4ed8] text-[#1d4ed8] bg-transparent hover:bg-blue-50/60 font-semibold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer shadow-2xs active:scale-[0.98]"
+              <label
+                htmlFor="personal-gallery-input"
+                className="flex-1 py-2.5 px-4 rounded-full border border-[#1d4ed8] text-[#1d4ed8] bg-transparent hover:bg-blue-50/60 font-semibold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer shadow-2xs active:scale-[0.98] select-none text-center"
               >
-                <ImageIcon className="w-4 h-4" />
+                <ImageIcon className="w-4 h-4 shrink-0" />
                 <span>Gallery</span>
-              </button>
+              </label>
             </div>
 
             {/* Note text below buttons */}
