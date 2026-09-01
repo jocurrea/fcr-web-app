@@ -250,31 +250,19 @@ export function PersonalIdentificationStep({ onNext, onBack }: PersonalIdentific
           
           {/* Avatar Section & Action Buttons (Camera / Gallery) */}
           <div className="flex flex-col items-center justify-center py-2">
-            {/* Hidden File Input for Gallery */}
-            <input
-              id="gallery-input"
-              type="file"
-              onChange={handlePhotoSelect}
-              accept="image/*"
-              className="hidden"
-            />
 
-            {/* Hidden File Input for Camera with capture attribute */}
-            <input
-              id="camera-input"
-              type="file"
-              onChange={handlePhotoSelect}
-              accept="image/*"
-              capture="user"
-              className="hidden"
-            />
-
-            {/* Solid Dark Gray Avatar Circle - Clickable via Label */}
+            {/* Solid Dark Gray Avatar Circle — input INSIDE label for direct click */}
             <label
-              htmlFor="gallery-input"
               className="relative cursor-pointer group"
               title="Click to upload photo"
             >
+              {/* Invisible file input covering the entire avatar area */}
+              <input
+                type="file"
+                onChange={handlePhotoSelect}
+                accept="image/*"
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+              />
               <div
                 className={cn(
                   "w-28 h-28 sm:w-32 sm:h-32 rounded-full bg-[#1e293b] flex items-center justify-center relative overflow-hidden shadow-sm transition-all group-hover:opacity-90",
@@ -293,29 +281,40 @@ export function PersonalIdentificationStep({ onNext, onBack }: PersonalIdentific
 
                 {/* Uploading spinner overlay */}
                 {isUploading && (
-                  <div className="absolute inset-0 bg-black/60 flex items-center justify-center text-white">
+                  <div className="absolute inset-0 bg-black/60 flex items-center justify-center text-white z-20">
                     <Loader2 className="w-6 h-6 animate-spin" />
                   </div>
                 )}
               </div>
             </label>
 
-            {/* Two Outline Buttons: Camera & Gallery as native Labels */}
+            {/* Two Outline Buttons: Camera & Gallery — each with inline invisible input */}
             <div className="flex items-center gap-3 mt-4 w-full max-w-xs justify-center">
               {/* Button 1: Camera */}
               <label
-                htmlFor="camera-input"
-                className="flex-1 py-2.5 px-4 rounded-full border border-[#1d4ed8] text-[#1d4ed8] bg-transparent hover:bg-blue-50/60 font-semibold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer shadow-2xs active:scale-[0.98] select-none text-center"
+                className="relative flex-1 py-2.5 px-4 rounded-full border border-[#1d4ed8] text-[#1d4ed8] bg-transparent hover:bg-blue-50/60 font-semibold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer shadow-2xs active:scale-[0.98] select-none text-center overflow-hidden"
               >
+                <input
+                  type="file"
+                  onChange={handlePhotoSelect}
+                  accept="image/*"
+                  capture="user"
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                />
                 <Camera className="w-4 h-4 shrink-0" />
                 <span>Camera</span>
               </label>
 
               {/* Button 2: Gallery */}
               <label
-                htmlFor="gallery-input"
-                className="flex-1 py-2.5 px-4 rounded-full border border-[#1d4ed8] text-[#1d4ed8] bg-transparent hover:bg-blue-50/60 font-semibold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer shadow-2xs active:scale-[0.98] select-none text-center"
+                className="relative flex-1 py-2.5 px-4 rounded-full border border-[#1d4ed8] text-[#1d4ed8] bg-transparent hover:bg-blue-50/60 font-semibold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer shadow-2xs active:scale-[0.98] select-none text-center overflow-hidden"
               >
+                <input
+                  type="file"
+                  onChange={handlePhotoSelect}
+                  accept="image/*"
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                />
                 <ImageIcon className="w-4 h-4 shrink-0" />
                 <span>Gallery</span>
               </label>

@@ -408,33 +408,19 @@ export function PersonalInfoForm({ onNext }: PersonalInfoFormProps) {
 
           <div className="space-y-3 pt-2">
             <Label className="font-semibold text-gray-900">Profile Photo</Label>
-            
-            {/* Permanently Rendered Inputs for Gallery and Camera */}
-            <input 
-              id="flightcrew-gallery-input"
-              type="file" 
-              accept="image/*" 
-              ref={galleryInputRef} 
-              onChange={handlePhotoUpload} 
-              className="sr-only"
-            />
-            <input 
-              id="flightcrew-camera-input"
-              type="file" 
-              accept="image/*" 
-              capture="user"
-              ref={cameraInputRef} 
-              onChange={handlePhotoUpload} 
-              className="sr-only"
-            />
 
             <div className="flex flex-col items-center justify-center p-4 border border-gray-100 rounded-3xl bg-gray-50/50">
-              {/* Circular Avatar */}
+              {/* Circular Avatar — input INSIDE label for direct click */}
               <label 
-                htmlFor="flightcrew-gallery-input"
                 className="w-28 h-28 rounded-full bg-[#1e293b] flex items-center justify-center relative overflow-hidden shadow-sm transition-all cursor-pointer hover:opacity-90 border-2 border-transparent hover:border-[#1d4ed8]"
                 title="Click to upload photo"
               >
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handlePhotoUpload}
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                />
                 {photoPreview ? (
                   <img src={photoPreview} alt="Profile preview" className="w-full h-full object-cover" />
                 ) : (
@@ -442,20 +428,31 @@ export function PersonalInfoForm({ onNext }: PersonalInfoFormProps) {
                 )}
               </label>
 
-              {/* Camera & Gallery Buttons as native Labels */}
+              {/* Camera & Gallery Buttons — each with inline invisible input */}
               <div className="flex items-center gap-3 mt-4 w-full max-w-xs justify-center">
                 <label
-                  htmlFor="flightcrew-camera-input"
-                  className="flex-1 py-2.5 px-4 rounded-full border border-[#1d4ed8] text-[#1d4ed8] bg-transparent hover:bg-blue-50/60 font-semibold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer shadow-2xs active:scale-[0.98] select-none text-center"
+                  className="relative flex-1 py-2.5 px-4 rounded-full border border-[#1d4ed8] text-[#1d4ed8] bg-transparent hover:bg-blue-50/60 font-semibold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer shadow-2xs active:scale-[0.98] select-none text-center overflow-hidden"
                 >
+                  <input
+                    type="file"
+                    accept="image/*"
+                    capture="user"
+                    onChange={handlePhotoUpload}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                  />
                   <Camera className="w-4 h-4 shrink-0" />
                   <span>Camera</span>
                 </label>
 
                 <label
-                  htmlFor="flightcrew-gallery-input"
-                  className="flex-1 py-2.5 px-4 rounded-full border border-[#1d4ed8] text-[#1d4ed8] bg-transparent hover:bg-blue-50/60 font-semibold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer shadow-2xs active:scale-[0.98] select-none text-center"
+                  className="relative flex-1 py-2.5 px-4 rounded-full border border-[#1d4ed8] text-[#1d4ed8] bg-transparent hover:bg-blue-50/60 font-semibold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer shadow-2xs active:scale-[0.98] select-none text-center overflow-hidden"
                 >
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handlePhotoUpload}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                  />
                   <ImageIcon className="w-4 h-4 shrink-0" />
                   <span>Gallery</span>
                 </label>
