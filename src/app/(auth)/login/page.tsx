@@ -38,7 +38,26 @@ export default function LoginPage() {
           .eq('id', data.session.user.id)
           .single();
 
-        if (userRecord?.onboarded) {
+        // Check if business user already completed onboarding via companies table
+        // (onboarded flag in users table may not be set correctly for business accounts)
+        let isBusinessOnboarded = false;
+        if (userRecord?.accountType === "business") {
+          const { data: companies } = await supabase
+            .from("companies")
+            .select("status")
+            .eq("owner_user_id", data.session.user.id)
+            .order("created_at", { ascending: false })
+            .limit(1);
+
+          if (companies && companies.length > 0) {
+            const status = companies[0].status;
+            if (status === "approved" || status === "active" || status === "pending") {
+              isBusinessOnboarded = true;
+            }
+          }
+        }
+
+        if (userRecord?.onboarded || isBusinessOnboarded) {
           router.push("/home");
         } else if (userRecord?.accountType === "business") {
           router.push("/onboarding-business");

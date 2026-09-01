@@ -596,6 +596,13 @@ export default function ProfilePage() {
                 )}
               </div>
               <span className="text-xs text-gray-500 mt-1 font-medium">Corporate associate account</span>
+              <Link
+                href="/onboarding-business?edit=company&from=profile"
+                className="mt-2 inline-flex items-center gap-1.5 text-[#1d4ed8] text-xs font-bold hover:underline cursor-pointer"
+              >
+                <Pencil className="w-3.5 h-3.5" />
+                <span>Edit Company Profile</span>
+              </Link>
             </div>
           </div>
         </div>
@@ -631,7 +638,16 @@ export default function ProfilePage() {
 
         {/* Company Details */}
         <div className="bg-white rounded-3xl p-6 flex flex-col shadow-xs border border-gray-100 gap-4">
-          <h2 className="font-extrabold text-base text-gray-900">Company details</h2>
+          <div className="flex items-center justify-between">
+            <h2 className="font-extrabold text-base text-gray-900">Company details</h2>
+            <Link
+              href="/onboarding-business?edit=company&from=profile"
+              className="text-[#1d4ed8] hover:text-[#1e40af] transition-colors"
+              title="Edit company details"
+            >
+              <Pencil className="w-4 h-4" />
+            </Link>
+          </div>
           <div className="space-y-3.5">
             {companyInfo?.location && (
               <div className="flex items-start gap-3">
@@ -648,6 +664,42 @@ export default function ProfilePage() {
                 <div>
                   <p className="text-xs text-gray-400 font-medium">Email</p>
                   <p className="text-sm font-semibold text-gray-900">{companyInfo.email}</p>
+                </div>
+              </div>
+            )}
+            {companyInfo?.phone && (
+              <div className="flex items-start gap-3">
+                <Phone className="w-4 h-4 text-gray-400 shrink-0 mt-1" />
+                <div>
+                  <p className="text-xs text-gray-400 font-medium">Phone</p>
+                  <p className="text-sm font-semibold text-gray-900">{companyInfo.phone}</p>
+                </div>
+              </div>
+            )}
+            {companyInfo?.website && (
+              <div className="flex items-start gap-3">
+                <Globe className="w-4 h-4 text-gray-400 shrink-0 mt-1" />
+                <div>
+                  <p className="text-xs text-gray-400 font-medium">Website</p>
+                  <p className="text-sm font-semibold text-gray-900">{companyInfo.website}</p>
+                </div>
+              </div>
+            )}
+            {companyInfo?.foundedYear && (
+              <div className="flex items-start gap-3">
+                <Calendar className="w-4 h-4 text-gray-400 shrink-0 mt-1" />
+                <div>
+                  <p className="text-xs text-gray-400 font-medium">Founded</p>
+                  <p className="text-sm font-semibold text-gray-900">{companyInfo.foundedYear}</p>
+                </div>
+              </div>
+            )}
+            {companyInfo?.description && (
+              <div className="flex items-start gap-3">
+                <FileText className="w-4 h-4 text-gray-400 shrink-0 mt-1" />
+                <div>
+                  <p className="text-xs text-gray-400 font-medium">Description</p>
+                  <p className="text-sm text-gray-700 leading-relaxed">{companyInfo.description}</p>
                 </div>
               </div>
             )}
