@@ -165,6 +165,18 @@ export default function ProfilePage() {
 
   // 3. All useEffect Hooks at the top of the component (Strictly before any early returns)
   useEffect(() => {
+    // Force the page to always start from the top when mounting
+    window.scrollTo(0, 0);
+  }, []);
+
+  useEffect(() => {
+    // Ensure clean top position when loading transition finishes
+    if (!loading) {
+      window.scrollTo(0, 0);
+    }
+  }, [loading]);
+
+  useEffect(() => {
     if (typeof window !== "undefined") {
       window.dispatchEvent(
         new CustomEvent("profile-progress-updated", { detail: completionPercentage })
