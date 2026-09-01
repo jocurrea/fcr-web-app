@@ -12,6 +12,7 @@ import {
   Search,
   Check,
   Calendar,
+  AlertCircle,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
@@ -69,46 +70,88 @@ function CountryFlagIcon({ code, className = "" }: { code: string; className?: s
 }
 
 const COUNTRIES_WITH_FLAGS: CountryOption[] = [
-  { code: "US", name: "United States" },
-  { code: "GB", name: "United Kingdom" },
-  { code: "CA", name: "Canada" },
+  { code: "AR", name: "Argentina" },
   { code: "AU", name: "Australia" },
-  { code: "ES", name: "Spain" },
+  { code: "AT", name: "Austria" },
+  { code: "BH", name: "Bahrain" },
+  { code: "BD", name: "Bangladesh" },
+  { code: "BE", name: "Belgium" },
+  { code: "BO", name: "Bolivia" },
+  { code: "BR", name: "Brazil" },
+  { code: "CA", name: "Canada" },
+  { code: "CL", name: "Chile" },
+  { code: "CN", name: "China" },
+  { code: "CO", name: "Colombia" },
+  { code: "CR", name: "Costa Rica" },
+  { code: "HR", name: "Croatia" },
+  { code: "CU", name: "Cuba" },
+  { code: "CY", name: "Cyprus" },
+  { code: "CZ", name: "Czech Republic" },
+  { code: "DK", name: "Denmark" },
+  { code: "DO", name: "Dominican Republic" },
+  { code: "EC", name: "Ecuador" },
+  { code: "EG", name: "Egypt" },
+  { code: "SV", name: "El Salvador" },
+  { code: "FI", name: "Finland" },
   { code: "FR", name: "France" },
   { code: "DE", name: "Germany" },
-  { code: "AE", name: "United Arab Emirates" },
-  { code: "QA", name: "Qatar" },
-  { code: "SG", name: "Singapore" },
-  { code: "BR", name: "Brazil" },
-  { code: "CO", name: "Colombia" },
-  { code: "MX", name: "Mexico" },
-  { code: "AR", name: "Argentina" },
-  { code: "CL", name: "Chile" },
-  { code: "PA", name: "Panama" },
-  { code: "SA", name: "Saudi Arabia" },
-  { code: "JP", name: "Japan" },
-  { code: "KR", name: "South Korea" },
-  { code: "NL", name: "Netherlands" },
-  { code: "CH", name: "Switzerland" },
-  { code: "IT", name: "Italy" },
-  { code: "PT", name: "Portugal" },
-  { code: "IN", name: "India" },
-  { code: "ZA", name: "South Africa" },
-  { code: "NZ", name: "New Zealand" },
-  { code: "IE", name: "Ireland" },
-  { code: "BE", name: "Belgium" },
-  { code: "AT", name: "Austria" },
-  { code: "SE", name: "Sweden" },
-  { code: "NO", name: "Norway" },
-  { code: "DK", name: "Denmark" },
-  { code: "FI", name: "Finland" },
-  { code: "TR", name: "Turkey" },
   { code: "GR", name: "Greece" },
-  { code: "PL", name: "Poland" },
+  { code: "GT", name: "Guatemala" },
+  { code: "HN", name: "Honduras" },
+  { code: "HK", name: "Hong Kong" },
+  { code: "HU", name: "Hungary" },
+  { code: "IS", name: "Iceland" },
+  { code: "IN", name: "India" },
+  { code: "ID", name: "Indonesia" },
+  { code: "IE", name: "Ireland" },
+  { code: "IL", name: "Israel" },
+  { code: "IT", name: "Italy" },
+  { code: "JM", name: "Jamaica" },
+  { code: "JP", name: "Japan" },
+  { code: "JO", name: "Jordan" },
+  { code: "KE", name: "Kenya" },
+  { code: "KW", name: "Kuwait" },
+  { code: "LB", name: "Lebanon" },
+  { code: "MY", name: "Malaysia" },
+  { code: "MT", name: "Malta" },
+  { code: "MX", name: "Mexico" },
+  { code: "MA", name: "Morocco" },
+  { code: "NP", name: "Nepal" },
+  { code: "NL", name: "Netherlands" },
+  { code: "NZ", name: "New Zealand" },
+  { code: "NI", name: "Nicaragua" },
+  { code: "NG", name: "Nigeria" },
+  { code: "NO", name: "Norway" },
+  { code: "OM", name: "Oman" },
+  { code: "PK", name: "Pakistan" },
+  { code: "PA", name: "Panama" },
+  { code: "PY", name: "Paraguay" },
   { code: "PE", name: "Peru" },
-  { code: "EC", name: "Ecuador" },
-  { code: "CR", name: "Costa Rica" },
-  { code: "DO", name: "Dominican Republic" },
+  { code: "PH", name: "Philippines" },
+  { code: "PL", name: "Poland" },
+  { code: "PT", name: "Portugal" },
+  { code: "PR", name: "Puerto Rico" },
+  { code: "QA", name: "Qatar" },
+  { code: "RO", name: "Romania" },
+  { code: "RU", name: "Russia" },
+  { code: "SA", name: "Saudi Arabia" },
+  { code: "SG", name: "Singapore" },
+  { code: "ZA", name: "South Africa" },
+  { code: "KR", name: "South Korea" },
+  { code: "ES", name: "Spain" },
+  { code: "LK", name: "Sri Lanka" },
+  { code: "SE", name: "Sweden" },
+  { code: "CH", name: "Switzerland" },
+  { code: "TH", name: "Thailand" },
+  { code: "TT", name: "Trinidad and Tobago" },
+  { code: "TR", name: "Turkey" },
+  { code: "UA", name: "Ukraine" },
+  { code: "AE", name: "United Arab Emirates" },
+  { code: "GB", name: "United Kingdom" },
+  { code: "US", name: "United States" },
+  { code: "UY", name: "Uruguay" },
+  { code: "VE", name: "Venezuela" },
+  { code: "VN", name: "Vietnam" },
   { code: "OTHER", name: "Other Country" },
 ];
 
@@ -444,7 +487,9 @@ export function ComplementaryInfoStep({ onNext, onBack, onSkip }: ComplementaryI
   const [expStartDate, setExpStartDate] = useState("");
   const [expEndDate, setExpEndDate] = useState("");
   const [expCurrentlyWorking, setExpCurrentlyWorking] = useState(false);
+  const [expModalError, setExpModalError] = useState<string | null>(null);
 
+  const [formError, setFormError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
   const countryDropdownRef = useRef<HTMLDivElement>(null);
@@ -506,6 +551,7 @@ export function ComplementaryInfoStep({ onNext, onBack, onSkip }: ComplementaryI
     setSelectedCountry(country);
     setIsCountryDropdownOpen(false);
     setCountrySearch("");
+    setFormError(null);
   };
 
   const handleToggleLanguage = (lang: string) => {
@@ -529,6 +575,7 @@ export function ComplementaryInfoStep({ onNext, onBack, onSkip }: ComplementaryI
     setExpStartDate("");
     setExpEndDate("");
     setExpCurrentlyWorking(false);
+    setExpModalError(null);
     setIsExperienceModalOpen(true);
   };
 
@@ -539,19 +586,66 @@ export function ComplementaryInfoStep({ onNext, onBack, onSkip }: ComplementaryI
     setExpStartDate("");
     setExpEndDate("");
     setExpCurrentlyWorking(false);
+    setExpModalError(null);
   };
 
   const handleSaveExperience = () => {
-    if (!expCompanyName.trim() && !expRole.trim()) {
-      handleCloseExperienceModal();
+    setExpModalError(null);
+
+    const comp = expCompanyName.trim();
+    const role = expRole.trim();
+    const start = expStartDate.trim();
+    const end = expCurrentlyWorking ? "Present" : expEndDate.trim();
+
+    if (!comp) {
+      setExpModalError("Company name is required.");
       return;
     }
+    if (!role) {
+      setExpModalError("Role title is required.");
+      return;
+    }
+    if (!start) {
+      setExpModalError("Start date is required.");
+      return;
+    }
+
+    const startDateObj = new Date(start);
+    if (isNaN(startDateObj.getTime())) {
+      setExpModalError("Please enter a valid start date.");
+      return;
+    }
+
+    const today = new Date();
+    today.setHours(23, 59, 59, 999);
+
+    if (startDateObj > today) {
+      setExpModalError("Start date cannot be in the future.");
+      return;
+    }
+
+    if (!expCurrentlyWorking) {
+      if (!end) {
+        setExpModalError("End date is required when not currently working here.");
+        return;
+      }
+      const endDateObj = new Date(end);
+      if (isNaN(endDateObj.getTime())) {
+        setExpModalError("Please enter a valid end date.");
+        return;
+      }
+      if (endDateObj < startDateObj) {
+        setExpModalError("End date cannot be earlier than start date.");
+        return;
+      }
+    }
+
     const item: WorkExperienceItem = {
       id: `exp-${Date.now()}`,
-      companyName: expCompanyName.trim(),
-      roleTitle: expRole.trim(),
-      startDate: expStartDate.trim(),
-      endDate: expCurrentlyWorking ? "Present" : (expEndDate.trim() || "Present"),
+      companyName: comp,
+      roleTitle: role,
+      startDate: start,
+      endDate: end || "Present",
     };
     setWorkExperiences(prev => [...prev, item]);
     handleCloseExperienceModal();
@@ -562,7 +656,19 @@ export function ComplementaryInfoStep({ onNext, onBack, onSkip }: ComplementaryI
   };
 
   const handleSaveAndProceed = async (skip = false) => {
+    setFormError(null);
     if (isSaving) return;
+
+    if (!skip) {
+      if (city.trim() && !selectedCountry) {
+        setFormError("Please select a country for your city location.");
+        return;
+      }
+      if (!city.trim() && selectedCountry) {
+        setFormError("Please enter a city for your selected country.");
+        return;
+      }
+    }
 
     setIsSaving(true);
     try {
@@ -892,6 +998,23 @@ export function ComplementaryInfoStep({ onNext, onBack, onSkip }: ComplementaryI
 
         </div>
 
+        {/* Form Error Banner */}
+        {formError && (
+          <div className="p-3.5 rounded-2xl bg-red-50 border border-red-200 text-red-700 text-xs font-medium flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
+              <span>{formError}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setFormError(null)}
+              className="text-red-400 hover:text-red-600 p-1 cursor-pointer"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
+
         {/* 4. Bottom Buttons: Skip (outline) & Continue (solid blue) */}
         <div className="pb-8 pt-6 flex items-center gap-3.5">
           <button
@@ -1019,6 +1142,14 @@ export function ComplementaryInfoStep({ onNext, onBack, onSkip }: ComplementaryI
                 <X className="w-5 h-5" />
               </button>
             </div>
+
+            {/* Modal Error Banner */}
+            {expModalError && (
+              <div className="p-3.5 rounded-2xl bg-red-50 border border-red-200 text-red-700 text-xs font-medium flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
+                <span>{expModalError}</span>
+              </div>
+            )}
 
             {/* Field: Company name */}
             <div className="space-y-1.5">

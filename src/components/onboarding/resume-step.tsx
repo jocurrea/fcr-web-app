@@ -188,6 +188,7 @@ export function ResumeStep({ onNext, isSaving }: ResumeStepProps) {
   const [isAddingPlane, setIsAddingPlane] = useState(false);
   const [expStartDate, setExpStartDate] = useState("");
   const [expEndDate, setExpEndDate] = useState("");
+  const [expError, setExpError] = useState<string | null>(null);
   const [experiences, setExperiences] = useState<{
     company: string, country: string, city: string, title: string, role: string, planes: string[], startDate: string, endDate: string
   }[]>(() => {
@@ -1068,6 +1069,12 @@ export function ResumeStep({ onNext, isSaving }: ResumeStepProps) {
               />
             </div>
 
+            {expError && (
+              <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs font-medium">
+                {expError}
+              </div>
+            )}
+
           </div>
 
           <div className="flex gap-4 pt-4 shrink-0 border-t mt-4">
@@ -1076,6 +1083,7 @@ export function ResumeStep({ onNext, isSaving }: ResumeStepProps) {
               variant="outline" 
               className="flex-1 rounded-full py-6 text-blue-600 border-blue-600 hover:bg-blue-50 text-base"
               onClick={() => {
+                setExpError(null);
                 setIsExpModalOpen(false);
               }}
             >
@@ -1085,30 +1093,53 @@ export function ResumeStep({ onNext, isSaving }: ResumeStepProps) {
               type="button"
               className="flex-1 rounded-full py-6 bg-blue-600 hover:bg-blue-700 text-white text-base"
               onClick={() => {
-                if (expCompany && expTitle) {
-                  setExperiences([
-                    ...experiences, 
-                    { 
-                      company: expCompany, 
-                      country: expCountry, 
-                      city: expCity, 
-                      title: expTitle, 
-                      role: expRole, 
-                      planes: expPlanes, 
-                      startDate: expStartDate, 
-                      endDate: expEndDate 
-                    }
-                  ]);
-                  setExpCompany("");
-                  setExpCountry("");
-                  setExpCity("");
-                  setExpTitle("");
-                  setExpRole("");
-                  setExpPlanes([]);
-                  setExpStartDate("");
-                  setExpEndDate("");
-                  setIsExpModalOpen(false);
+                setExpError(null);
+                if (!expCompany.trim() || !expTitle.trim()) {
+                  setExpError("Company and Title are required.");
+                  return;
                 }
+
+                if (expStartDate) {
+                  const startObj = new Date(expStartDate);
+                  const today = new Date();
+                  today.setHours(23, 59, 59, 999);
+                  if (startObj > today) {
+                    setExpError("Start date cannot be in the future.");
+                    return;
+                  }
+                  if (expEndDate) {
+                    const endObj = new Date(expEndDate);
+                    if (endObj < startObj) {
+                      setExpError("End date cannot be earlier than start date.");
+                      return;
+                    }
+                  }
+                }
+
+                setExperiences([
+                  ...experiences, 
+                  { 
+                    company: expCompany, 
+                    country: expCountry, 
+                    city: expCity, 
+                    title: expTitle, 
+                    role: expRole, 
+                    planes: expPlanes, 
+                    startDate: expStartDate, 
+                    endDate: expEndDate 
+                  }
+                ]);
+                setExpCompany("");
+                setExpCountry("");
+                setExpCountry("");
+                setExpCity("");
+                setExpTitle("");
+                setExpRole("");
+                setExpPlanes([]);
+                setExpStartDate("");
+                setExpEndDate("");
+                setExpError(null);
+                setIsExpModalOpen(false);
               }}
             >
               Add

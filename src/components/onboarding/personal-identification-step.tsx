@@ -24,7 +24,8 @@ interface PersonalIdentificationStepProps {
 
 export function PersonalIdentificationStep({ onNext, onBack }: PersonalIdentificationStepProps) {
   const router = useRouter();
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
 
@@ -106,22 +107,30 @@ export function PersonalIdentificationStep({ onNext, onBack }: PersonalIdentific
     }
   };
 
-  // Gallery File Selection Handler
+  // Photo Selection Handler for both Gallery and Camera inputs
   const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     if (file.size > 5 * 1024 * 1024) {
       alert("Image is too large. Maximum allowed size is 5MB.");
+      if (e.target) e.target.value = "";
       return;
     }
 
     const localUrl = URL.createObjectURL(file);
+    if (e.target) e.target.value = "";
     await uploadImageBlobOrFile(file, localUrl);
   };
 
-  // Camera and Gallery Refs
-  const mobileCameraInputRef = useRef<HTMLInputElement>(null);
+  const handleCameraClick = () => {
+    const isMobile = typeof navigator !== "undefined" && /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    if (isMobile || !navigator?.mediaDevices?.getUserMedia) {
+      cameraInputRef.current?.click();
+    } else {
+      startWebcam();
+    }
+  };
 
   // Webcam Handlers
   const startWebcam = async () => {
@@ -130,8 +139,7 @@ export function PersonalIdentificationStep({ onNext, onBack }: PersonalIdentific
 
     // Check if mediaDevices API is available
     if (!navigator?.mediaDevices?.getUserMedia) {
-      // Fallback directly to native mobile camera input
-      mobileCameraInputRef.current?.click();
+      cameraInputRef.current?.click();
       setIsWebcamOpen(false);
       return;
     }
@@ -316,9 +324,19 @@ export function PersonalIdentificationStep({ onNext, onBack }: PersonalIdentific
             {/* Hidden File Input for Gallery */}
             <input
               type="file"
-              ref={fileInputRef}
+              ref={galleryInputRef}
               onChange={handlePhotoSelect}
               accept="image/*"
+              className="hidden"
+            />
+
+            {/* Hidden File Input for Camera with capture attribute */}
+            <input
+              type="file"
+              ref={cameraInputRef}
+              onChange={handlePhotoSelect}
+              accept="image/*"
+              capture="user"
               className="hidden"
             />
 
@@ -354,7 +372,7 @@ export function PersonalIdentificationStep({ onNext, onBack }: PersonalIdentific
               {/* Button 1: Camera */}
               <button
                 type="button"
-                onClick={startWebcam}
+                onClick={handleCameraClick}
                 className="flex-1 py-2.5 px-4 rounded-full border border-[#1d4ed8] text-[#1d4ed8] bg-transparent hover:bg-blue-50/60 font-semibold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer shadow-2xs active:scale-[0.98]"
               >
                 <Camera className="w-4 h-4" />
@@ -364,7 +382,7 @@ export function PersonalIdentificationStep({ onNext, onBack }: PersonalIdentific
               {/* Button 2: Gallery */}
               <button
                 type="button"
-                onClick={() => fileInputRef.current?.click()}
+                onClick={() => galleryInputRef.current?.click()}
                 className="flex-1 py-2.5 px-4 rounded-full border border-[#1d4ed8] text-[#1d4ed8] bg-transparent hover:bg-blue-50/60 font-semibold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer shadow-2xs active:scale-[0.98]"
               >
                 <ImageIcon className="w-4 h-4" />
@@ -489,7 +507,7 @@ export function PersonalIdentificationStep({ onNext, onBack }: PersonalIdentific
                   type="button"
                   onClick={() => {
                     stopWebcam();
-                    fileInputRef.current?.click();
+                    galleryInputRef.current?.click();
                   }}
                   className="w-full py-2.5 px-4 rounded-xl bg-white border border-red-200 text-[#1d4ed8] hover:bg-blue-50 font-bold text-xs transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-2xs"
                 >
