@@ -682,51 +682,36 @@ export default function ProfilePage() {
         </div>
 
         {/* 3. People & Affiliations Section */}
-        <div className="bg-white rounded-3xl p-6 flex flex-col shadow-xs border border-gray-100 gap-2">
+        <div className="bg-white rounded-3xl p-6 flex flex-col shadow-xs border border-gray-100">
           <h2 className="font-extrabold text-base text-gray-900 mb-1">People & affiliations</h2>
-          <div className="flex flex-col divide-y divide-gray-50">
+          <div className="flex flex-col divide-y divide-gray-100">
             <Link
               href="/business/professionals"
-              className="flex items-center justify-between py-3.5 px-2 hover:bg-gray-50 rounded-2xl transition-colors group cursor-pointer"
+              className="flex items-center justify-between py-4 px-1 hover:bg-gray-50/60 rounded-xl transition-colors group cursor-pointer"
             >
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-full bg-blue-50 flex items-center justify-center text-[#1d4ed8]">
-                  <Users className="w-4 h-4" />
-                </div>
-                <span className="text-sm font-bold text-gray-900 group-hover:text-[#1d4ed8] transition-colors">
-                  Affiliated professionals
-                </span>
-              </div>
+              <span className="text-sm font-bold text-gray-900 group-hover:text-[#1d4ed8] transition-colors">
+                Affiliated professionals
+              </span>
               <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-[#1d4ed8] group-hover:translate-x-0.5 transition-all" />
             </Link>
 
             <Link
               href="/business/requests"
-              className="flex items-center justify-between py-3.5 px-2 hover:bg-gray-50 rounded-2xl transition-colors group cursor-pointer"
+              className="flex items-center justify-between py-4 px-1 hover:bg-gray-50/60 rounded-xl transition-colors group cursor-pointer"
             >
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-full bg-blue-50 flex items-center justify-center text-[#1d4ed8]">
-                  <Building2 className="w-4 h-4" />
-                </div>
-                <span className="text-sm font-bold text-gray-900 group-hover:text-[#1d4ed8] transition-colors">
-                  Affiliation requests
-                </span>
-              </div>
+              <span className="text-sm font-bold text-gray-900 group-hover:text-[#1d4ed8] transition-colors">
+                Affiliation requests
+              </span>
               <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-[#1d4ed8] group-hover:translate-x-0.5 transition-all" />
             </Link>
 
             <Link
               href="/business/invitations"
-              className="flex items-center justify-between py-3.5 px-2 hover:bg-gray-50 rounded-2xl transition-colors group cursor-pointer"
+              className="flex items-center justify-between py-4 px-1 hover:bg-gray-50/60 rounded-xl transition-colors group cursor-pointer"
             >
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-full bg-blue-50 flex items-center justify-center text-[#1d4ed8]">
-                  <Mail className="w-4 h-4" />
-                </div>
-                <span className="text-sm font-bold text-gray-900 group-hover:text-[#1d4ed8] transition-colors">
-                  Company invitations
-                </span>
-              </div>
+              <span className="text-sm font-bold text-gray-900 group-hover:text-[#1d4ed8] transition-colors">
+                Company invitations
+              </span>
               <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-[#1d4ed8] group-hover:translate-x-0.5 transition-all" />
             </Link>
           </div>
