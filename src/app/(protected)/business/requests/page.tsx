@@ -24,14 +24,19 @@ export default function BusinessRequestsPage() {
         >
           <ChevronLeft className="w-5 h-5" />
         </button>
-        <div>
-          <h1 className="text-xl sm:text-2xl font-extrabold text-gray-900 leading-tight">
-            Affiliation requests
-          </h1>
-          <p className="text-xs sm:text-sm text-gray-500 font-medium mt-0.5">
-            Approve only professionals whose relationship with your company can verify.
-          </p>
-        </div>
+        <span className="text-sm sm:text-base font-bold text-gray-900">
+          Pending requests
+        </span>
+      </div>
+
+      {/* Main Section Header */}
+      <div className="space-y-1">
+        <h1 className="text-xl sm:text-2xl font-extrabold text-gray-900 leading-tight">
+          Affiliation requests
+        </h1>
+        <p className="text-xs sm:text-sm text-gray-500 font-medium">
+          Approve only professionals whose relationship with your company can verify.
+        </p>
       </div>
 
       {/* Manager Card Container */}

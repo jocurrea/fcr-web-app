@@ -139,7 +139,7 @@ export default function AffiliatedProfessionalsPage() {
 
   return (
     <div className="max-w-lg mx-auto flex flex-col w-full pb-12 bg-[#f8f9fa] min-h-screen px-4 sm:px-0 py-6 md:py-8 gap-5">
-      {/* Top Header */}
+      {/* Top Header Bar */}
       <div className="flex items-center gap-3">
         <button
           type="button"
@@ -149,14 +149,19 @@ export default function AffiliatedProfessionalsPage() {
         >
           <ChevronLeft className="w-5 h-5" />
         </button>
-        <div>
-          <h1 className="text-xl sm:text-2xl font-extrabold text-gray-900 leading-tight">
-            Verified professionals
-          </h1>
-          <p className="text-xs sm:text-sm text-gray-500 font-medium mt-0.5">
-            These professional profiles are publicly verified as affiliated with your company.
-          </p>
-        </div>
+        <span className="text-sm sm:text-base font-bold text-gray-900">
+          Affiliated professionals
+        </span>
+      </div>
+
+      {/* Main Section Header */}
+      <div className="space-y-1">
+        <h1 className="text-xl sm:text-2xl font-extrabold text-gray-900 leading-tight">
+          Verified professionals
+        </h1>
+        <p className="text-xs sm:text-sm text-gray-500 font-medium">
+          These professional profiles are publicly verified as affiliated with your company.
+        </p>
       </div>
 
       {/* Main Content */}
