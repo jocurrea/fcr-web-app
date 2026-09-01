@@ -41,6 +41,7 @@ const ROLES = [
 export function ProfessionalTypeStep({ onNext, onBack }: ProfessionalTypeStepProps) {
   const router = useRouter();
   const [selectedRole, setSelectedRole] = useState<string | null>(null);
+  const [customRole, setCustomRole] = useState("");
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
@@ -50,6 +51,15 @@ export function ProfessionalTypeStep({ onNext, onBack }: ProfessionalTypeStepPro
         const parsed = JSON.parse(saved);
         if (parsed.professionalRole) {
           setSelectedRole(parsed.professionalRole);
+          if (parsed.professionalRole === "other") {
+            setCustomRole(
+              parsed.customRole ||
+              parsed.otherRole ||
+              parsed.specifiedRole ||
+              (parsed.professionalTitle && parsed.professionalTitle !== "Other Aviation Professional" ? parsed.professionalTitle : "") ||
+              ""
+            );
+          }
         } else if (parsed.role && ROLES.some(r => r.id === parsed.role)) {
           setSelectedRole(parsed.role);
         }
@@ -59,6 +69,13 @@ export function ProfessionalTypeStep({ onNext, onBack }: ProfessionalTypeStepPro
     }
   }, []);
 
+  const handleRoleSelect = (roleId: string) => {
+    setSelectedRole(roleId);
+    if (roleId !== "other") {
+      setCustomRole("");
+    }
+  };
+
   const handleBackClick = () => {
     if (onBack) {
       onBack();
@@ -67,13 +84,22 @@ export function ProfessionalTypeStep({ onNext, onBack }: ProfessionalTypeStepPro
     }
   };
 
+  const isFormValid = Boolean(
+    selectedRole && (selectedRole !== "other" || customRole.trim().length > 0)
+  );
+
   const handleNextClick = async () => {
-    if (!selectedRole || isSaving) return;
+    if (!isFormValid || isSaving || !selectedRole) return;
 
     setIsSaving(true);
     try {
       const selectedObj = ROLES.find(r => r.id === selectedRole);
-      const roleLabel = selectedObj ? selectedObj.label : "Aviation Professional";
+      const roleLabel =
+        selectedRole === "other" && customRole.trim()
+          ? customRole.trim()
+          : selectedObj
+          ? selectedObj.label
+          : "Aviation Professional";
 
       const existing = localStorage.getItem("onboarding_personal");
       const parsed = existing ? JSON.parse(existing) : {};
@@ -83,6 +109,9 @@ export function ProfessionalTypeStep({ onNext, onBack }: ProfessionalTypeStepPro
         category: "aviation_professional",
         role: "aviation_professional",
         professionalRole: selectedRole,
+        customRole: selectedRole === "other" ? customRole.trim() : "",
+        otherRole: selectedRole === "other" ? customRole.trim() : "",
+        specifiedRole: selectedRole === "other" ? customRole.trim() : "",
         professionalTitle: roleLabel,
         professionalRoleLabel: roleLabel
       };
@@ -156,38 +185,55 @@ export function ProfessionalTypeStep({ onNext, onBack }: ProfessionalTypeStepPro
         <div className="flex flex-col gap-3.5 flex-1">
           {ROLES.map((role) => {
             const isSelected = selectedRole === role.id;
+            const isOtherRole = role.id === "other";
+
             return (
-              <button
-                key={role.id}
-                type="button"
-                onClick={() => setSelectedRole(role.id)}
-                className={`flex items-center p-4 sm:p-5 rounded-2xl border transition-all text-left group cursor-pointer ${
-                  isSelected 
-                    ? "border-[#1d4ed8] bg-[#f0f5ff] ring-2 ring-[#1d4ed8]/20 shadow-sm" 
-                    : "border-gray-100 hover:border-gray-200 bg-white shadow-xs"
-                }`}
-              >
-                {/* Gray Icon on Left */}
-                <div className="shrink-0 mr-4 flex items-center justify-center">
-                  {role.icon}
-                </div>
+              <div key={role.id} className="flex flex-col gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleRoleSelect(role.id)}
+                  className={`flex items-center p-4 sm:p-5 rounded-2xl border transition-all text-left group cursor-pointer ${
+                    isSelected 
+                      ? "border-[#1d4ed8] bg-[#f0f5ff] ring-2 ring-[#1d4ed8]/20 shadow-sm" 
+                      : "border-gray-100 hover:border-gray-200 bg-white shadow-xs"
+                  }`}
+                >
+                  {/* Gray Icon on Left */}
+                  <div className="shrink-0 mr-4 flex items-center justify-center">
+                    {role.icon}
+                  </div>
 
-                {/* Role Text */}
-                <div className="flex-1 min-w-0 pr-2">
-                  <h2 className="text-[17px] font-semibold text-gray-900">
-                    {role.label}
-                  </h2>
-                </div>
+                  {/* Role Text */}
+                  <div className="flex-1 min-w-0 pr-2">
+                    <h2 className="text-[17px] font-semibold text-gray-900">
+                      {role.label}
+                    </h2>
+                  </div>
 
-                {/* Square Checkbox on Right */}
-                <div className={`w-5 h-5 rounded-[4px] flex items-center justify-center shrink-0 ml-2 transition-all ${
-                  isSelected 
-                    ? "bg-[#1d4ed8] text-white shadow-xs" 
-                    : "border-2 border-gray-300 group-hover:border-gray-400 bg-white"
-                }`}>
-                  {isSelected ? <Check className="w-3.5 h-3.5 stroke-[3]" /> : null}
-                </div>
-              </button>
+                  {/* Square Checkbox on Right */}
+                  <div className={`w-5 h-5 rounded-[4px] flex items-center justify-center shrink-0 ml-2 transition-all ${
+                    isSelected 
+                      ? "bg-[#1d4ed8] text-white shadow-xs" 
+                      : "border-2 border-gray-300 group-hover:border-gray-400 bg-white"
+                  }`}>
+                    {isSelected ? <Check className="w-3.5 h-3.5 stroke-[3]" /> : null}
+                  </div>
+                </button>
+
+                {/* Dynamic input field when Other Aviation Professional is selected */}
+                {isOtherRole && isSelected && (
+                  <div className="mt-1 px-1 animate-in fade-in slide-in-from-top-1 duration-200">
+                    <input
+                      type="text"
+                      value={customRole}
+                      onChange={(e) => setCustomRole(e.target.value)}
+                      placeholder="Specify your professional role"
+                      className="w-full px-4 py-3.5 bg-white border border-gray-200 rounded-2xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[#1d4ed8] focus:ring-1 focus:ring-[#1d4ed8] transition-all shadow-xs"
+                      autoFocus
+                    />
+                  </div>
+                )}
+              </div>
             );
           })}
         </div>
@@ -197,9 +243,9 @@ export function ProfessionalTypeStep({ onNext, onBack }: ProfessionalTypeStepPro
           <button
             type="button"
             onClick={handleNextClick}
-            disabled={!selectedRole || isSaving}
+            disabled={!isFormValid || isSaving}
             className={`w-full py-4 rounded-full font-bold text-white transition-all shadow-md ${
-              selectedRole && !isSaving
+              isFormValid && !isSaving
                 ? "bg-[#1d4ed8] hover:bg-[#1e40af] cursor-pointer" 
                 : "bg-[#85b0fa] cursor-not-allowed opacity-90"
             }`}
