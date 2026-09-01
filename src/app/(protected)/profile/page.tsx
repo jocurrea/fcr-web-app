@@ -686,7 +686,7 @@ export default function ProfilePage() {
           <h2 className="font-extrabold text-base text-gray-900 mb-1">People & affiliations</h2>
           <div className="flex flex-col divide-y divide-gray-50">
             <Link
-              href="/business/requests"
+              href="/business/professionals"
               className="flex items-center justify-between py-3.5 px-2 hover:bg-gray-50 rounded-2xl transition-colors group cursor-pointer"
             >
               <div className="flex items-center gap-3">
@@ -716,7 +716,7 @@ export default function ProfilePage() {
             </Link>
 
             <Link
-              href="/business/requests"
+              href="/business/invitations"
               className="flex items-center justify-between py-3.5 px-2 hover:bg-gray-50 rounded-2xl transition-colors group cursor-pointer"
             >
               <div className="flex items-center gap-3">

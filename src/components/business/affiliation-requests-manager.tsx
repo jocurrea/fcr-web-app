@@ -344,14 +344,16 @@ export function AffiliationRequestsManager({
 
       {/* Empty State */}
       {!isLoading && !error && requests.length === 0 && (
-        <div className="bg-white rounded-3xl p-10 border border-gray-100 shadow-xs flex flex-col items-center justify-center text-center gap-3">
-          <div className="w-16 h-16 rounded-2xl bg-gray-50 border border-gray-100 flex items-center justify-center text-gray-400">
-            <ShieldCheck className="w-8 h-8 text-gray-300" />
+        <div className="bg-white rounded-3xl p-8 sm:p-10 border border-gray-100 shadow-xs flex flex-col items-center justify-center text-center gap-3">
+          <div className="w-16 h-16 rounded-full bg-blue-50 border border-blue-100/80 flex items-center justify-center text-[#1d4ed8] shadow-2xs mb-1">
+            <Building2 className="w-8 h-8 text-[#1d4ed8]" />
           </div>
           <div className="space-y-1 max-w-sm">
-            <h3 className="text-base font-bold text-gray-900">No Pending Requests</h3>
-            <p className="text-xs text-gray-500 leading-relaxed">
-              When aviation professionals link their profile to your company, their affiliation requests will appear here for review.
+            <h3 className="text-base sm:text-lg font-bold text-gray-900">
+              No pending requests
+            </h3>
+            <p className="text-xs sm:text-sm text-gray-500 leading-relaxed">
+              New professional affiliation requests will appear here.
             </p>
           </div>
         </div>
