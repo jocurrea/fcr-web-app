@@ -19,6 +19,7 @@ import {
   Briefcase,
   Plane,
   Building2,
+  Users,
   Plus,
   CheckCircle2,
   ShieldCheck,
@@ -376,6 +377,37 @@ export default function ProfilePage() {
 
             if (companies && companies.length > 0) {
               const comp = companies[0] as any;
+              
+              let resolvedTypes: string[] = [];
+              if (Array.isArray(comp.services) && comp.services.length > 0) {
+                resolvedTypes = comp.services;
+              }
+              if (resolvedTypes.length === 0 && typeof window !== "undefined") {
+                try {
+                  const saved = localStorage.getItem("company_types_" + comp.id);
+                  if (saved) {
+                    const parsed = JSON.parse(saved);
+                    if (Array.isArray(parsed) && parsed.length > 0) resolvedTypes = parsed;
+                  }
+                } catch (e) {}
+              }
+              if (resolvedTypes.length === 0) {
+                try {
+                  const { data: sel } = await supabase
+                    .from("company_type_selections")
+                    .select("company_type_id, company_types(label, name, key)")
+                    .eq("company_id", comp.id);
+                  if (sel && sel.length > 0) {
+                    resolvedTypes = sel
+                      .map((s: any) => s.company_types?.label || s.company_types?.name || s.company_types?.key)
+                      .filter(Boolean);
+                  }
+                } catch (e) {}
+              }
+              if (resolvedTypes.length === 0) {
+                resolvedTypes = ["Airline / Operator"];
+              }
+
               setCompanyInfo({
                 name: comp.name || "Company Name",
                 status: comp.status,
@@ -389,7 +421,7 @@ export default function ProfilePage() {
                 operatingAreas: comp.operating_areas || [],
                 services: comp.services || [],
                 fleetTypes: comp.fleet_types || [],
-                types: ["Airline / Operator"],
+                types: resolvedTypes,
               });
             }
           }
@@ -563,14 +595,20 @@ export default function ProfilePage() {
   }
 
   // ==========================================
-  // BUSINESS PROFILE VIEW (Preserved)
+  // BUSINESS PROFILE VIEW (Refactored Clean Cards)
   // ==========================================
   if (isBusiness) {
     const isApproved = companyInfo?.status === "active" || companyInfo?.status === "approved";
-    const isPending = !isApproved;
+    const companyTypesList =
+      companyInfo?.types && companyInfo.types.length > 0
+        ? companyInfo.types
+        : companyInfo?.services && companyInfo.services.length > 0
+        ? companyInfo.services
+        : ["Airline / Operator"];
 
     return (
-      <div className="max-w-lg mx-auto flex flex-col w-full pb-12 bg-[#f8f9fa] min-h-screen px-4 py-6 gap-5">
+      <div className="max-w-2xl mx-auto flex flex-col w-full pb-12 bg-[#f8f9fa] min-h-screen px-4 py-6 md:py-8 gap-5">
+        {/* 1. Header Card */}
         <div className="bg-white rounded-3xl p-6 flex flex-col shadow-xs border border-gray-100">
           <div className="flex items-start gap-4">
             <div className="w-20 h-20 shrink-0 rounded-2xl overflow-hidden border border-gray-100 bg-gray-50 flex items-center justify-center shadow-xs">
@@ -581,68 +619,114 @@ export default function ProfilePage() {
               )}
             </div>
             <div className="flex flex-col flex-1 min-w-0">
-              <div className="flex items-center justify-between gap-2 flex-wrap">
-                <h1 className="text-xl font-extrabold text-gray-900 leading-tight truncate">
-                  {companyInfo?.name || "Company Name"}
-                </h1>
-                {isApproved ? (
-                  <span className="bg-emerald-100 text-emerald-800 px-3 py-0.5 rounded-full text-xs font-bold">
-                    Active
-                  </span>
-                ) : (
-                  <span className="bg-amber-100 text-amber-800 px-3 py-0.5 rounded-full text-xs font-bold">
-                    Pending review
-                  </span>
-                )}
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <div className="flex items-center gap-2.5 flex-wrap min-w-0">
+                  <h1 className="text-xl font-extrabold text-gray-900 leading-tight truncate">
+                    {companyInfo?.name || "Company Name"}
+                  </h1>
+                  {isApproved ? (
+                    <span className="bg-emerald-100 text-emerald-800 px-3 py-0.5 rounded-full text-xs font-bold inline-flex items-center">
+                      Active
+                    </span>
+                  ) : (
+                    <span className="bg-amber-100 text-amber-800 px-3 py-0.5 rounded-full text-xs font-bold inline-flex items-center">
+                      Pending review
+                    </span>
+                  )}
+                </div>
+                <Link
+                  href="/onboarding-business?edit=company&from=profile"
+                  className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full border border-gray-200 text-xs font-bold text-gray-700 bg-white hover:bg-gray-50 hover:text-[#1d4ed8] hover:border-[#1d4ed8] transition-all shadow-2xs shrink-0 cursor-pointer"
+                  title="Edit company profile"
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                  <span>Edit</span>
+                </Link>
               </div>
               <span className="text-xs text-gray-500 mt-1 font-medium">Corporate associate account</span>
-              <Link
-                href="/onboarding-business?edit=company&from=profile"
-                className="mt-2 inline-flex items-center gap-1.5 text-[#1d4ed8] text-xs font-bold hover:underline cursor-pointer"
-              >
-                <Pencil className="w-3.5 h-3.5" />
-                <span>Edit Company Profile</span>
-              </Link>
             </div>
           </div>
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex items-center gap-3 flex-wrap">
-          <Link
-            href="/business/requests"
-            className="bg-white rounded-full px-5 py-2.5 flex items-center gap-2 font-bold text-xs sm:text-sm text-[#1d4ed8] border border-[#1d4ed8] hover:bg-blue-50/50 transition-all shadow-2xs cursor-pointer"
-          >
-            <Building2 className="w-4 h-4 text-[#1d4ed8]" />
-            <span>Affiliation requests</span>
-          </Link>
-
+        {/* 2. Metric Buttons (Quick Action) */}
+        <div className="flex items-center gap-3">
           <button
             type="button"
             onClick={handleOpenLikersModal}
-            className="bg-white rounded-full px-5 py-2.5 flex items-center gap-2 font-bold text-xs sm:text-sm text-[#1d4ed8] border border-[#1d4ed8] hover:bg-blue-50/50 transition-all shadow-2xs cursor-pointer"
+            className="flex-1 max-w-[170px] py-2.5 px-4 rounded-full border border-[#1d4ed8] text-[#1d4ed8] bg-transparent hover:bg-blue-50/60 transition-all font-bold text-xs flex items-center justify-center gap-2 cursor-pointer shadow-2xs active:scale-95"
           >
-            <Heart className="w-4 h-4 text-[#1d4ed8]" />
+            <Heart className="w-4 h-4 text-[#1d4ed8] shrink-0" />
             <span>Profile likes ({likers.length})</span>
           </button>
 
           <button
             type="button"
             onClick={handleOpenVisitorsModal}
-            className="bg-white rounded-full px-5 py-2.5 flex items-center gap-2 font-bold text-xs sm:text-sm text-[#1d4ed8] border border-[#1d4ed8] hover:bg-blue-50/50 transition-all shadow-2xs cursor-pointer"
+            className="flex-1 max-w-[170px] py-2.5 px-4 rounded-full border border-[#1d4ed8] text-[#1d4ed8] bg-transparent hover:bg-blue-50/60 transition-all font-bold text-xs flex items-center justify-center gap-2 cursor-pointer shadow-2xs active:scale-95"
           >
-            <Eye className="w-4 h-4 text-[#1d4ed8]" />
+            <Eye className="w-4 h-4 text-[#1d4ed8] shrink-0" />
             <span>Profile visitors ({visitors.length})</span>
           </button>
         </div>
 
-        {/* Company Details */}
+        {/* 3. People & Affiliations Section */}
+        <div className="bg-white rounded-3xl p-6 flex flex-col shadow-xs border border-gray-100 gap-2">
+          <h2 className="font-extrabold text-base text-gray-900 mb-1">People & affiliations</h2>
+          <div className="flex flex-col divide-y divide-gray-50">
+            <Link
+              href="/business/requests"
+              className="flex items-center justify-between py-3.5 px-2 hover:bg-gray-50 rounded-2xl transition-colors group cursor-pointer"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-full bg-blue-50 flex items-center justify-center text-[#1d4ed8]">
+                  <Users className="w-4 h-4" />
+                </div>
+                <span className="text-sm font-bold text-gray-900 group-hover:text-[#1d4ed8] transition-colors">
+                  Affiliated professionals
+                </span>
+              </div>
+              <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-[#1d4ed8] group-hover:translate-x-0.5 transition-all" />
+            </Link>
+
+            <Link
+              href="/business/requests"
+              className="flex items-center justify-between py-3.5 px-2 hover:bg-gray-50 rounded-2xl transition-colors group cursor-pointer"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-full bg-blue-50 flex items-center justify-center text-[#1d4ed8]">
+                  <Building2 className="w-4 h-4" />
+                </div>
+                <span className="text-sm font-bold text-gray-900 group-hover:text-[#1d4ed8] transition-colors">
+                  Affiliation requests
+                </span>
+              </div>
+              <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-[#1d4ed8] group-hover:translate-x-0.5 transition-all" />
+            </Link>
+
+            <Link
+              href="/business/requests"
+              className="flex items-center justify-between py-3.5 px-2 hover:bg-gray-50 rounded-2xl transition-colors group cursor-pointer"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-full bg-blue-50 flex items-center justify-center text-[#1d4ed8]">
+                  <Mail className="w-4 h-4" />
+                </div>
+                <span className="text-sm font-bold text-gray-900 group-hover:text-[#1d4ed8] transition-colors">
+                  Company invitations
+                </span>
+              </div>
+              <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-[#1d4ed8] group-hover:translate-x-0.5 transition-all" />
+            </Link>
+          </div>
+        </div>
+
+        {/* 4. Company Details Section */}
         <div className="bg-white rounded-3xl p-6 flex flex-col shadow-xs border border-gray-100 gap-4">
           <div className="flex items-center justify-between">
             <h2 className="font-extrabold text-base text-gray-900">Company details</h2>
             <Link
               href="/onboarding-business?edit=company&from=profile"
-              className="text-[#1d4ed8] hover:text-[#1e40af] transition-colors"
+              className="text-[#1d4ed8] hover:text-[#1e40af] transition-colors p-1"
               title="Edit company details"
             >
               <Pencil className="w-4 h-4" />
@@ -705,6 +789,32 @@ export default function ProfilePage() {
             )}
           </div>
         </div>
+
+        {/* 5. Company Types Section */}
+        {companyTypesList.length > 0 && (
+          <div className="bg-white rounded-3xl p-6 flex flex-col shadow-xs border border-gray-100 gap-4">
+            <div className="flex items-center justify-between">
+              <h2 className="font-extrabold text-base text-gray-900">Company types</h2>
+              <Link
+                href="/onboarding-business?edit=company&from=profile"
+                className="text-[#1d4ed8] hover:text-[#1e40af] transition-colors p-1"
+                title="Edit company types"
+              >
+                <Pencil className="w-4 h-4" />
+              </Link>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {companyTypesList.map((type, idx) => (
+                <span
+                  key={idx}
+                  className="bg-[#eef4ff] text-[#1d4ed8] px-4 py-2 rounded-full text-xs sm:text-sm font-semibold leading-tight"
+                >
+                  {type}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     );
   }
