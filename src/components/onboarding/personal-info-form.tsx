@@ -18,7 +18,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Search, Check, ChevronDown, Upload, X } from "lucide-react";
+import { Search, Check, ChevronDown, Upload, X, Camera, Image as ImageIcon, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
 
@@ -89,7 +89,8 @@ interface PersonalInfoFormProps {
 
 export function PersonalInfoForm({ onNext }: PersonalInfoFormProps) {
   // Photo Upload State
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   
   useEffect(() => {
@@ -102,30 +103,44 @@ export function PersonalInfoForm({ onNext }: PersonalInfoFormProps) {
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        alert("File is too large (max 5MB)");
+      if (file.size > 10 * 1024 * 1024) {
+        alert("File is too large (max 10MB)");
+        if (e.target) e.target.value = "";
         return;
       }
       
-      const url = URL.createObjectURL(file);
-      setPhotoPreview(url); // Optimistic preview
+      // Instant Base64 preview & local storage
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const dataUrl = event.target?.result as string;
+        if (dataUrl) {
+          setPhotoPreview(dataUrl);
+          try {
+            localStorage.setItem("userProfilePhoto", dataUrl);
+          } catch (err) {
+            console.warn(err);
+          }
+        }
+      };
+      reader.readAsDataURL(file);
+
+      const localUrl = URL.createObjectURL(file);
+      if (e.target) e.target.value = "";
       
       try {
-        const { supabase } = await import('@/lib/supabase');
         const { data: userData } = await supabase.auth.getUser();
         
         if (userData?.user) {
-          const fileExt = file.name.split('.').pop();
-          const fileName = `${Math.random()}.${fileExt}`;
-          const filePath = `profiles/${userData.user.id}-${fileName}`;
+          const fileExt = file.name.split('.').pop() || 'jpg';
+          const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}.${fileExt}`;
+          const filePath = `avatars/${userData.user.id}/${fileName}`;
           
           const { error: uploadError } = await supabase.storage
             .from('uploads')
-            .upload(filePath, file);
+            .upload(filePath, file, { upsert: true });
             
           if (uploadError) {
-            console.error("Error uploading profile image:", uploadError);
-            alert("Error uploading image. Please try again.");
+            console.warn("Storage upload fallback:", uploadError);
             return;
           }
           
@@ -134,7 +149,11 @@ export function PersonalInfoForm({ onNext }: PersonalInfoFormProps) {
             .getPublicUrl(filePath);
             
           if (publicUrlData?.publicUrl) {
-            localStorage.setItem("userProfilePhoto", publicUrlData.publicUrl);
+            try {
+              localStorage.setItem("userProfilePhoto", publicUrlData.publicUrl);
+            } catch (err) {
+              console.warn(err);
+            }
             setPhotoPreview(publicUrlData.publicUrl);
             await supabase
               .from('users')
@@ -387,39 +406,66 @@ export function PersonalInfoForm({ onNext }: PersonalInfoFormProps) {
             />
           </div>
 
-          <div className="space-y-2">
-            <Label>Upload Photo</Label>
+          <div className="space-y-3 pt-2">
+            <Label className="font-semibold text-gray-900">Profile Photo</Label>
+            
+            {/* Hidden Inputs for Gallery and Camera */}
             <input 
+              id="flightcrew-gallery-input"
               type="file" 
               accept="image/*" 
-              className="hidden" 
-              ref={fileInputRef} 
+              ref={galleryInputRef} 
               onChange={handlePhotoUpload} 
+              style={{ display: "none" }}
             />
-            {photoPreview ? (
-              <div className="relative border border-gray-200 rounded-2xl bg-gray-50 h-48 flex items-center justify-center overflow-hidden">
-                <img src={photoPreview} alt="Profile preview" className="w-full h-full object-cover" />
-                <button 
+            <input 
+              id="flightcrew-camera-input"
+              type="file" 
+              accept="image/*" 
+              capture="user"
+              ref={cameraInputRef} 
+              onChange={handlePhotoUpload} 
+              style={{ display: "none" }}
+            />
+
+            <div className="flex flex-col items-center justify-center p-4 border border-gray-100 rounded-3xl bg-gray-50/50">
+              {/* Circular Avatar */}
+              <div 
+                onClick={() => galleryInputRef.current?.click()}
+                className="w-28 h-28 rounded-full bg-[#1e293b] flex items-center justify-center relative overflow-hidden shadow-sm transition-all cursor-pointer hover:opacity-90 border-2 border-transparent hover:border-[#1d4ed8]"
+              >
+                {photoPreview ? (
+                  <img src={photoPreview} alt="Profile preview" className="w-full h-full object-cover" />
+                ) : (
+                  <User className="w-12 h-12 text-white stroke-[1.5]" />
+                )}
+              </div>
+
+              {/* Camera & Gallery Buttons */}
+              <div className="flex items-center gap-3 mt-4 w-full max-w-xs justify-center">
+                <button
                   type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setPhotoPreview(null);
-                    localStorage.removeItem("userProfilePhoto");
-                    if (fileInputRef.current) fileInputRef.current.value = "";
-                  }}
-                  className="absolute top-3 right-3 p-1.5 bg-white rounded-full shadow-sm hover:bg-gray-100 transition-colors"
+                  onClick={() => cameraInputRef.current?.click()}
+                  className="flex-1 py-2.5 px-4 rounded-full border border-[#1d4ed8] text-[#1d4ed8] bg-transparent hover:bg-blue-50/60 font-semibold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer shadow-2xs active:scale-[0.98]"
                 >
-                  <X className="w-4 h-4 text-gray-600" />
+                  <Camera className="w-4 h-4" />
+                  <span>Camera</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => galleryInputRef.current?.click()}
+                  className="flex-1 py-2.5 px-4 rounded-full border border-[#1d4ed8] text-[#1d4ed8] bg-transparent hover:bg-blue-50/60 font-semibold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer shadow-2xs active:scale-[0.98]"
+                >
+                  <ImageIcon className="w-4 h-4" />
+                  <span>Gallery</span>
                 </button>
               </div>
-            ) : (
-              <div 
-                onClick={() => fileInputRef.current?.click()}
-                className="border border-gray-200 rounded-2xl bg-gray-50 h-48 flex items-center justify-center cursor-pointer hover:bg-gray-100 transition-colors"
-              >
-                <Upload className="w-8 h-8 text-gray-400 stroke-[1.5]" />
-              </div>
-            )}
+
+              <p className="text-xs text-gray-400 mt-2.5 text-center">
+                Select a photo from your gallery or take a new one with your camera.
+              </p>
+            </div>
           </div>
         </form>
       </div>

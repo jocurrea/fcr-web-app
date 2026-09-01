@@ -26,8 +26,6 @@ export function PersonalIdentificationStep({ onNext, onBack }: PersonalIdentific
   const router = useRouter();
   const galleryInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const mediaStreamRef = useRef<MediaStream | null>(null);
 
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -35,11 +33,6 @@ export function PersonalIdentificationStep({ onNext, onBack }: PersonalIdentific
   const [isUploading, setIsUploading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [touched, setTouched] = useState({ firstName: false, lastName: false, photo: false });
-
-  // Webcam Capture Modal State
-  const [isWebcamOpen, setIsWebcamOpen] = useState(false);
-  const [webcamError, setWebcamError] = useState<string | null>(null);
-  const [isCapturing, setIsCapturing] = useState(false);
 
   const sanitizeName = (val: string) => val.replace(/[^a-zA-ZÀ-ÿ\s'-]/g, '');
 
@@ -80,14 +73,22 @@ export function PersonalIdentificationStep({ onNext, onBack }: PersonalIdentific
 
         if (uploadError) {
           console.warn("Storage bucket upload fallback:", uploadError);
-          localStorage.setItem("userProfilePhoto", localPreviewUrl);
+          try {
+            localStorage.setItem("userProfilePhoto", localPreviewUrl);
+          } catch (storageErr) {
+            console.warn(storageErr);
+          }
         } else {
           const { data: publicUrlData } = supabase.storage
             .from('uploads')
             .getPublicUrl(filePath);
 
           if (publicUrlData?.publicUrl) {
-            localStorage.setItem("userProfilePhoto", publicUrlData.publicUrl);
+            try {
+              localStorage.setItem("userProfilePhoto", publicUrlData.publicUrl);
+            } catch (storageErr) {
+              console.warn(storageErr);
+            }
             setPhotoPreview(publicUrlData.publicUrl);
 
             await supabase
@@ -97,11 +98,19 @@ export function PersonalIdentificationStep({ onNext, onBack }: PersonalIdentific
           }
         }
       } else {
-        localStorage.setItem("userProfilePhoto", localPreviewUrl);
+        try {
+          localStorage.setItem("userProfilePhoto", localPreviewUrl);
+        } catch (storageErr) {
+          console.warn(storageErr);
+        }
       }
     } catch (err) {
       console.error("Upload error:", err);
-      localStorage.setItem("userProfilePhoto", localPreviewUrl);
+      try {
+        localStorage.setItem("userProfilePhoto", localPreviewUrl);
+      } catch (storageErr) {
+        console.warn(storageErr);
+      }
     } finally {
       setIsUploading(false);
     }
@@ -112,11 +121,27 @@ export function PersonalIdentificationStep({ onNext, onBack }: PersonalIdentific
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 5 * 1024 * 1024) {
-      alert("Image is too large. Maximum allowed size is 5MB.");
+    if (file.size > 10 * 1024 * 1024) {
+      alert("Image is too large. Maximum allowed size is 10MB.");
       if (e.target) e.target.value = "";
       return;
     }
+
+    // Instant Base64 preview & storage
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const dataUrl = event.target?.result as string;
+      if (dataUrl) {
+        setPhotoPreview(dataUrl);
+        setTouched(prev => ({ ...prev, photo: true }));
+        try {
+          localStorage.setItem("userProfilePhoto", dataUrl);
+        } catch (err) {
+          console.warn("Local storage write error:", err);
+        }
+      }
+    };
+    reader.readAsDataURL(file);
 
     const localUrl = URL.createObjectURL(file);
     if (e.target) e.target.value = "";
@@ -124,97 +149,11 @@ export function PersonalIdentificationStep({ onNext, onBack }: PersonalIdentific
   };
 
   const handleCameraClick = () => {
-    const isMobile = typeof navigator !== "undefined" && /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-    if (isMobile || !navigator?.mediaDevices?.getUserMedia) {
-      cameraInputRef.current?.click();
-    } else {
-      startWebcam();
-    }
+    cameraInputRef.current?.click();
   };
 
-  // Webcam Handlers
-  const startWebcam = async () => {
-    setIsWebcamOpen(true);
-    setWebcamError(null);
-
-    // Check if mediaDevices API is available
-    if (!navigator?.mediaDevices?.getUserMedia) {
-      cameraInputRef.current?.click();
-      setIsWebcamOpen(false);
-      return;
-    }
-
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: "user",
-          width: { ideal: 720 },
-          height: { ideal: 720 },
-        },
-        audio: false,
-      });
-
-      mediaStreamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-      }
-    } catch (err: any) {
-      console.warn("Camera access warning:", err?.name, err?.message);
-      if (err?.name === "NotAllowedError" || err?.name === "PermissionDeniedError" || err?.message?.includes("dismissed")) {
-        setWebcamError(
-          "Camera permission was dismissed or blocked. Please enable camera access in your browser settings or select a photo from your gallery."
-        );
-      } else if (err?.name === "NotFoundError" || err?.name === "DevicesNotFoundError") {
-        setWebcamError(
-          "No camera device was detected on your system. Please choose a photo from your gallery."
-        );
-      } else {
-        setWebcamError(
-          "Unable to access the camera. You can choose a photo from your gallery instead."
-        );
-      }
-    }
-  };
-
-  const stopWebcam = () => {
-    if (mediaStreamRef.current) {
-      mediaStreamRef.current.getTracks().forEach((track) => track.stop());
-      mediaStreamRef.current = null;
-    }
-    setIsWebcamOpen(false);
-  };
-
-  const capturePhoto = async () => {
-    if (!videoRef.current) return;
-
-    setIsCapturing(true);
-    try {
-      const video = videoRef.current;
-      const canvas = document.createElement("canvas");
-      const size = Math.min(video.videoWidth || 640, video.videoHeight || 640);
-      canvas.width = size;
-      canvas.height = size;
-
-      const ctx = canvas.getContext("2d");
-      if (ctx) {
-        // Center crop square
-        const startX = ((video.videoWidth || size) - size) / 2;
-        const startY = ((video.videoHeight || size) - size) / 2;
-        ctx.drawImage(video, startX, startY, size, size, 0, 0, size, size);
-
-        canvas.toBlob(async (blob) => {
-          if (blob) {
-            const localUrl = URL.createObjectURL(blob);
-            stopWebcam();
-            await uploadImageBlobOrFile(blob, localUrl);
-          }
-        }, "image/jpeg", 0.92);
-      }
-    } catch (err) {
-      console.error("Error capturing photo:", err);
-    } finally {
-      setIsCapturing(false);
-    }
+  const handleGalleryClick = () => {
+    galleryInputRef.current?.click();
   };
 
   const isFirstNameValid = firstName.trim().length >= 2;
@@ -323,30 +262,35 @@ export function PersonalIdentificationStep({ onNext, onBack }: PersonalIdentific
           <div className="flex flex-col items-center justify-center py-2">
             {/* Hidden File Input for Gallery */}
             <input
+              id="personal-gallery-input"
               type="file"
               ref={galleryInputRef}
               onChange={handlePhotoSelect}
               accept="image/*"
-              className="hidden"
+              style={{ display: "none" }}
             />
 
             {/* Hidden File Input for Camera with capture attribute */}
             <input
+              id="personal-camera-input"
               type="file"
               ref={cameraInputRef}
               onChange={handlePhotoSelect}
               accept="image/*"
               capture="user"
-              className="hidden"
+              style={{ display: "none" }}
             />
 
-            {/* Solid Dark Gray Avatar Circle */}
+            {/* Solid Dark Gray Avatar Circle - Clickable */}
             <div className="relative">
-              <div
+              <button
+                type="button"
+                onClick={() => galleryInputRef.current?.click()}
                 className={cn(
-                  "w-28 h-28 sm:w-32 sm:h-32 rounded-full bg-[#1e293b] flex items-center justify-center relative overflow-hidden shadow-sm transition-all",
+                  "w-28 h-28 sm:w-32 sm:h-32 rounded-full bg-[#1e293b] flex items-center justify-center relative overflow-hidden shadow-sm transition-all cursor-pointer hover:opacity-90",
                   photoPreview ? "border-2 border-[#1d4ed8]" : ""
                 )}
+                title="Click to upload photo"
               >
                 {photoPreview ? (
                   <img
@@ -364,7 +308,7 @@ export function PersonalIdentificationStep({ onNext, onBack }: PersonalIdentific
                     <Loader2 className="w-6 h-6 animate-spin" />
                   </div>
                 )}
-              </div>
+              </button>
             </div>
 
             {/* Two Outline Buttons: Camera & Gallery */}
@@ -382,7 +326,7 @@ export function PersonalIdentificationStep({ onNext, onBack }: PersonalIdentific
               {/* Button 2: Gallery */}
               <button
                 type="button"
-                onClick={() => galleryInputRef.current?.click()}
+                onClick={handleGalleryClick}
                 className="flex-1 py-2.5 px-4 rounded-full border border-[#1d4ed8] text-[#1d4ed8] bg-transparent hover:bg-blue-50/60 font-semibold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer shadow-2xs active:scale-[0.98]"
               >
                 <ImageIcon className="w-4 h-4" />
@@ -458,6 +402,7 @@ export function PersonalIdentificationStep({ onNext, onBack }: PersonalIdentific
         </div>
 
         {/* 4. Bottom Next Button */}
+        {/* 4. Bottom Next Button */}
         <div className="pb-8 pt-4">
           <button
             type="button"
@@ -474,92 +419,6 @@ export function PersonalIdentificationStep({ onNext, onBack }: PersonalIdentific
         </div>
 
       </div>
-
-      {/* Webcam Modal */}
-      {isWebcamOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-150">
-          <div className="bg-white rounded-3xl p-6 max-w-md w-full border border-gray-100 shadow-2xl flex flex-col items-center gap-4">
-            <div className="flex items-center justify-between w-full">
-              <h3 className="text-base font-extrabold text-gray-900 flex items-center gap-2">
-                <Camera className="w-5 h-5 text-[#1d4ed8]" />
-                <span>Take Profile Photo</span>
-              </h3>
-              <button
-                type="button"
-                onClick={stopWebcam}
-                className="w-8 h-8 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-600 flex items-center justify-center transition-colors cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {webcamError ? (
-              <div className="p-4 rounded-2xl bg-red-50 border border-red-200 text-red-700 text-xs flex flex-col gap-3 w-full">
-                <div className="flex items-start gap-2.5">
-                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                  <div>
-                    <p className="font-bold text-sm text-red-800">Camera Access Notice</p>
-                    <p className="mt-1 text-xs text-red-700 leading-relaxed">{webcamError}</p>
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    stopWebcam();
-                    galleryInputRef.current?.click();
-                  }}
-                  className="w-full py-2.5 px-4 rounded-xl bg-white border border-red-200 text-[#1d4ed8] hover:bg-blue-50 font-bold text-xs transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-2xs"
-                >
-                  <ImageIcon className="w-4 h-4" />
-                  <span>Choose from Gallery instead</span>
-                </button>
-              </div>
-            ) : (
-              <div className="w-64 h-64 sm:w-72 sm:h-72 rounded-full overflow-hidden bg-black border-4 border-white shadow-md relative flex items-center justify-center">
-                <video
-                  ref={videoRef}
-                  autoPlay
-                  playsInline
-                  muted
-                  className="w-full h-full object-cover scale-x-[-1]"
-                />
-              </div>
-            )}
-
-            <div className="flex items-center gap-3 w-full pt-2">
-              <button
-                type="button"
-                onClick={stopWebcam}
-                className="flex-1 py-3 px-4 rounded-full border border-gray-200 text-gray-700 font-semibold text-xs sm:text-sm hover:bg-gray-50 transition-colors cursor-pointer"
-              >
-                Close
-              </button>
-
-              {!webcamError && (
-                <button
-                  type="button"
-                  onClick={capturePhoto}
-                  disabled={isCapturing}
-                  className="flex-1 py-3 px-4 rounded-full bg-[#1d4ed8] hover:bg-[#1e40af] text-white font-bold text-xs sm:text-sm transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer active:scale-95 disabled:opacity-50"
-                >
-                  {isCapturing ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>Capturing...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Camera className="w-4 h-4" />
-                      <span>Capture</span>
-                    </>
-                  )}
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
