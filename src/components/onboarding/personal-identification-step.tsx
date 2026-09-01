@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useEffect } from "react";
 import {
   ChevronLeft,
   Camera,
@@ -24,8 +24,6 @@ interface PersonalIdentificationStepProps {
 
 export function PersonalIdentificationStep({ onNext, onBack }: PersonalIdentificationStepProps) {
   const router = useRouter();
-  const galleryInputRef = useRef<HTMLInputElement>(null);
-  const cameraInputRef = useRef<HTMLInputElement>(null);
 
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -148,14 +146,6 @@ export function PersonalIdentificationStep({ onNext, onBack }: PersonalIdentific
     await uploadImageBlobOrFile(file, localUrl);
   };
 
-  const handleCameraClick = () => {
-    cameraInputRef.current?.click();
-  };
-
-  const handleGalleryClick = () => {
-    galleryInputRef.current?.click();
-  };
-
   const isFirstNameValid = firstName.trim().length >= 2;
   const isLastNameValid = lastName.trim().length >= 2;
   const isPhotoValid = Boolean(photoPreview);
@@ -260,30 +250,28 @@ export function PersonalIdentificationStep({ onNext, onBack }: PersonalIdentific
           
           {/* Avatar Section & Action Buttons (Camera / Gallery) */}
           <div className="flex flex-col items-center justify-center py-2">
-            {/* Permanently Rendered File Input for Gallery */}
+            {/* Hidden File Input for Gallery */}
             <input
-              id="personal-gallery-input"
+              id="gallery-input"
               type="file"
-              ref={galleryInputRef}
               onChange={handlePhotoSelect}
               accept="image/*"
-              className="sr-only"
+              className="hidden"
             />
 
-            {/* Permanently Rendered File Input for Camera with capture */}
+            {/* Hidden File Input for Camera with capture attribute */}
             <input
-              id="personal-camera-input"
+              id="camera-input"
               type="file"
-              ref={cameraInputRef}
               onChange={handlePhotoSelect}
               accept="image/*"
               capture="user"
-              className="sr-only"
+              className="hidden"
             />
 
             {/* Solid Dark Gray Avatar Circle - Clickable via Label */}
             <label
-              htmlFor="personal-gallery-input"
+              htmlFor="gallery-input"
               className="relative cursor-pointer group"
               title="Click to upload photo"
             >
@@ -316,7 +304,7 @@ export function PersonalIdentificationStep({ onNext, onBack }: PersonalIdentific
             <div className="flex items-center gap-3 mt-4 w-full max-w-xs justify-center">
               {/* Button 1: Camera */}
               <label
-                htmlFor="personal-camera-input"
+                htmlFor="camera-input"
                 className="flex-1 py-2.5 px-4 rounded-full border border-[#1d4ed8] text-[#1d4ed8] bg-transparent hover:bg-blue-50/60 font-semibold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer shadow-2xs active:scale-[0.98] select-none text-center"
               >
                 <Camera className="w-4 h-4 shrink-0" />
@@ -325,7 +313,7 @@ export function PersonalIdentificationStep({ onNext, onBack }: PersonalIdentific
 
               {/* Button 2: Gallery */}
               <label
-                htmlFor="personal-gallery-input"
+                htmlFor="gallery-input"
                 className="flex-1 py-2.5 px-4 rounded-full border border-[#1d4ed8] text-[#1d4ed8] bg-transparent hover:bg-blue-50/60 font-semibold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer shadow-2xs active:scale-[0.98] select-none text-center"
               >
                 <ImageIcon className="w-4 h-4 shrink-0" />
