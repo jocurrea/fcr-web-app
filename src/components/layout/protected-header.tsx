@@ -65,7 +65,7 @@ export function ProtectedHeader() {
         const [{ data: dbUser }, { data: companyData }] = await Promise.all([
           supabase
             .from('users')
-            .select('firstName, middleName, lastName, profileImage, accountType')
+            .select('firstName, middleName, lastName, profileImage, accountType, professionalRole, role')
             .eq('id', userId)
             .maybeSingle(),
           supabase
@@ -95,12 +95,27 @@ export function ProtectedHeader() {
             ? 'business'
             : (localPersonal?.category || dbUser?.accountType || session?.user?.user_metadata?.accountType);
 
+        const professionalRole =
+          localPersonal?.professionalRoleLabel ||
+          localPersonal?.professionalTitle ||
+          localPersonal?.professionalRole ||
+          dbUser?.professionalRole ||
+          (effectiveAccountType === 'aviation_professional'
+            ? 'Aviation Professional'
+            : localPersonal?.role === 'crew' || dbUser?.role === 'crew'
+            ? 'Cabin Crew'
+            : 'Pilot');
+
+        const role = localPersonal?.role || dbUser?.role || (effectiveAccountType === 'aviation_professional' ? 'aviation_professional' : 'pilot');
+
         const userPayload: any = { id: userId, onboarded: 1 };
         if (firstName) userPayload.firstName = firstName;
         if (middleName) userPayload.middleName = middleName;
         if (lastName) userPayload.lastName = lastName;
         if (profilePhoto) userPayload.profileImage = profilePhoto;
         if (effectiveAccountType) userPayload.accountType = effectiveAccountType;
+        if (professionalRole) userPayload.professionalRole = professionalRole;
+        if (role) userPayload.role = role;
 
         const savedLicenses = localStorage.getItem("onboarding_licenses");
         const savedRatings = localStorage.getItem("onboarding_ratings");

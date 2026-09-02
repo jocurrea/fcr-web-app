@@ -135,12 +135,40 @@ export default function RoleSelectionPage() {
 
     if (selectedType === "flight_crew" || selectedType === "aviation_professional") {
       const { data: { user } } = await supabase.auth.getUser();
+      const defaultRole = selectedType === "aviation_professional" ? "aviation_professional" : "pilot";
+      const defaultProfessionalRole = selectedType === "aviation_professional" ? "Aviation Professional" : "Pilot";
+
       if (user) {
         await Promise.allSettled([
-          supabase.auth.updateUser({ data: { accountType: selectedType } }),
-          supabase.from("users").update({ accountType: selectedType }).eq("id", user.id),
-          supabase.from("users").upsert({ id: user.id, accountType: selectedType }, { onConflict: "id" })
+          supabase.auth.updateUser({
+            data: {
+              accountType: selectedType,
+              role: defaultRole,
+              professionalRole: defaultProfessionalRole,
+              professional_role: defaultProfessionalRole,
+              category: selectedType,
+            },
+          }),
+          supabase.from("users").update({
+            accountType: selectedType,
+            role: defaultRole,
+            professionalRole: defaultProfessionalRole,
+          }).eq("id", user.id),
+          supabase.from("users").upsert({
+            id: user.id,
+            accountType: selectedType,
+            role: defaultRole,
+            professionalRole: defaultProfessionalRole,
+          }, { onConflict: "id" }),
         ]);
+
+        try {
+          await supabase.from("profiles").update({
+            role: defaultRole,
+            professionalRole: defaultProfessionalRole,
+            professional_role: defaultProfessionalRole,
+          }).eq("id", user.id);
+        } catch (e) {}
       }
 
       try {
@@ -149,7 +177,11 @@ export default function RoleSelectionPage() {
         localStorage.setItem("onboarding_personal", JSON.stringify({
           ...parsed,
           category: selectedType,
-          role: selectedType === "aviation_professional" ? "aviation_professional" : (parsed.role || "pilot")
+          role: defaultRole,
+          professionalRole: defaultProfessionalRole,
+          professional_role: defaultProfessionalRole,
+          professionalTitle: defaultProfessionalRole,
+          professionalRoleLabel: defaultProfessionalRole,
         }));
       } catch (e) {}
       

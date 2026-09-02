@@ -38,25 +38,35 @@ export function AvailabilityStep({ onNext, onBack }: AvailabilityStepProps) {
     try {
       const existing = localStorage.getItem("onboarding_personal");
       const parsed = existing ? JSON.parse(existing) : {};
+      const roleKey = parsed.role || "aviation_professional";
+      const roleLabel =
+        parsed.professionalRoleLabel ||
+        parsed.professionalTitle ||
+        parsed.professionalRole ||
+        "Aviation Professional";
 
       const updated = {
         ...parsed,
         availabilityStatus: selectedStatus,
         availability_status: selectedStatus,
         category: "aviation_professional",
-        role: "aviation_professional",
+        role: roleKey,
+        professionalRole: roleLabel,
+        professional_role: roleLabel,
       };
 
       localStorage.setItem("onboarding_personal", JSON.stringify(updated));
 
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
-        // Update users table with availability_status
+        // Update users table with availability_status, role, and professionalRole
         await supabase.from("users").upsert({
           id: session.user.id,
           availability_status: selectedStatus,
           onboarded: 1,
           accountType: "aviation_professional",
+          role: roleKey,
+          professionalRole: roleLabel,
         }, { onConflict: "id" });
 
         // Update resumes table
@@ -66,9 +76,10 @@ export function AvailabilityStep({ onNext, onBack }: AvailabilityStepProps) {
           .eq("userId", session.user.id)
           .maybeSingle();
 
-        const resumeData = (currentResume?.data as any) || {};
+        const resumeData = (currentResume?.data as Record<string, unknown>) || {};
+        const currentPersonal = (resumeData.personal as Record<string, unknown>) || {};
         const updatedPersonal = {
-          ...(resumeData.personal || {}),
+          ...currentPersonal,
           ...updated,
         };
 
@@ -85,6 +96,9 @@ export function AvailabilityStep({ onNext, onBack }: AvailabilityStepProps) {
           data: {
             onboarded: true,
             accountType: "aviation_professional",
+            role: roleKey,
+            professionalRole: roleLabel,
+            professional_role: roleLabel,
             availability_status: selectedStatus,
             crew_data_saved: true,
           },

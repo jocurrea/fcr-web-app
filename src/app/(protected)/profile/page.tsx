@@ -302,6 +302,8 @@ export default function ProfilePage() {
             email: userData?.email || localPersonal?.email || crewData?.personal?.email || session.user.email || "",
             phone: userData?.phone || localPersonal?.phone || crewData?.personal?.phone || "",
             location: userData?.location || localPersonal?.location || crewData?.personal?.location || "",
+            professionalRole: userData?.professionalRole || localPersonal?.professionalRole || localPersonal?.professionalRoleLabel || localPersonal?.professionalTitle || crewData?.personal?.professionalRole || "",
+            role: userData?.role || localPersonal?.role || crewData?.personal?.role || "",
             availabilityStatus:
               userData?.availability_status ||
               localPersonal?.availabilityStatus ||

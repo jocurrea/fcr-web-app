@@ -210,6 +210,20 @@ export default function OnboardingPage() {
         resume: resumeRaw ? JSON.parse(resumeRaw) : {},
       };
 
+      const resolvedRole =
+        personalData?.role ||
+        (category === "aviation_professional" ? "aviation_professional" : "pilot");
+
+      const resolvedProfessionalRole =
+        personalData?.professionalRoleLabel ||
+        personalData?.professionalTitle ||
+        personalData?.professionalRole ||
+        (category === "aviation_professional"
+          ? "Aviation Professional"
+          : resolvedRole === "crew"
+          ? "Cabin Crew"
+          : "Pilot");
+
       await Promise.allSettled([
         supabase.from("resumes").upsert(
           {
@@ -231,6 +245,8 @@ export default function OnboardingPage() {
             availability_status: personalData?.availabilityStatus || "active",
             onboarded: 1,
             accountType: category,
+            role: resolvedRole,
+            professionalRole: resolvedProfessionalRole,
           },
           { onConflict: "id" }
         ),
@@ -239,6 +255,9 @@ export default function OnboardingPage() {
           data: {
             onboarded: true,
             accountType: category,
+            role: resolvedRole,
+            professionalRole: resolvedProfessionalRole,
+            professional_role: resolvedProfessionalRole,
             crew_data_saved: true,
           },
         }),

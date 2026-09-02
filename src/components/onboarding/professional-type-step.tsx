@@ -107,8 +107,9 @@ export function ProfessionalTypeStep({ onNext, onBack }: ProfessionalTypeStepPro
       const updated = {
         ...parsed,
         category: "aviation_professional",
-        role: "aviation_professional",
-        professionalRole: selectedRole,
+        role: selectedRole,
+        professionalRole: roleLabel,
+        professional_role: roleLabel,
         customRole: selectedRole === "other" ? customRole.trim() : "",
         otherRole: selectedRole === "other" ? customRole.trim() : "",
         specifiedRole: selectedRole === "other" ? customRole.trim() : "",
@@ -120,10 +121,74 @@ export function ProfessionalTypeStep({ onNext, onBack }: ProfessionalTypeStepPro
 
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
-        await supabase.from("users").upsert({
-          id: session.user.id,
-          accountType: "aviation_professional"
-        }, { onConflict: "id" });
+        // 1. Update public.users table with professionalRole, role, and accountType
+        await Promise.allSettled([
+          supabase.from("users").update({
+            accountType: "aviation_professional",
+            role: selectedRole,
+            professionalRole: roleLabel,
+          }).eq("id", session.user.id),
+
+          supabase.from("users").upsert({
+            id: session.user.id,
+            accountType: "aviation_professional",
+            role: selectedRole,
+            professionalRole: roleLabel,
+          }, { onConflict: "id" }),
+
+          // 2. Update auth user metadata (matching mobile payload format)
+          supabase.auth.updateUser({
+            data: {
+              accountType: "aviation_professional",
+              role: selectedRole,
+              professionalRole: roleLabel,
+              professional_role: roleLabel,
+              category: "aviation_professional",
+              professionalTitle: roleLabel,
+              professionalRoleLabel: roleLabel,
+            },
+          }),
+        ]);
+
+        // 3. Gracefully update profiles table if present
+        try {
+          await supabase.from("profiles").update({
+            role: selectedRole,
+            professionalRole: roleLabel,
+            professional_role: roleLabel,
+          }).eq("id", session.user.id);
+        } catch {
+          // ignore if table doesn't exist
+        }
+
+        // 4. Update resume record with personal role info
+        try {
+          const { data: currentResume } = await supabase
+            .from("resumes")
+            .select("data")
+            .eq("userId", session.user.id)
+            .maybeSingle();
+
+          const resumeData = (currentResume?.data as Record<string, unknown>) || {};
+          const currentPersonal = (resumeData.personal as Record<string, unknown>) || {};
+          await supabase.from("resumes").upsert({
+            userId: session.user.id,
+            data: {
+              ...resumeData,
+              personal: {
+                ...currentPersonal,
+                ...updated,
+                role: selectedRole,
+                professionalRole: roleLabel,
+                professional_role: roleLabel,
+                professionalTitle: roleLabel,
+                professionalRoleLabel: roleLabel,
+              },
+            },
+          }, { onConflict: "userId" });
+        } catch (resumeErr) {
+          console.error("Error updating resume role data:", resumeErr);
+        }
       }
 
       if (onNext) {
