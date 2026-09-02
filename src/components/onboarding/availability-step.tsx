@@ -59,14 +59,15 @@ export function AvailabilityStep({ onNext, onBack }: AvailabilityStepProps) {
 
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
-        // Update users table with availability_status, role, and professionalRole
+        // Update users table with availability_status, role, and professionalRole matching schema
         await supabase.from("users").upsert({
           id: session.user.id,
           availability_status: selectedStatus,
           onboarded: 1,
-          accountType: "aviation_professional",
-          role: roleKey,
-          professionalRole: roleLabel,
+          accountType: "flight_crew",
+          role: roleKey || "aviation_professional",
+          professionalRole: "aviation_professional",
+          professionalTitleKey: roleKey || "aviation_professional",
         }, { onConflict: "id" });
 
         // Update resumes table
@@ -96,9 +97,11 @@ export function AvailabilityStep({ onNext, onBack }: AvailabilityStepProps) {
           data: {
             onboarded: true,
             accountType: "aviation_professional",
-            role: roleKey,
-            professionalRole: roleLabel,
-            professional_role: roleLabel,
+            role: roleKey || "aviation_professional",
+            professionalRole: "aviation_professional",
+            professional_role: "aviation_professional",
+            professionalRoleLabel: roleLabel,
+            professionalTitle: roleLabel,
             availability_status: selectedStatus,
             crew_data_saved: true,
           },

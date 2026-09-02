@@ -121,45 +121,29 @@ export function ProfessionalTypeStep({ onNext, onBack }: ProfessionalTypeStepPro
 
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
-        // 1. Update public.users table with professionalRole, role, and accountType
+        // 1. Update public.users table with professionalRole, role, and accountType matching DB schema
         await Promise.allSettled([
           supabase.from("users").update({
-            accountType: "aviation_professional",
+            accountType: "flight_crew",
             role: selectedRole,
-            professionalRole: roleLabel,
+            professionalRole: "aviation_professional",
+            professionalTitleKey: selectedRole,
+            ...(selectedRole === "other" && customRole.trim() ? { professionalTitleOther: customRole.trim() } : {}),
           }).eq("id", session.user.id),
-
-          supabase.from("users").upsert({
-            id: session.user.id,
-            accountType: "aviation_professional",
-            role: selectedRole,
-            professionalRole: roleLabel,
-          }, { onConflict: "id" }),
 
           // 2. Update auth user metadata (matching mobile payload format)
           supabase.auth.updateUser({
             data: {
               accountType: "aviation_professional",
               role: selectedRole,
-              professionalRole: roleLabel,
-              professional_role: roleLabel,
+              professionalRole: "aviation_professional",
+              professional_role: "aviation_professional",
               category: "aviation_professional",
               professionalTitle: roleLabel,
               professionalRoleLabel: roleLabel,
             },
           }),
         ]);
-
-        // 3. Gracefully update profiles table if present
-        try {
-          await supabase.from("profiles").update({
-            role: selectedRole,
-            professionalRole: roleLabel,
-            professional_role: roleLabel,
-          }).eq("id", session.user.id);
-        } catch {
-          // ignore if table doesn't exist
-        }
 
         // 4. Update resume record with personal role info
         try {

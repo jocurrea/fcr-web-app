@@ -127,6 +127,46 @@ export default function RoleSelectionPage() {
     };
   }, [router]);
 
+  const handleSelectType = async (type: "flight_crew" | "business" | "aviation_professional") => {
+    setSelectedType(type);
+
+    if (type === "flight_crew" || type === "aviation_professional") {
+      const targetRole = type === "aviation_professional" ? "aviation_professional" : "pilot";
+      const targetProfessionalRole = type === "aviation_professional" ? "aviation_professional" : "pilot";
+      const humanLabel = type === "aviation_professional" ? "Aviation Professional" : "Pilot";
+
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          // Direct UPDATE to public.users filtered by authenticated user id
+          await supabase
+            .from("users")
+            .update({
+              professionalRole: targetProfessionalRole,
+              role: targetRole,
+              accountType: "flight_crew",
+            })
+            .eq("id", user.id);
+
+          // Sync auth user metadata
+          await supabase.auth.updateUser({
+            data: {
+              accountType: type,
+              role: targetRole,
+              professionalRole: targetProfessionalRole,
+              professional_role: targetProfessionalRole,
+              professionalTitle: humanLabel,
+              professionalRoleLabel: humanLabel,
+              category: type,
+            },
+          });
+        }
+      } catch (err) {
+        console.warn("Direct role selection update warning:", err);
+      }
+    }
+  };
+
   const handleContinue = async () => {
     if (!selectedType || isContinuing) return;
 
@@ -136,7 +176,8 @@ export default function RoleSelectionPage() {
     if (selectedType === "flight_crew" || selectedType === "aviation_professional") {
       const { data: { user } } = await supabase.auth.getUser();
       const defaultRole = selectedType === "aviation_professional" ? "aviation_professional" : "pilot";
-      const defaultProfessionalRole = selectedType === "aviation_professional" ? "Aviation Professional" : "Pilot";
+      const validProfessionalRole = selectedType === "aviation_professional" ? "aviation_professional" : "pilot";
+      const humanLabel = selectedType === "aviation_professional" ? "Aviation Professional" : "Pilot";
 
       if (user) {
         await Promise.allSettled([
@@ -144,31 +185,19 @@ export default function RoleSelectionPage() {
             data: {
               accountType: selectedType,
               role: defaultRole,
-              professionalRole: defaultProfessionalRole,
-              professional_role: defaultProfessionalRole,
+              professionalRole: validProfessionalRole,
+              professional_role: validProfessionalRole,
+              professionalTitle: humanLabel,
+              professionalRoleLabel: humanLabel,
               category: selectedType,
             },
           }),
           supabase.from("users").update({
-            accountType: selectedType,
+            accountType: "flight_crew",
             role: defaultRole,
-            professionalRole: defaultProfessionalRole,
+            professionalRole: validProfessionalRole,
           }).eq("id", user.id),
-          supabase.from("users").upsert({
-            id: user.id,
-            accountType: selectedType,
-            role: defaultRole,
-            professionalRole: defaultProfessionalRole,
-          }, { onConflict: "id" }),
         ]);
-
-        try {
-          await supabase.from("profiles").update({
-            role: defaultRole,
-            professionalRole: defaultProfessionalRole,
-            professional_role: defaultProfessionalRole,
-          }).eq("id", user.id);
-        } catch (e) {}
       }
 
       try {
@@ -178,10 +207,10 @@ export default function RoleSelectionPage() {
           ...parsed,
           category: selectedType,
           role: defaultRole,
-          professionalRole: defaultProfessionalRole,
-          professional_role: defaultProfessionalRole,
-          professionalTitle: defaultProfessionalRole,
-          professionalRoleLabel: defaultProfessionalRole,
+          professionalRole: validProfessionalRole,
+          professional_role: validProfessionalRole,
+          professionalTitle: humanLabel,
+          professionalRoleLabel: humanLabel,
         }));
       } catch (e) {}
       
@@ -248,7 +277,7 @@ export default function RoleSelectionPage() {
           {/* 1. Flight Crew Option */}
           <button
             type="button"
-            onClick={() => setSelectedType("flight_crew")}
+            onClick={() => handleSelectType("flight_crew")}
             className={`flex items-center p-5 rounded-2xl border transition-all text-left group cursor-pointer ${
               selectedType === "flight_crew" 
                 ? "border-[#1d4ed8] bg-[#f0f5ff] ring-2 ring-[#1d4ed8]/20 shadow-sm" 
@@ -278,7 +307,7 @@ export default function RoleSelectionPage() {
           {/* 2. Business Option */}
           <button
             type="button"
-            onClick={() => setSelectedType("business")}
+            onClick={() => handleSelectType("business")}
             className={`flex items-center p-5 rounded-2xl border transition-all text-left group cursor-pointer ${
               selectedType === "business" 
                 ? "border-[#1d4ed8] bg-[#f0f5ff] ring-2 ring-[#1d4ed8]/20 shadow-sm" 
@@ -310,7 +339,7 @@ export default function RoleSelectionPage() {
           {/* 3. Aviation Professional Option */}
           <button
             type="button"
-            onClick={() => setSelectedType("aviation_professional")}
+            onClick={() => handleSelectType("aviation_professional")}
             className={`flex items-center p-5 rounded-2xl border transition-all text-left group cursor-pointer ${
               selectedType === "aviation_professional" 
                 ? "border-[#1d4ed8] bg-[#f0f5ff] ring-2 ring-[#1d4ed8]/20 shadow-sm" 

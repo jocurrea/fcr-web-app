@@ -210,17 +210,46 @@ export default function OnboardingPage() {
         resume: resumeRaw ? JSON.parse(resumeRaw) : {},
       };
 
-      const resolvedRole =
-        personalData?.role ||
-        (category === "aviation_professional" ? "aviation_professional" : "pilot");
+      // Fetch existing user to avoid overwriting previously selected roles with null
+      const { data: existingUser } = await supabase
+        .from("users")
+        .select("role, professionalRole, accountType, professionalTitleKey")
+        .eq("id", session.user.id)
+        .maybeSingle();
 
-      const resolvedProfessionalRole =
+      const isAviationPro =
+        category === "aviation_professional" ||
+        personalData?.category === "aviation_professional" ||
+        personalData?.role === "aviation_professional" ||
+        existingUser?.professionalRole === "aviation_professional";
+
+      const isCrew =
+        personalData?.role === "crew" ||
+        personalData?.role === "cabin_crew" ||
+        existingUser?.professionalRole === "crew" ||
+        existingUser?.role === "crew";
+
+      // Must strictly match users_professional_role_check: 'pilot' | 'crew' | 'aviation_professional'
+      const validProfessionalRole = isAviationPro
+        ? "aviation_professional"
+        : isCrew
+        ? "crew"
+        : (existingUser?.professionalRole || "pilot");
+
+      const validRole =
+        personalData?.role ||
+        existingUser?.role ||
+        (isAviationPro ? "aviation_professional" : isCrew ? "crew" : "pilot");
+
+      // Must strictly match users_account_type_check: 'flight_crew' | 'business'
+      const validAccountType: "flight_crew" | "business" = "flight_crew";
+
+      const humanRoleLabel =
         personalData?.professionalRoleLabel ||
         personalData?.professionalTitle ||
-        personalData?.professionalRole ||
-        (category === "aviation_professional"
+        (isAviationPro
           ? "Aviation Professional"
-          : resolvedRole === "crew"
+          : isCrew
           ? "Cabin Crew"
           : "Pilot");
 
@@ -245,9 +274,10 @@ export default function OnboardingPage() {
             location: personalData?.location || null,
             availability_status: personalData?.availabilityStatus || "active",
             onboarded: 1,
-            accountType: category,
-            role: resolvedRole,
-            professionalRole: resolvedProfessionalRole,
+            accountType: validAccountType,
+            role: validRole,
+            professionalRole: validProfessionalRole,
+            ...(isAviationPro ? { professionalTitleKey: validRole } : {}),
           },
           { onConflict: "id" }
         ),
@@ -259,9 +289,12 @@ export default function OnboardingPage() {
           data: {
             onboarded: true,
             accountType: category,
-            role: resolvedRole,
-            professionalRole: resolvedProfessionalRole,
-            professional_role: resolvedProfessionalRole,
+            category: category,
+            role: validRole,
+            professionalRole: validProfessionalRole,
+            professional_role: validProfessionalRole,
+            professionalRoleLabel: humanRoleLabel,
+            professionalTitle: humanRoleLabel,
             crew_data_saved: true,
           },
         });
