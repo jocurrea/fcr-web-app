@@ -41,6 +41,10 @@ interface CompanyTypeStepProps {
   onNext: () => void;
 }
 
+// Validates exclusively alphabetic characters (including accents) and spaces
+const isAlphaOnly = (val: string) => /^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s]+$/.test(val) && /[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ]/.test(val);
+const sanitizeAlpha = (val: string) => val.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s]/g, "");
+
 export function CompanyTypeStep({ onNext }: CompanyTypeStepProps) {
   const { onboarding, isLoading, error: loadError, saveTypes } = useBusinessOnboarding();
   const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
@@ -61,7 +65,7 @@ export function CompanyTypeStep({ onNext }: CompanyTypeStepProps) {
 
   const selectedSet = useMemo(() => new Set(selectedTypes), [selectedTypes]);
   const isOtherSelected = selectedSet.has("other");
-  const isOtherValid = !isOtherSelected || otherTypeText.trim().length > 0;
+  const isOtherValid = !isOtherSelected || (otherTypeText.trim().length > 0 && isAlphaOnly(otherTypeText.trim()));
   const canContinue = selectedTypes.length > 0 && isOtherValid && !isLoading && !isSaving;
 
   const toggleType = (key: string) => {
@@ -72,6 +76,10 @@ export function CompanyTypeStep({ onNext }: CompanyTypeStepProps) {
 
   const handleNext = async () => {
     if (!canContinue) return;
+    if (isOtherSelected && !isAlphaOnly(otherTypeText.trim())) {
+      setError("Please enter only alphabetic characters for the other company type.");
+      return;
+    }
     setIsSaving(true);
     setError(null);
 
@@ -143,17 +151,20 @@ export function CompanyTypeStep({ onNext }: CompanyTypeStepProps) {
                     </div>
                   </div>
 
-                  {/* Dynamic input field when Other is selected - identical to Aviation Professional */}
+                  {/* Dynamic input field when Other is selected - validated exclusively for alphabetic characters */}
                   {isOther && isSelected && (
                     <div className="mt-1 px-1 animate-in fade-in slide-in-from-top-1 duration-200" onClick={(e) => e.stopPropagation()}>
                       <input
                         type="text"
                         value={otherTypeText}
-                        onChange={(e) => setOtherTypeText(e.target.value)}
+                        onChange={(e) => setOtherTypeText(sanitizeAlpha(e.target.value))}
                         placeholder="Specify your company type"
                         className="w-full px-4 py-3.5 bg-white border border-gray-200 rounded-2xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[#1d4ed8] focus:ring-1 focus:ring-[#1d4ed8] transition-all shadow-xs"
                         autoFocus
                       />
+                      <p className="text-[11px] text-gray-500 mt-1 pl-1">
+                        Only alphabetic characters allowed (letters and spaces).
+                      </p>
                     </div>
                   )}
                 </div>

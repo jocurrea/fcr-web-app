@@ -38,6 +38,10 @@ const ROLES = [
   }
 ];
 
+// Validates exclusively alphabetic characters (including accents) and spaces
+const isAlphaOnly = (val: string) => /^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s]+$/.test(val) && /[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ]/.test(val);
+const sanitizeAlpha = (val: string) => val.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s]/g, "");
+
 export function ProfessionalTypeStep({ onNext, onBack }: ProfessionalTypeStepProps) {
   const router = useRouter();
   const [selectedRole, setSelectedRole] = useState<string | null>(null);
@@ -100,11 +104,14 @@ export function ProfessionalTypeStep({ onNext, onBack }: ProfessionalTypeStepPro
   };
 
   const isFormValid = Boolean(
-    selectedRole && (selectedRole !== "other" || customRole.trim().length > 0)
+    selectedRole &&
+      (selectedRole !== "other" ||
+        (customRole.trim().length > 0 && isAlphaOnly(customRole.trim())))
   );
 
   const handleNextClick = async () => {
     if (!isFormValid || isSaving || !selectedRole) return;
+    if (selectedRole === "other" && !isAlphaOnly(customRole.trim())) return;
 
     setIsSaving(true);
     try {
@@ -284,17 +291,20 @@ export function ProfessionalTypeStep({ onNext, onBack }: ProfessionalTypeStepPro
                   </div>
                 </button>
 
-                {/* Dynamic input field when Other Aviation Professional is selected */}
+                {/* Dynamic input field when Other Aviation Professional is selected - validated exclusively for alphabetic characters */}
                 {isOtherRole && isSelected && (
                   <div className="mt-1 px-1 animate-in fade-in slide-in-from-top-1 duration-200">
                     <input
                       type="text"
                       value={customRole}
-                      onChange={(e) => setCustomRole(e.target.value)}
+                      onChange={(e) => setCustomRole(sanitizeAlpha(e.target.value))}
                       placeholder="Specify your professional role"
                       className="w-full px-4 py-3.5 bg-white border border-gray-200 rounded-2xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[#1d4ed8] focus:ring-1 focus:ring-[#1d4ed8] transition-all shadow-xs"
                       autoFocus
                     />
+                    <p className="text-[11px] text-gray-500 mt-1 pl-1">
+                      Only alphabetic characters allowed (letters and spaces).
+                    </p>
                   </div>
                 )}
               </div>
