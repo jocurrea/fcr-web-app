@@ -71,7 +71,13 @@ export async function signUpWithPassword(formData: FormData) {
     email,
     password,
     options: {
-      emailRedirectTo: `${origin}/auth/callback?next=/`,
+      emailRedirectTo: `${origin}/auth/callback?next=/role-selection`,
+      data: {
+        onboarded: false,
+        platformRole: "user",
+        role: null,
+        professionalRole: null,
+      },
     },
   });
 
@@ -79,8 +85,20 @@ export async function signUpWithPassword(formData: FormData) {
     redirect(`/register?error=${safeRedirectParam(error.message)}`);
   }
 
-  if (data.session) {
-    redirect("/");
+  if (data.session && data.user) {
+    try {
+      await supabase.from("users").upsert({
+        id: data.user.id,
+        email: email.trim().toLowerCase(),
+        onboarded: 0,
+        role: null,
+        professionalRole: null,
+      }, { onConflict: "id" });
+    } catch {
+      // ignore
+    }
+
+    redirect("/role-selection");
   }
 
   redirect(

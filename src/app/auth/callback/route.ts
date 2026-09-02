@@ -20,18 +20,54 @@ export async function GET(request: NextRequest) {
         .eq("id", userId)
         .maybeSingle();
 
-      let isOnboarded =
-        userRecord?.onboarded === 1 ||
-        userRecord?.onboarded === true ||
-        String(userRecord?.onboarded) === "1" ||
-        String(userRecord?.onboarded).toLowerCase() === "true" ||
-        data.user.user_metadata?.onboarded === true;
+      const dbOnboardedVal = userRecord?.onboarded;
+      const isDbOnboarded =
+        dbOnboardedVal === 1 ||
+        dbOnboardedVal === true ||
+        String(dbOnboardedVal) === "1" ||
+        String(dbOnboardedVal).toLowerCase() === "true";
+
+      const isDbExplicitlyFalse =
+        dbOnboardedVal === 0 ||
+        dbOnboardedVal === false ||
+        String(dbOnboardedVal) === "0" ||
+        String(dbOnboardedVal).toLowerCase() === "false" ||
+        dbOnboardedVal === null ||
+        dbOnboardedVal === undefined;
+
+      const metaOnboardedVal = data.user.user_metadata?.onboarded;
+      const isMetaOnboarded =
+        metaOnboardedVal === true ||
+        String(metaOnboardedVal) === "1" ||
+        String(metaOnboardedVal).toLowerCase() === "true";
+
+      const isMetaExplicitlyFalse =
+        metaOnboardedVal === false ||
+        String(metaOnboardedVal) === "0" ||
+        String(metaOnboardedVal).toLowerCase() === "false" ||
+        metaOnboardedVal === null ||
+        metaOnboardedVal === undefined;
+
+      let isOnboarded = false;
+      if (isDbExplicitlyFalse || isMetaExplicitlyFalse) {
+        isOnboarded = false;
+      } else {
+        isOnboarded = isDbOnboarded || isMetaOnboarded;
+      }
 
       const effectiveRole =
         userRecord?.accountType ||
         userRecord?.role ||
         data.user.user_metadata?.accountType ||
+        data.user.user_metadata?.role ||
         "";
+
+      let hasRole = Boolean(
+        effectiveRole &&
+        effectiveRole !== "individual" &&
+        effectiveRole !== "corporate_member" &&
+        effectiveRole !== "null"
+      );
 
       // Check companies fallback for business accounts
       if (effectiveRole === "business" || !isOnboarded) {
@@ -46,25 +82,13 @@ export async function GET(request: NextRequest) {
           const status = companies[0].status;
           if (status === "approved" || status === "active" || status === "pending") {
             isOnboarded = true;
+            hasRole = true;
           }
         }
       }
 
-      // Check resume fallback
-      if (!isOnboarded) {
-        const { data: resumeData } = await supabase
-          .from("resumes")
-          .select("data")
-          .eq("userId", userId)
-          .maybeSingle();
-
-        if (resumeData?.data) {
-          isOnboarded = true;
-        }
-      }
-
-      // 2. If onboarded, redirect directly to /home
-      if (isOnboarded) {
+      // 2. If fully onboarded and has role, redirect directly to /home
+      if (isOnboarded && hasRole) {
         return NextResponse.redirect(new URL("/home", request.url));
       }
 

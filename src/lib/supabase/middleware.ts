@@ -5,22 +5,13 @@ import { supabaseAnonKey, supabaseUrl } from "@/lib/env";
 
 export async function updateSession(request: NextRequest) {
   const url = request.nextUrl.clone();
+  const pathname = url.pathname;
 
-  // Clean residual parameters on /login
-  if (url.pathname === "/login" && (url.searchParams.has("edit") || url.searchParams.has("from"))) {
+  // 1. Clean residual parameters on /login
+  if (pathname === "/login" && (url.searchParams.has("edit") || url.searchParams.has("from"))) {
     url.searchParams.delete("edit");
     url.searchParams.delete("from");
     return NextResponse.redirect(url);
-  }
-
-  // Redirect onboarded users away from /role-selection unless explicitly editing from profile
-  if (url.pathname === "/role-selection" && request.cookies.get("flightcrew_onboarded")?.value === "true") {
-    const isProfileEdit = url.searchParams.get("from") === "profile" || url.searchParams.get("edit") === "company";
-    if (!isProfileEdit) {
-      url.pathname = "/home";
-      url.search = "";
-      return NextResponse.redirect(url);
-    }
   }
 
   let response = NextResponse.next({
@@ -48,7 +39,175 @@ export async function updateSession(request: NextRequest) {
     },
   });
 
-  await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const isAuthCallback = pathname === "/auth/callback";
+  if (isAuthCallback) {
+    return response;
+  }
+
+  const isPublicAuthRoute =
+    pathname === "/login" ||
+    pathname === "/register" ||
+    pathname === "/welcome" ||
+    pathname === "/forgotPassword" ||
+    pathname === "/reset";
+
+  const isPublicStaticRoute =
+    pathname === "/privacyPolicy" ||
+    pathname === "/termsAndConditions" ||
+    pathname === "/community-safety" ||
+    pathname === "/_not-found";
+
+  const isOnboardingRoute =
+    pathname === "/role-selection" ||
+    pathname.startsWith("/onboarding"); // /onboarding, /onboarding-business, /onboarding-complete
+
+  const isRoot = pathname === "/";
+
+  // Helper to carry cookies over redirects
+  const makeRedirect = (target: string) => {
+    const redirectUrl = new URL(target, request.url);
+    const redirectRes = NextResponse.redirect(redirectUrl);
+    response.cookies.getAll().forEach((c) => {
+      redirectRes.cookies.set(c.name, c.value, c);
+    });
+    return redirectRes;
+  };
+
+  // -------------------------------------------------------------
+  // Case A: Unauthenticated user
+  // -------------------------------------------------------------
+  if (!user) {
+    if (isPublicAuthRoute || isPublicStaticRoute) {
+      return response;
+    }
+    if (isRoot) {
+      return makeRedirect("/welcome");
+    }
+    // Protected or onboarding routes require login
+    return makeRedirect("/login");
+  }
+
+  // -------------------------------------------------------------
+  // Case B: Authenticated user — evaluate real profile status
+  // -------------------------------------------------------------
+  const { data: userRecord } = await supabase
+    .from("users")
+    .select("id, onboarded, accountType, role")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  const dbOnboardedVal = userRecord?.onboarded;
+  const isDbOnboarded =
+    dbOnboardedVal === 1 ||
+    dbOnboardedVal === true ||
+    String(dbOnboardedVal) === "1" ||
+    String(dbOnboardedVal).toLowerCase() === "true";
+
+  const isDbExplicitlyNotOnboarded =
+    dbOnboardedVal === 0 ||
+    dbOnboardedVal === false ||
+    String(dbOnboardedVal) === "0" ||
+    String(dbOnboardedVal).toLowerCase() === "false" ||
+    dbOnboardedVal === null ||
+    dbOnboardedVal === undefined;
+
+  const metaOnboardedVal = user.user_metadata?.onboarded;
+  const isMetaOnboarded =
+    metaOnboardedVal === true ||
+    String(metaOnboardedVal) === "1" ||
+    String(metaOnboardedVal).toLowerCase() === "true";
+
+  const isMetaExplicitlyNotOnboarded =
+    metaOnboardedVal === false ||
+    String(metaOnboardedVal) === "0" ||
+    String(metaOnboardedVal).toLowerCase() === "false" ||
+    metaOnboardedVal === null ||
+    metaOnboardedVal === undefined;
+
+  let isOnboarded = false;
+  if (isDbExplicitlyNotOnboarded || isMetaExplicitlyNotOnboarded) {
+    isOnboarded = false;
+  } else {
+    isOnboarded = isDbOnboarded || isMetaOnboarded;
+  }
+
+  const effectiveRole =
+    userRecord?.accountType ||
+    userRecord?.role ||
+    user.user_metadata?.accountType ||
+    user.user_metadata?.role ||
+    "";
+
+  let hasRole = Boolean(
+    effectiveRole &&
+    effectiveRole !== "individual" &&
+    effectiveRole !== "corporate_member" &&
+    effectiveRole !== "null"
+  );
+
+  // Fallback for business accounts with approved company
+  if (!isOnboarded && effectiveRole === "business") {
+    const { data: companies } = await supabase
+      .from("companies")
+      .select("status")
+      .eq("owner_user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(1);
+
+    if (companies && companies.length > 0) {
+      const status = companies[0].status;
+      if (status === "approved" || status === "active" || status === "pending") {
+        isOnboarded = true;
+        hasRole = true;
+      }
+    }
+  }
+
+  // Synchronize flightcrew_onboarded cookie with verified status
+  if (isOnboarded && hasRole) {
+    response.cookies.set("flightcrew_onboarded", "true", { path: "/", maxAge: 31536000 });
+  } else {
+    response.cookies.set("flightcrew_onboarded", "false", { path: "/", maxAge: 0 });
+  }
+
+  // 1. User is NOT fully onboarded or has no role
+  if (!isOnboarded || !hasRole) {
+    // If attempting to access /home or any protected route
+    if (pathname === "/home" || (!isOnboardingRoute && !isPublicStaticRoute)) {
+      return makeRedirect("/role-selection");
+    }
+    // Allow onboarding flow and static legal pages
+    return response;
+  }
+
+  // 2. User IS fully onboarded and has a role
+  if (isOnboarded && hasRole) {
+    // If trying to access public auth routes or welcome
+    if (isPublicAuthRoute || isRoot) {
+      return makeRedirect("/home");
+    }
+
+    // If trying to access /role-selection without explicit edit parameter
+    if (pathname === "/role-selection") {
+      const isExplicitEdit =
+        url.searchParams.get("from") === "profile" ||
+        url.searchParams.get("edit") === "company";
+      if (!isExplicitEdit) {
+        return makeRedirect("/home");
+      }
+    }
+
+    // If trying to access /onboarding without edit flag
+    if (pathname === "/onboarding" && !url.searchParams.has("edit")) {
+      return makeRedirect("/home");
+    }
+
+    return response;
+  }
 
   return response;
 }

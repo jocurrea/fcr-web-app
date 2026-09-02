@@ -89,10 +89,12 @@ function RegisterForm() {
         options: {
           data: {
             accountType,
-            professionalRole: "Aviation Professional",
             platformRole: "user",
             employer: employerName,
             invited_by_company_id: invitedCompany?.id,
+            onboarded: false,
+            role: null,
+            professionalRole: null,
           },
         },
       });
@@ -107,10 +109,40 @@ function RegisterForm() {
         throw authError;
       }
 
+      // Clear any lingering onboarding state or cookies from previous sessions
+      try {
+        document.cookie = "flightcrew_onboarded=false; path=/; max-age=0";
+        localStorage.removeItem("flightcrew_onboarded");
+        sessionStorage.removeItem("flightcrew_onboarded");
+        localStorage.removeItem("onboarding_personal");
+        localStorage.removeItem("onboarding_licenses");
+        localStorage.removeItem("onboarding_ratings");
+        localStorage.removeItem("onboarding_work");
+        localStorage.removeItem("onboarding_resume");
+        localStorage.removeItem("userProfilePhoto");
+        localStorage.removeItem("userCoverPhoto");
+      } catch (storageErr) {
+        console.warn("Storage cleanup error:", storageErr);
+      }
+
       const userId = data.session?.user.id || data.user?.id;
 
       if (userId) {
         localStorage.setItem("current_user_id", userId);
+
+        // Ensure user record in users table has onboarded strictly set to 0 and no assigned role
+        try {
+          await supabase.from("users").upsert({
+            id: userId,
+            email: email.trim().toLowerCase(),
+            onboarded: 0,
+            accountType: accountType || null,
+            role: null,
+            professionalRole: null,
+          }, { onConflict: "id" });
+        } catch (dbErr) {
+          console.warn("Could not upsert default user row:", dbErr);
+        }
 
         // Scenario 2: Bind user profile to invited Business entity with Pre-linked status
         if (invitedCompany?.id) {
@@ -126,7 +158,7 @@ function RegisterForm() {
         }
       }
 
-      // Successful registration - proceed to onboarding
+      // Successful registration - proceed strictly to role selection
       router.push("/role-selection");
     } catch (err: any) {
       setError(err.message || "An error occurred during registration");

@@ -59,19 +59,54 @@ export default function LoginPage() {
         console.warn("[Login] Error fetching user record:", userError);
       }
 
-      // Check onboarded flag (handles numeric 1, boolean true, or strings)
-      let isOnboarded =
-        userRecord?.onboarded === 1 ||
-        userRecord?.onboarded === true ||
-        String(userRecord?.onboarded) === "1" ||
-        String(userRecord?.onboarded).toLowerCase() === "true" ||
-        session?.user?.user_metadata?.onboarded === true;
+      const dbOnboardedVal = userRecord?.onboarded;
+      const isDbOnboarded =
+        dbOnboardedVal === 1 ||
+        dbOnboardedVal === true ||
+        String(dbOnboardedVal) === "1" ||
+        String(dbOnboardedVal).toLowerCase() === "true";
+
+      const isDbExplicitlyFalse =
+        dbOnboardedVal === 0 ||
+        dbOnboardedVal === false ||
+        String(dbOnboardedVal) === "0" ||
+        String(dbOnboardedVal).toLowerCase() === "false" ||
+        dbOnboardedVal === null ||
+        dbOnboardedVal === undefined;
+
+      const metaOnboardedVal = session?.user?.user_metadata?.onboarded;
+      const isMetaOnboarded =
+        metaOnboardedVal === true ||
+        String(metaOnboardedVal) === "1" ||
+        String(metaOnboardedVal).toLowerCase() === "true";
+
+      const isMetaExplicitlyFalse =
+        metaOnboardedVal === false ||
+        String(metaOnboardedVal) === "0" ||
+        String(metaOnboardedVal).toLowerCase() === "false" ||
+        metaOnboardedVal === null ||
+        metaOnboardedVal === undefined;
+
+      let isOnboarded = false;
+      if (isDbExplicitlyFalse || isMetaExplicitlyFalse) {
+        isOnboarded = false;
+      } else {
+        isOnboarded = isDbOnboarded || isMetaOnboarded;
+      }
 
       const effectiveRole =
         userRecord?.accountType ||
         userRecord?.role ||
         session?.user?.user_metadata?.accountType ||
+        session?.user?.user_metadata?.role ||
         "";
+
+      let hasRole = Boolean(
+        effectiveRole &&
+        effectiveRole !== "individual" &&
+        effectiveRole !== "corporate_member" &&
+        effectiveRole !== "null"
+      );
 
       // Check if business user already completed onboarding via companies table
       if (effectiveRole === "business" || !isOnboarded) {
@@ -86,26 +121,14 @@ export default function LoginPage() {
           const status = companies[0].status;
           if (status === "approved" || status === "active" || status === "pending") {
             isOnboarded = true;
+            hasRole = true;
           }
         }
       }
 
-      // Check resume fallback for flight crew / aviation professionals
-      if (!isOnboarded) {
-        const { data: resumeData } = await supabase
-          .from("resumes")
-          .select("data")
-          .eq("userId", userId)
-          .maybeSingle();
-
-        if (resumeData?.data) {
-          isOnboarded = true;
-        }
-      }
-
-      // 2. Ruta Correcta: Si el usuario ya tiene su cuenta configurada (onboarded === true),
+      // 2. Ruta Correcta: Si el usuario ya tiene su cuenta configurada y rol asignado,
       // fuerza la redirección directamente hacia el panel principal (/home)
-      if (isOnboarded) {
+      if (isOnboarded && hasRole) {
         try {
           document.cookie = "flightcrew_onboarded=true; path=/; max-age=31536000";
           sessionStorage.setItem("flightcrew_onboarded", "true");
