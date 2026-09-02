@@ -18,7 +18,7 @@ export async function signInWithPassword(formData: FormData) {
   const password = String(formData.get("password") ?? "");
   const supabase = await createClient();
 
-  const { error } = await supabase.auth.signInWithPassword({
+  const { data, error } = await supabase.auth.signInWithPassword({
     email,
     password,
   });
@@ -27,7 +27,38 @@ export async function signInWithPassword(formData: FormData) {
     redirect(`/login?error=${safeRedirectParam(error.message)}`);
   }
 
-  redirect("/");
+  if (data?.user) {
+    const { data: userRecord } = await supabase
+      .from("users")
+      .select("id, onboarded, accountType, role")
+      .eq("id", data.user.id)
+      .maybeSingle();
+
+    const isOnboarded =
+      userRecord?.onboarded === 1 ||
+      userRecord?.onboarded === true ||
+      String(userRecord?.onboarded) === "1" ||
+      String(userRecord?.onboarded).toLowerCase() === "true" ||
+      data.user.user_metadata?.onboarded === true;
+
+    const effectiveRole =
+      userRecord?.accountType ||
+      userRecord?.role ||
+      data.user.user_metadata?.accountType ||
+      "";
+
+    if (isOnboarded) {
+      redirect("/home");
+    }
+
+    if (effectiveRole === "business") {
+      redirect("/onboarding-business");
+    }
+
+    redirect("/role-selection");
+  }
+
+  redirect("/home");
 }
 
 export async function signUpWithPassword(formData: FormData) {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { LogOut, ChevronRight, Users, Building2, User, Check } from "lucide-react";
+import { LogOut, Users, User, Check } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { ensureBusinessDraft } from "@/lib/api/business";
@@ -17,14 +17,9 @@ export default function RoleSelectionPage() {
     let isMounted = true;
 
     const params = new URLSearchParams(window.location.search);
-    const isExplicitEdit = params.get("edit") === "true" || params.get("edit") === "company" || params.get("from") === "profile" || params.get("from") === "onboarding" || typeof window !== "undefined" && window.location.search.includes("edit=");
+    const isProfileEdit = params.get("from") === "profile" || params.get("edit") === "company";
 
     async function redirectCompletedUsers() {
-      if (isExplicitEdit) {
-        setIsCheckingAccess(false);
-        return;
-      }
-
       const { data: { session } } = await supabase.auth.getSession();
 
       if (!session) {
@@ -37,16 +32,21 @@ export default function RoleSelectionPage() {
 
       const { data: userRecord } = await supabase
         .from("users")
-        .select("onboarded, accountType")
+        .select("onboarded, accountType, role")
         .eq("id", session.user.id)
         .maybeSingle();
 
       if (userRecord) {
-        onboarded = !!userRecord.onboarded;
-        accountType = userRecord.accountType || '';
+        onboarded =
+          userRecord.onboarded === 1 ||
+          userRecord.onboarded === true ||
+          String(userRecord.onboarded) === "1" ||
+          String(userRecord.onboarded).toLowerCase() === "true" ||
+          session.user.user_metadata?.onboarded === true;
+        accountType = userRecord.accountType || userRecord.role || '';
       }
 
-      // Fallback: If the database trigger failed to create the users row, check if they have a company
+      // Fallback: If company approved, active or pending
       const { data: companies } = await supabase
         .from("companies")
         .select("status")
@@ -57,28 +57,67 @@ export default function RoleSelectionPage() {
       if (companies && companies.length > 0) {
         accountType = "business";
         const status = companies[0].status;
-        if (status === "approved" || status === "pending") {
+        if (status === "approved" || status === "pending" || status === "active") {
+          onboarded = true;
+        }
+      }
+
+      // Check resume fallback for flight crew / aviation professional
+      if (!onboarded) {
+        const { data: resumeData } = await supabase
+          .from("resumes")
+          .select("data")
+          .eq("userId", session.user.id)
+          .maybeSingle();
+
+        if (resumeData?.data) {
           onboarded = true;
         }
       }
 
       if (!isMounted) return;
 
-      if (!onboarded) {
-        setIsCheckingAccess(false);
-        return;
-      }
-
-      if (accountType === "business") {
-        if (!isMounted) return;
-
-        if (companies?.[0]?.status === "rejected") {
+      // If user is already onboarded:
+      if (onboarded) {
+        // Only allow if explicitly editing from profile
+        if (isProfileEdit) {
           setIsCheckingAccess(false);
           return;
         }
+
+        // Clean residual URL params and force redirect to /home
+        if (typeof window !== "undefined") {
+          try {
+            document.cookie = "flightcrew_onboarded=true; path=/; max-age=31536000";
+            sessionStorage.setItem("flightcrew_onboarded", "true");
+            localStorage.setItem("flightcrew_onboarded", "true");
+            window.history.replaceState(null, "", "/home");
+          } catch (e) {}
+          window.location.replace("/home");
+        } else {
+          router.replace("/home");
+        }
+        return;
       }
 
-      window.location.href = "/home";
+      // If user is a new / non-onboarded user:
+      // Clean any residual parameters (?edit=true&from=onboarding)
+      if (typeof window !== "undefined" && (params.has("edit") || params.has("from"))) {
+        try {
+          window.history.replaceState(null, "", window.location.pathname);
+        } catch (e) {}
+      }
+
+      if (accountType === "business" && !isProfileEdit) {
+        if (typeof window !== "undefined") {
+          window.location.replace("/onboarding-business");
+        } else {
+          router.replace("/onboarding-business");
+        }
+        return;
+      }
+
+      setIsCheckingAccess(false);
     }
 
     redirectCompletedUsers();

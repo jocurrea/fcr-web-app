@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, AtSign, Lock, EyeOff, Eye } from "lucide-react";
-import { useState } from "react";
+import { ChevronLeft, Lock, EyeOff, Eye } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
 
 export default function LoginPage() {
@@ -15,6 +16,137 @@ export default function LoginPage() {
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Clean any residual parameters (like ?edit=true&from=onboarding) from the URL or session
+  const cleanResidualParams = useCallback(() => {
+    if (typeof window !== "undefined") {
+      try {
+        sessionStorage.removeItem("onboarding_step");
+        const url = new URL(window.location.href);
+        let changed = false;
+        if (url.searchParams.has("edit")) {
+          url.searchParams.delete("edit");
+          changed = true;
+        }
+        if (url.searchParams.has("from")) {
+          url.searchParams.delete("from");
+          changed = true;
+        }
+        if (changed) {
+          const cleanQuery = url.searchParams.toString();
+          const cleanUrl = url.pathname + (cleanQuery ? `?${cleanQuery}` : "");
+          window.history.replaceState(null, "", cleanUrl);
+        }
+      } catch (e) {
+        console.error("Error cleaning residual params:", e);
+      }
+    }
+  }, []);
+
+  const handlePostLoginRedirect = useCallback(async (userId: string, session: Session | null) => {
+    cleanResidualParams();
+    localStorage.setItem("current_user_id", userId);
+
+    try {
+      // 1. Validación de Estado: Consulta el perfil del usuario en la base de datos (Supabase)
+      const { data: userRecord, error: userError } = await supabase
+        .from("users")
+        .select("id, onboarded, accountType, role")
+        .eq("id", userId)
+        .maybeSingle();
+
+      if (userError) {
+        console.warn("[Login] Error fetching user record:", userError);
+      }
+
+      // Check onboarded flag (handles numeric 1, boolean true, or strings)
+      let isOnboarded =
+        userRecord?.onboarded === 1 ||
+        userRecord?.onboarded === true ||
+        String(userRecord?.onboarded) === "1" ||
+        String(userRecord?.onboarded).toLowerCase() === "true" ||
+        session?.user?.user_metadata?.onboarded === true;
+
+      const effectiveRole =
+        userRecord?.accountType ||
+        userRecord?.role ||
+        session?.user?.user_metadata?.accountType ||
+        "";
+
+      // Check if business user already completed onboarding via companies table
+      if (effectiveRole === "business" || !isOnboarded) {
+        const { data: companies } = await supabase
+          .from("companies")
+          .select("status")
+          .eq("owner_user_id", userId)
+          .order("created_at", { ascending: false })
+          .limit(1);
+
+        if (companies && companies.length > 0) {
+          const status = companies[0].status;
+          if (status === "approved" || status === "active" || status === "pending") {
+            isOnboarded = true;
+          }
+        }
+      }
+
+      // Check resume fallback for flight crew / aviation professionals
+      if (!isOnboarded) {
+        const { data: resumeData } = await supabase
+          .from("resumes")
+          .select("data")
+          .eq("userId", userId)
+          .maybeSingle();
+
+        if (resumeData?.data) {
+          isOnboarded = true;
+        }
+      }
+
+      // 2. Ruta Correcta: Si el usuario ya tiene su cuenta configurada (onboarded === true),
+      // fuerza la redirección directamente hacia el panel principal (/home)
+      if (isOnboarded) {
+        try {
+          document.cookie = "flightcrew_onboarded=true; path=/; max-age=31536000";
+          sessionStorage.setItem("flightcrew_onboarded", "true");
+          localStorage.setItem("flightcrew_onboarded", "true");
+        } catch (e) {}
+
+        window.location.replace("/home");
+        return;
+      }
+
+      // 3. Ruta de Nuevos Usuarios: La redirección hacia /role-selection debe ser estrictamente
+      // exclusiva para usuarios nuevos cuyo registro indique onboarded === false o nulo
+      if (effectiveRole === "business") {
+        window.location.replace("/onboarding-business");
+        return;
+      }
+
+      window.location.replace("/role-selection");
+    } catch (redirectErr) {
+      console.error("[Login] Redirect error:", redirectErr);
+      window.location.replace("/home");
+    }
+  }, [cleanResidualParams]);
+
+  useEffect(() => {
+    cleanResidualParams();
+
+    // If an existing session is already active, redirect according to onboarded status
+    async function checkExistingSession() {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) {
+          await handlePostLoginRedirect(session.user.id, session);
+        }
+      } catch (err) {
+        console.error("Error checking session:", err);
+      }
+    }
+
+    checkExistingSession();
+  }, [cleanResidualParams, handlePostLoginRedirect]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,46 +162,13 @@ export default function LoginPage() {
       if (authError) throw authError;
 
       if (data.session) {
-        localStorage.setItem("current_user_id", data.session.user.id);
-        
-        const { data: userRecord } = await supabase
-          .from('users')
-          .select('onboarded, accountType')
-          .eq('id', data.session.user.id)
-          .single();
-
-        // Check if business user already completed onboarding via companies table
-        // (onboarded flag in users table may not be set correctly for business accounts)
-        let isBusinessOnboarded = false;
-        if (userRecord?.accountType === "business") {
-          const { data: companies } = await supabase
-            .from("companies")
-            .select("status")
-            .eq("owner_user_id", data.session.user.id)
-            .order("created_at", { ascending: false })
-            .limit(1);
-
-          if (companies && companies.length > 0) {
-            const status = companies[0].status;
-            if (status === "approved" || status === "active" || status === "pending") {
-              isBusinessOnboarded = true;
-            }
-          }
-        }
-
-        if (userRecord?.onboarded || isBusinessOnboarded) {
-          router.push("/home");
-        } else if (userRecord?.accountType === "business") {
-          router.push("/onboarding-business");
-        } else {
-          router.push("/role-selection");
-        }
+        await handlePostLoginRedirect(data.session.user.id, data.session);
       } else {
-        // Fallback just in case
-        router.push("/home");
+        // Fallback
+        window.location.replace("/home");
       }
-    } catch (err: any) {
-      const msg = err?.message || "";
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : (typeof err === "object" && err !== null && "message" in err ? String((err as { message: unknown }).message) : "");
       if (msg.includes("Email not confirmed")) {
         setError("Your email confirmation is pending. Please check your inbox or confirm your email to sign in.");
       } else if (msg.includes("Invalid login credentials")) {
@@ -222,7 +321,7 @@ export default function LoginPage() {
         </div>
 
         <div className="text-center mt-2">
-          <span className="text-xs text-gray-500">Don't have an account! </span>
+          <span className="text-xs text-gray-500">Don&apos;t have an account! </span>
           <Link href="/register" className="text-xs text-[#0f172a] font-bold hover:underline">
             Signup
           </Link>
