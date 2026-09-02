@@ -1001,20 +1001,24 @@ export default function ProfilePage() {
               Company affiliation
             </h2>
             <Link
-              href="/onboarding?edit=true&step=4"
+              href="/business/affiliate"
               className="text-xs sm:text-sm font-bold text-[#1d4ed8] hover:text-[#1e40af] cursor-pointer"
             >
-              Edit
+              {affiliationName ? "Edit" : "Link"}
             </Link>
           </div>
 
-          <div className="p-4 rounded-2xl bg-gray-50/70 border border-gray-100 flex items-center justify-between gap-3 shadow-2xs">
+          <Link
+            href="/business/affiliate"
+            className="p-4 rounded-2xl bg-gray-50/70 border border-gray-100 hover:border-blue-200 hover:bg-blue-50/40 flex items-center justify-between gap-3 shadow-2xs transition-all cursor-pointer group"
+            title="Link your employer"
+          >
             <div className="flex items-center gap-3.5 min-w-0">
-              <div className="w-11 h-11 rounded-2xl bg-blue-50 border border-blue-100 text-[#1d4ed8] flex items-center justify-center shrink-0">
+              <div className="w-11 h-11 rounded-2xl bg-blue-50 border border-blue-100 text-[#1d4ed8] group-hover:bg-[#1d4ed8] group-hover:text-white flex items-center justify-center shrink-0 transition-colors">
                 <Building2 className="w-5 h-5" />
               </div>
               <div className="flex flex-col min-w-0">
-                <span className="text-xs sm:text-sm font-bold text-gray-900 truncate">
+                <span className="text-xs sm:text-sm font-bold text-gray-900 group-hover:text-[#1d4ed8] truncate transition-colors">
                   {affiliationName ? affiliationName : "Link your employer"}
                 </span>
                 <span className="text-xs text-gray-500 truncate font-medium">
@@ -1035,13 +1039,10 @@ export default function ProfilePage() {
               </div>
             </div>
 
-            <Link
-              href="/onboarding?edit=true&step=4"
-              className="p-2 text-gray-400 hover:text-[#1d4ed8] transition-colors"
-            >
+            <div className="p-2 text-gray-400 group-hover:text-[#1d4ed8] transition-colors">
               <ChevronRight className="w-5 h-5" />
-            </Link>
-          </div>
+            </div>
+          </Link>
         </div>
 
         {/* CARD: Professional details */}
