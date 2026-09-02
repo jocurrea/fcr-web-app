@@ -23,6 +23,7 @@ import {
   Plus,
   CheckCircle2,
   ShieldCheck,
+  Check,
 } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
@@ -73,11 +74,12 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
-  // Visitors & Likes modal states
+  // Visitors, Likes & Availability modal states
   const [visitors, setVisitors] = useState<any[]>([]);
   const [likers, setLikers] = useState<any[]>([]);
   const [showVisitorsModal, setShowVisitorsModal] = useState(false);
   const [showLikersModal, setShowLikersModal] = useState(false);
+  const [showAvailabilityModal, setShowAvailabilityModal] = useState(false);
   const [loadingVisitors, setLoadingVisitors] = useState(false);
   const [loadingLikers, setLoadingLikers] = useState(false);
 
@@ -898,15 +900,16 @@ export default function ProfilePage() {
 
           {/* Status Pill Badge directly on page background */}
           <div className="flex justify-center mt-3">
-            <Link
-              href="/onboarding?edit=true&step=7"
-              className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-emerald-500 text-emerald-600 bg-transparent text-xs font-bold hover:bg-emerald-50/50 transition-colors cursor-pointer shadow-2xs"
+            <button
+              type="button"
+              onClick={() => setShowAvailabilityModal(true)}
+              className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-emerald-500 text-emerald-600 bg-transparent text-xs font-bold hover:bg-emerald-50/50 transition-colors cursor-pointer shadow-2xs active:scale-95"
               title="Change availability status"
             >
               <Briefcase className="w-3.5 h-3.5" />
               <span>{statusDisplayText}</span>
               <Pencil className="w-3 h-3 text-emerald-500 ml-0.5 opacity-80" />
-            </Link>
+            </button>
           </div>
 
           {/* 2. BOTONES DE INTERACCIÓN (Profile Likes & Profile Visitors) */}
@@ -1478,6 +1481,153 @@ export default function ProfilePage() {
                 })}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Work Availability Modal ── */}
+      {showAvailabilityModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
+          <div className="relative w-full max-w-sm sm:max-w-md bg-white rounded-3xl shadow-2xl border border-gray-100 p-6 sm:p-7 flex flex-col gap-4 animate-in zoom-in-95 duration-150">
+            {/* Title & Subtitle */}
+            <div className="space-y-1 text-left">
+              <h3 className="text-lg sm:text-xl font-extrabold text-gray-900 leading-tight">
+                Work availability
+              </h3>
+              <p className="text-xs sm:text-sm text-gray-500 leading-relaxed font-normal">
+                Choose what other professionals and companies see on your profile.
+              </p>
+            </div>
+
+            {/* Availability Options */}
+            <div className="flex flex-col gap-2.5 pt-2">
+              {/* Option 1: AVAILABLE FOR WORK */}
+              <button
+                type="button"
+                onClick={async () => {
+                  setPersonal((prev: any) => ({
+                    ...(prev || {}),
+                    availabilityStatus: "available",
+                    availability_status: "available",
+                  }));
+                  setShowAvailabilityModal(false);
+
+                  try {
+                    const savedPersonal = localStorage.getItem("onboarding_personal");
+                    const parsed = savedPersonal ? JSON.parse(savedPersonal) : {};
+                    parsed.availabilityStatus = "available";
+                    parsed.availability_status = "available";
+                    parsed.workAvailability = "available";
+                    localStorage.setItem("onboarding_personal", JSON.stringify(parsed));
+                  } catch (e) {}
+
+                  try {
+                    const { data: { session } } = await supabase.auth.getSession();
+                    if (session?.user) {
+                      await supabase.from("users").update({
+                        availability_status: "available",
+                        work_availability: "available",
+                      }).eq("id", session.user.id);
+
+                      const { data: resumeData } = await supabase.from("resumes").select("data").eq("userId", session.user.id).maybeSingle();
+                      if (resumeData?.data) {
+                        const currentData = resumeData.data as any;
+                        await supabase.from("resumes").update({
+                          data: {
+                            ...currentData,
+                            personal: { ...(currentData.personal || {}), availabilityStatus: "available", workAvailability: "available" },
+                          },
+                        }).eq("userId", session.user.id);
+                      }
+                    }
+                  } catch (err) {
+                    console.error("Error syncing availability:", err);
+                  }
+                }}
+                className={cn(
+                  "w-full py-4 px-4 sm:px-5 rounded-2xl flex items-center justify-between text-left transition-all cursor-pointer",
+                  !isEmployed
+                    ? "bg-gray-50 border border-gray-200/80 font-bold"
+                    : "hover:bg-gray-50/70 border border-transparent font-semibold"
+                )}
+              >
+                <span className="text-xs sm:text-sm text-gray-900 uppercase tracking-wider font-extrabold">
+                  AVAILABLE FOR WORK
+                </span>
+                {!isEmployed && (
+                  <Check className="w-5 h-5 text-emerald-600 stroke-[2.5]" />
+                )}
+              </button>
+
+              {/* Option 2: ACTIVE / EMPLOYED */}
+              <button
+                type="button"
+                onClick={async () => {
+                  setPersonal((prev: any) => ({
+                    ...(prev || {}),
+                    availabilityStatus: "active",
+                    availability_status: "active",
+                  }));
+                  setShowAvailabilityModal(false);
+
+                  try {
+                    const savedPersonal = localStorage.getItem("onboarding_personal");
+                    const parsed = savedPersonal ? JSON.parse(savedPersonal) : {};
+                    parsed.availabilityStatus = "active";
+                    parsed.availability_status = "active";
+                    parsed.workAvailability = "active";
+                    localStorage.setItem("onboarding_personal", JSON.stringify(parsed));
+                  } catch (e) {}
+
+                  try {
+                    const { data: { session } } = await supabase.auth.getSession();
+                    if (session?.user) {
+                      await supabase.from("users").update({
+                        availability_status: "active",
+                        work_availability: "active",
+                      }).eq("id", session.user.id);
+
+                      const { data: resumeData } = await supabase.from("resumes").select("data").eq("userId", session.user.id).maybeSingle();
+                      if (resumeData?.data) {
+                        const currentData = resumeData.data as any;
+                        await supabase.from("resumes").update({
+                          data: {
+                            ...currentData,
+                            personal: { ...(currentData.personal || {}), availabilityStatus: "active", workAvailability: "active" },
+                          },
+                        }).eq("userId", session.user.id);
+                      }
+                    }
+                  } catch (err) {
+                    console.error("Error syncing availability:", err);
+                  }
+                }}
+                className={cn(
+                  "w-full py-4 px-4 sm:px-5 rounded-2xl flex items-center justify-between text-left transition-all cursor-pointer",
+                  isEmployed
+                    ? "bg-gray-50 border border-gray-200/80 font-bold"
+                    : "hover:bg-gray-50/70 border border-transparent font-semibold"
+                )}
+              >
+                <span className="text-xs sm:text-sm text-gray-900 uppercase tracking-wider font-extrabold">
+                  ACTIVE / EMPLOYED
+                </span>
+                {isEmployed && (
+                  <Check className="w-5 h-5 text-emerald-600 stroke-[2.5]" />
+                )}
+              </button>
+            </div>
+
+            {/* Cancel Action Button */}
+            <div className="flex items-center justify-end pt-2">
+              <button
+                type="button"
+                onClick={() => setShowAvailabilityModal(false)}
+                className="py-2.5 px-5 rounded-full text-xs sm:text-sm font-bold text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-colors uppercase tracking-wider cursor-pointer"
+              >
+                CANCEL
+              </button>
+            </div>
           </div>
         </div>
       )}
