@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import {
   ChevronLeft,
   Camera,
@@ -32,6 +32,14 @@ export function PersonalIdentificationStep({ onNext, onBack }: PersonalIdentific
   const [isSaving, setIsSaving] = useState(false);
   const [touched, setTouched] = useState({ firstName: false, lastName: false, photo: false });
 
+  // Webcam state
+  const [showCamera, setShowCamera] = useState(false);
+  const [cameraError, setCameraError] = useState<string | null>(null);
+  const [cameraReady, setCameraReady] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+
   const sanitizeName = (val: string) => val.replace(/[^a-zA-ZÀ-ÿ\s'-]/g, '');
 
   useEffect(() => {
@@ -50,6 +58,16 @@ export function PersonalIdentificationStep({ onNext, onBack }: PersonalIdentific
     } catch (e) {
       console.error("Error reading saved personal data:", e);
     }
+  }, []);
+
+  // Cleanup camera stream on unmount
+  useEffect(() => {
+    return () => {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+        streamRef.current = null;
+      }
+    };
   }, []);
 
   // Upload helper for both File and Blob
@@ -114,7 +132,7 @@ export function PersonalIdentificationStep({ onNext, onBack }: PersonalIdentific
     }
   };
 
-  // Photo Selection Handler for both Gallery and Camera inputs
+  // Photo Selection Handler for Gallery input
   const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -145,6 +163,94 @@ export function PersonalIdentificationStep({ onNext, onBack }: PersonalIdentific
     if (e.target) e.target.value = "";
     await uploadImageBlobOrFile(file, localUrl);
   };
+
+  // ── Webcam: Open Camera ──
+  const openCamera = useCallback(async () => {
+    setCameraError(null);
+    setCameraReady(false);
+    setShowCamera(true);
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 } },
+        audio: false,
+      });
+      streamRef.current = stream;
+
+      // Wait for the video element to be mounted
+      // Use a short timeout to let React render the modal
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.onloadedmetadata = () => {
+          videoRef.current?.play();
+          setCameraReady(true);
+        };
+      }
+    } catch (err) {
+      console.error("Camera access error:", err);
+      setCameraError(
+        "Could not access camera. Please make sure you have granted camera permission in your browser."
+      );
+    }
+  }, []);
+
+  // ── Webcam: Close Camera ──
+  const closeCamera = useCallback(() => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+    setShowCamera(false);
+    setCameraError(null);
+    setCameraReady(false);
+  }, []);
+
+  // ── Webcam: Take Photo ──
+  const capturePhoto = useCallback(async () => {
+    if (!videoRef.current || !canvasRef.current) return;
+
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    // Mirror horizontally for selfie feel
+    ctx.translate(canvas.width, 0);
+    ctx.scale(-1, 1);
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    // Convert to blob for upload
+    canvas.toBlob(
+      async (blob) => {
+        if (!blob) return;
+
+        closeCamera();
+
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.92);
+        setPhotoPreview(dataUrl);
+        setTouched(prev => ({ ...prev, photo: true }));
+        try {
+          localStorage.setItem("userProfilePhoto", dataUrl);
+        } catch (err) {
+          console.warn("Local storage write error:", err);
+        }
+
+        const localUrl = URL.createObjectURL(blob);
+        await uploadImageBlobOrFile(blob, localUrl);
+      },
+      "image/jpeg",
+      0.92
+    );
+  }, [closeCamera]);
 
   const isFirstNameValid = firstName.trim().length >= 2;
   const isLastNameValid = lastName.trim().length >= 2;
@@ -251,21 +357,14 @@ export function PersonalIdentificationStep({ onNext, onBack }: PersonalIdentific
           {/* Avatar Section & Action Buttons (Camera / Gallery) */}
           <div className="flex flex-col items-center justify-center py-2">
 
-            {/* Solid Dark Gray Avatar Circle — input INSIDE label for direct click */}
-            <label
-              className="relative cursor-pointer group"
-              title="Click to upload photo"
+            {/* Solid Dark Gray Avatar Circle */}
+            <div
+              className="relative group"
+              title="Use Camera or Gallery below to upload photo"
             >
-              {/* Invisible file input covering the entire avatar area */}
-              <input
-                type="file"
-                onChange={handlePhotoSelect}
-                accept="image/*"
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-              />
               <div
                 className={cn(
-                  "w-28 h-28 sm:w-32 sm:h-32 rounded-full bg-[#1e293b] flex items-center justify-center relative overflow-hidden shadow-sm transition-all group-hover:opacity-90",
+                  "w-28 h-28 sm:w-32 sm:h-32 rounded-full bg-[#1e293b] flex items-center justify-center relative overflow-hidden shadow-sm transition-all",
                   photoPreview ? "border-2 border-[#1d4ed8]" : ""
                 )}
               >
@@ -286,30 +385,27 @@ export function PersonalIdentificationStep({ onNext, onBack }: PersonalIdentific
                   </div>
                 )}
               </div>
-            </label>
+            </div>
 
-            {/* Two Outline Buttons: Camera & Gallery — each with inline invisible input */}
+            {/* Two Outline Buttons: Camera & Gallery */}
             <div className="flex items-center gap-3 mt-4 w-full max-w-xs justify-center">
-              {/* Button 1: Camera */}
-              <label
-                className="relative flex-1 py-2.5 px-4 rounded-full border border-[#1d4ed8] text-[#1d4ed8] bg-transparent hover:bg-blue-50/60 font-semibold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer shadow-2xs active:scale-[0.98] select-none text-center overflow-hidden"
+              {/* Button 1: Camera — opens real webcam via getUserMedia */}
+              <button
+                type="button"
+                onClick={openCamera}
+                className="flex-1 py-2.5 px-4 rounded-full border border-[#1d4ed8] text-[#1d4ed8] bg-transparent hover:bg-blue-50/60 font-semibold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer shadow-2xs active:scale-[0.98] select-none text-center"
               >
-                <input
-                  type="file"
-                  onChange={handlePhotoSelect}
-                  accept="image/*"
-                  capture="user"
-                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                />
                 <Camera className="w-4 h-4 shrink-0" />
                 <span>Camera</span>
-              </label>
+              </button>
 
-              {/* Button 2: Gallery */}
+              {/* Button 2: Gallery — opens file picker / photo library (no capture) */}
               <label
+                htmlFor="photo-gallery"
                 className="relative flex-1 py-2.5 px-4 rounded-full border border-[#1d4ed8] text-[#1d4ed8] bg-transparent hover:bg-blue-50/60 font-semibold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer shadow-2xs active:scale-[0.98] select-none text-center overflow-hidden"
               >
                 <input
+                  id="photo-gallery"
                   type="file"
                   onChange={handlePhotoSelect}
                   accept="image/*"
@@ -405,6 +501,115 @@ export function PersonalIdentificationStep({ onNext, onBack }: PersonalIdentific
         </div>
 
       </div>
+
+      {/* ── Custom Floating Webcam Modal ── */}
+      {showCamera && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 transition-all">
+          {/* Hidden canvas for snapshot */}
+          <canvas ref={canvasRef} className="hidden" />
+
+          {/* Floating Card Dialog */}
+          <div className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden border border-gray-100 flex flex-col p-6 animate-in fade-in zoom-in-95 duration-200">
+            {/* Header */}
+            <div className="flex items-start justify-between pr-8">
+              <div>
+                <h3 className="text-xl font-extrabold text-gray-900">
+                  Take a Photo
+                </h3>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Position your face clearly within the frame
+                </p>
+              </div>
+
+              {/* Close (X) button */}
+              <button
+                type="button"
+                onClick={closeCamera}
+                className="absolute top-5 right-5 w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 flex items-center justify-center transition-colors cursor-pointer"
+                title="Close"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Video Preview Container */}
+            <div className="relative w-full aspect-[4/3] bg-gray-900 rounded-2xl overflow-hidden my-4 shadow-inner flex items-center justify-center">
+              {cameraError ? (
+                /* Error state inside modal */
+                <div className="flex flex-col items-center gap-3 p-6 text-center z-10">
+                  <div className="w-12 h-12 rounded-full bg-red-500/20 flex items-center justify-center">
+                    <AlertCircle className="w-6 h-6 text-red-400" />
+                  </div>
+                  <p className="text-white text-xs max-w-xs leading-relaxed">
+                    {cameraError}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={openCamera}
+                    className="mt-1 px-5 py-2 rounded-full bg-white text-gray-900 font-semibold text-xs hover:bg-gray-100 transition-colors cursor-pointer flex items-center gap-1.5"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    Try again
+                  </button>
+                </div>
+              ) : (
+                <>
+                  {/* Loading spinner while stream connects */}
+                  {!cameraReady && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-900 text-white gap-2 z-10">
+                      <Loader2 className="w-7 h-7 animate-spin text-[#1d4ed8]" />
+                      <p className="text-xs text-gray-400">Starting camera...</p>
+                    </div>
+                  )}
+
+                  {/* Real-time live video feed */}
+                  <video
+                    ref={videoRef}
+                    autoPlay
+                    playsInline
+                    muted
+                    className="w-full h-full object-cover"
+                    style={{ transform: "scaleX(-1)" }}
+                  />
+
+                  {/* Face oval alignment guideline */}
+                  {cameraReady && (
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                      <div className="w-44 h-52 sm:w-48 sm:h-56 rounded-[50%] border-2 border-white/50 shadow-[0_0_0_9999px_rgba(0,0,0,0.3)]" />
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex items-center gap-3 mt-1">
+              <button
+                type="button"
+                onClick={closeCamera}
+                className="py-3 px-5 rounded-full text-gray-700 bg-gray-100 hover:bg-gray-200 font-semibold text-xs sm:text-sm transition-all cursor-pointer select-none"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                onClick={capturePhoto}
+                disabled={!cameraReady || Boolean(cameraError)}
+                className={cn(
+                  "flex-1 py-3 px-6 rounded-full font-bold text-xs sm:text-sm text-white flex items-center justify-center gap-2 transition-all shadow-md select-none",
+                  cameraReady && !cameraError
+                    ? "bg-[#1d4ed8] hover:bg-[#1e40af] cursor-pointer active:scale-[0.98]"
+                    : "bg-[#85b0fa] cursor-not-allowed opacity-80"
+                )}
+              >
+                <Camera className="w-4 h-4" />
+                <span>Capture Photo</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
