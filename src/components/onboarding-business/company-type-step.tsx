@@ -44,16 +44,25 @@ interface CompanyTypeStepProps {
 export function CompanyTypeStep({ onNext }: CompanyTypeStepProps) {
   const { onboarding, isLoading, error: loadError, saveTypes } = useBusinessOnboarding();
   const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
+  const [otherTypeText, setOtherTypeText] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const companyTypes = onboarding?.companyTypes ?? [];
 
   useEffect(() => {
     setSelectedTypes(onboarding?.selectedCompanyTypeKeys ?? []);
-  }, [onboarding?.selectedCompanyTypeKeys]);
+    if (onboarding?.otherTypeText) {
+      setOtherTypeText(onboarding.otherTypeText);
+    } else if (typeof window !== "undefined" && onboarding?.company?.id) {
+      const cached = localStorage.getItem("company_other_type_" + onboarding.company.id);
+      if (cached) setOtherTypeText(cached);
+    }
+  }, [onboarding?.selectedCompanyTypeKeys, onboarding?.otherTypeText, onboarding?.company?.id]);
 
   const selectedSet = useMemo(() => new Set(selectedTypes), [selectedTypes]);
-  const canContinue = selectedTypes.length > 0 && !isLoading && !isSaving;
+  const isOtherSelected = selectedSet.has("other");
+  const isOtherValid = !isOtherSelected || otherTypeText.trim().length > 0;
+  const canContinue = selectedTypes.length > 0 && isOtherValid && !isLoading && !isSaving;
 
   const toggleType = (key: string) => {
     setSelectedTypes((prev) =>
@@ -66,7 +75,7 @@ export function CompanyTypeStep({ onNext }: CompanyTypeStepProps) {
     setIsSaving(true);
     setError(null);
 
-    const response = await saveTypes(selectedTypes);
+    const response = await saveTypes(selectedTypes, isOtherSelected ? otherTypeText.trim() : undefined);
     setIsSaving(false);
 
     if (!response.success) {
@@ -101,32 +110,53 @@ export function CompanyTypeStep({ onNext }: CompanyTypeStepProps) {
             {companyTypes.map((type) => {
               const Icon = COMPANY_TYPE_ICONS[type.key] ?? MoreHorizontal;
               const isSelected = selectedSet.has(type.key);
+              const isOther = type.key === "other";
 
               return (
-                <label
-                  key={type.id}
-                  onClick={() => toggleType(type.key)}
-                  className="flex items-center justify-between p-4 bg-white border border-gray-100 shadow-sm rounded-3xl cursor-pointer hover:bg-gray-50 transition-colors"
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="flex items-center justify-center text-gray-700">
-                      <Icon className="w-6 h-6" strokeWidth={1.75} />
-                    </div>
-                    <span className="text-[16px] text-gray-900 font-bold">{type.label}</span>
-                  </div>
+                <div key={type.id} className="flex flex-col gap-2">
                   <div
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => toggleType(type.key)}
                     className={cn(
-                      "w-6 h-6 rounded border flex items-center justify-center transition-colors",
-                      isSelected ? "bg-blue-600 border-blue-600" : "border-gray-300"
+                      "flex items-center justify-between p-4 bg-white border border-gray-100 shadow-sm rounded-3xl cursor-pointer hover:bg-gray-50 transition-colors",
+                      isSelected && "border-[#1d4ed8] bg-[#f0f5ff] ring-1 ring-[#1d4ed8]/20"
                     )}
                   >
-                    {isSelected && (
-                      <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                      </svg>
-                    )}
+                    <div className="flex items-center gap-4">
+                      <div className="flex items-center justify-center text-gray-700">
+                        <Icon className="w-6 h-6" strokeWidth={1.75} />
+                      </div>
+                      <span className="text-[16px] text-gray-900 font-bold">{type.label}</span>
+                    </div>
+                    <div
+                      className={cn(
+                        "w-6 h-6 rounded border flex items-center justify-center transition-colors",
+                        isSelected ? "bg-blue-600 border-blue-600" : "border-gray-300"
+                      )}
+                    >
+                      {isSelected && (
+                        <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                        </svg>
+                      )}
+                    </div>
                   </div>
-                </label>
+
+                  {/* Dynamic input field when Other is selected - identical to Aviation Professional */}
+                  {isOther && isSelected && (
+                    <div className="mt-1 px-1 animate-in fade-in slide-in-from-top-1 duration-200" onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="text"
+                        value={otherTypeText}
+                        onChange={(e) => setOtherTypeText(e.target.value)}
+                        placeholder="Specify your company type"
+                        className="w-full px-4 py-3.5 bg-white border border-gray-200 rounded-2xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[#1d4ed8] focus:ring-1 focus:ring-[#1d4ed8] transition-all shadow-xs"
+                        autoFocus
+                      />
+                    </div>
+                  )}
+                </div>
               );
             })}
           </div>

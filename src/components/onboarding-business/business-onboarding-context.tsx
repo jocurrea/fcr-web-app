@@ -26,7 +26,7 @@ type BusinessOnboardingContextValue = {
   isLoading: boolean;
   error: string | null;
   reload: () => Promise<void>;
-  saveTypes: (companyTypeKeys: string[]) => Promise<{ success: true } | { success: false; error: string }>;
+  saveTypes: (companyTypeKeys: string[], otherTypeText?: string) => Promise<{ success: true } | { success: false; error: string }>;
   saveProfile: (profile: CompanyProfileInput) => Promise<{ success: true } | { success: false; error: string }>;
   saveVisibility: (visibility: CommunityVisibilityInput) => Promise<{ success: true } | { success: false; error: string }>;
   submit: () => Promise<{ success: true } | { success: false; error: string }>;
@@ -70,8 +70,8 @@ export function BusinessOnboardingProvider({ children }: { children: ReactNode }
     reload();
   }, [reload]);
 
-  const saveTypes = useCallback(async (companyTypeKeys: string[]) => {
-    const response = await saveCompanyTypeSelections(companyTypeKeys);
+  const saveTypes = useCallback(async (companyTypeKeys: string[], otherTypeText?: string) => {
+    const response = await saveCompanyTypeSelections(companyTypeKeys, otherTypeText);
 
     if (!response.success) {
       return { success: false as const, error: response.error };
@@ -83,6 +83,7 @@ export function BusinessOnboardingProvider({ children }: { children: ReactNode }
             ...current,
             company: response.data,
             selectedCompanyTypeKeys: companyTypeKeys,
+            otherTypeText: otherTypeText?.trim() || "",
           }
         : current,
     );

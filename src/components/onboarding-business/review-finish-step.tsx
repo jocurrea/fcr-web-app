@@ -38,8 +38,19 @@ export function ReviewFinishStep({ onNext }: ReviewFinishStepProps) {
     const { company, companyTypes, selectedCompanyTypeKeys, settings } = onboarding;
     const labelsByKey = new Map(companyTypes.map((companyType) => [companyType.key, companyType.label]));
 
+    const otherText =
+      onboarding.otherTypeText ||
+      (typeof window !== "undefined" && company.id ? localStorage.getItem("company_other_type_" + company.id) : null);
+
+    const resolvedCompanyTypes = selectedCompanyTypeKeys.map((typeKey) => {
+      if (typeKey === "other" && otherText) {
+        return otherText;
+      }
+      return labelsByKey.get(typeKey) || typeKey;
+    });
+
     setData({
-      companyTypes: selectedCompanyTypeKeys.map((typeKey) => labelsByKey.get(typeKey) || typeKey),
+      companyTypes: resolvedCompanyTypes,
       profile: {
         companyName: company.name || "Not provided",
         location: company.location || "Not provided",

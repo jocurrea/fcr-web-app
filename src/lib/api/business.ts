@@ -39,6 +39,7 @@ export type BusinessOnboardingData = {
   company: CompanyRow;
   companyTypes: CompanyType[];
   selectedCompanyTypeKeys: string[];
+  otherTypeText?: string;
   settings: CompanySettings | null;
 };
 
@@ -239,11 +240,30 @@ export async function fetchBusinessOnboarding(): Promise<ApiResult<BusinessOnboa
       .filter((companyType) => selectedIds.has(companyType.id))
       .map((companyType) => companyType.key);
 
-    // Check company.services if DB company_type_selections is empty
-    if (selectedCompanyTypeKeys.length === 0 && Array.isArray(company.services) && company.services.length > 0) {
-      selectedCompanyTypeKeys = mappedCompanyTypes
-        .filter((ct) => company.services.includes(ct.label) || company.services.includes(ct.key))
-        .map((ct) => ct.key);
+    let otherTypeText = "";
+    if (typeof window !== 'undefined' && company.id) {
+      try {
+        otherTypeText = localStorage.getItem("company_other_type_" + company.id) || "";
+      } catch (e) {}
+    }
+
+    // Check company.services if DB company_type_selections is empty or contains custom type
+    if (Array.isArray(company.services) && company.services.length > 0) {
+      if (selectedCompanyTypeKeys.length === 0) {
+        selectedCompanyTypeKeys = mappedCompanyTypes
+          .filter((ct) => company.services.includes(ct.label) || company.services.includes(ct.key))
+          .map((ct) => ct.key);
+      }
+
+      // If other is selected or a custom service exists that is not a standard label, extract otherTypeText
+      const knownLabels = new Set(DEFAULT_COMPANY_TYPES_MAP.map((d) => d.label));
+      const customService = company.services.find((s: string) => !knownLabels.has(s) && s !== "Other");
+      if (customService && !otherTypeText) {
+        otherTypeText = customService;
+        if (!selectedCompanyTypeKeys.includes("other")) {
+          selectedCompanyTypeKeys.push("other");
+        }
+      }
     }
 
     // Fallback: Check localStorage strictly for this specific company.id
@@ -265,6 +285,7 @@ export async function fetchBusinessOnboarding(): Promise<ApiResult<BusinessOnboa
         company,
         companyTypes: mappedCompanyTypes,
         selectedCompanyTypeKeys,
+        otherTypeText,
         settings: settings ?? null,
       },
     };
@@ -290,15 +311,22 @@ const DEFAULT_COMPANY_TYPES_MAP = [
   { key: "other", label: "Other" }
 ];
 
-export async function saveCompanyTypeSelections(companyTypeKeys: string[]): Promise<ApiResult<CompanyRow>> {
+export async function saveCompanyTypeSelections(
+  companyTypeKeys: string[],
+  otherTypeText?: string
+): Promise<ApiResult<CompanyRow>> {
   try {
     const companyResponse = await ensureBusinessDraft();
     if (!companyResponse.success) return companyResponse;
 
     const company = companyResponse.data;
+    const cleanOtherText = otherTypeText?.trim() || "";
 
-    // Map keys to human-readable labels
+    // Map keys to human-readable labels, substituting custom other text if provided
     const selectedLabels = companyTypeKeys.map(key => {
+      if (key === "other" && cleanOtherText) {
+        return cleanOtherText;
+      }
       const match = DEFAULT_COMPANY_TYPES_MAP.find(d => d.key === key);
       return match ? match.label : key;
     });
@@ -369,11 +397,16 @@ export async function saveCompanyTypeSelections(companyTypeKeys: string[]): Prom
       console.warn("Exception saving company_type_selections:", e);
     }
 
-    // Persist selected keys and labels strictly for this company.id
+    // Persist selected keys, other text and labels strictly for this company.id
     if (typeof window !== 'undefined' && company.id) {
       try {
         localStorage.setItem("company_type_keys_" + company.id, JSON.stringify(companyTypeKeys));
         localStorage.setItem("company_types_" + company.id, JSON.stringify(selectedLabels));
+        if (cleanOtherText) {
+          localStorage.setItem("company_other_type_" + company.id, cleanOtherText);
+        } else {
+          localStorage.removeItem("company_other_type_" + company.id);
+        }
       } catch (e) {}
     }
 
