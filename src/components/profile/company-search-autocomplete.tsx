@@ -47,6 +47,7 @@ export function CompanySearchAutocomplete({
   const [selectedCompany, setSelectedCompany] = useState<CompanySelection | null>(
     value ? { id: selectedCompanyId, name: value, status: selectedCompanyId ? "pending" : "active" } : null
   );
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -203,9 +204,21 @@ export function CompanySearchAutocomplete({
     }
   };
 
-  const handleSelectCustomName = () => {
+  // Opens the confirmation modal before selecting unregistered company
+  const handleOpenConfirmModal = () => {
     const trimmed = query.trim();
     if (!trimmed) return;
+    setIsOpen(false);
+    setShowConfirmModal(true);
+  };
+
+  // Confirms adding the unregistered company
+  const handleConfirmAddUnregistered = () => {
+    const trimmed = query.trim();
+    if (!trimmed) {
+      setShowConfirmModal(false);
+      return;
+    }
 
     const selection: CompanySelection = {
       id: null,
@@ -213,7 +226,7 @@ export function CompanySearchAutocomplete({
       status: "unverified",
     };
     setSelectedCompany(selection);
-    setIsOpen(false);
+    setShowConfirmModal(false);
 
     if (onSelectCompany) {
       onSelectCompany(selection);
@@ -332,7 +345,7 @@ export function CompanySearchAutocomplete({
               <div className="p-2 bg-gray-50/50 border-t border-gray-100">
                 <button
                   type="button"
-                  onClick={handleSelectCustomName}
+                  onClick={handleOpenConfirmModal}
                   className="w-full p-2.5 hover:bg-blue-50/80 rounded-xl flex items-center gap-2.5 transition-colors cursor-pointer text-left group"
                 >
                   <div className="w-7 h-7 rounded-full bg-blue-100 text-[#1d4ed8] flex items-center justify-center shrink-0 shadow-2xs group-hover:bg-[#1d4ed8] group-hover:text-white transition-colors">
@@ -362,7 +375,7 @@ export function CompanySearchAutocomplete({
 
               <button
                 type="button"
-                onClick={handleSelectCustomName}
+                onClick={handleOpenConfirmModal}
                 className="w-full p-3 bg-blue-50/80 hover:bg-blue-100/80 border border-blue-200/80 rounded-2xl flex items-center gap-3 transition-all cursor-pointer text-left group active:scale-[0.99] shadow-2xs"
               >
                 <div className="w-8 h-8 rounded-full bg-[#1d4ed8] text-white flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-105 transition-transform">
@@ -379,6 +392,42 @@ export function CompanySearchAutocomplete({
               </button>
             </div>
           )}
+        </div>
+      )}
+
+      {/* ── Unregistered Company Confirmation Modal ── */}
+      {showConfirmModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
+          <div className="relative w-full max-w-sm sm:max-w-md bg-white rounded-3xl shadow-2xl border border-gray-100 p-6 sm:p-7 flex flex-col gap-4 animate-in zoom-in-95 duration-150">
+            {/* Title */}
+            <h3 className="text-lg sm:text-xl font-bold text-gray-900 leading-snug">
+              Add unregistered company?
+            </h3>
+
+            {/* Dynamic descriptive text with user typed text */}
+            <p className="text-xs sm:text-sm text-gray-600 leading-relaxed font-normal">
+              <strong>&quot;{query.trim()}&quot;</strong> will appear as a self-reported company without a verified badge.
+            </p>
+
+            {/* Bottom buttons: CANCEL and ADD COMPANY */}
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowConfirmModal(false)}
+                className="py-2.5 px-5 rounded-full text-xs sm:text-sm font-bold text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-colors uppercase tracking-wider cursor-pointer"
+              >
+                CANCEL
+              </button>
+
+              <button
+                type="button"
+                onClick={handleConfirmAddUnregistered}
+                className="py-2.5 px-6 rounded-full text-xs sm:text-sm font-bold text-white bg-[#1d4ed8] hover:bg-[#1e40af] transition-all uppercase tracking-wider shadow-md active:scale-95 cursor-pointer"
+              >
+                ADD COMPANY
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

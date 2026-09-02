@@ -33,6 +33,8 @@ export default function BusinessAffiliatePage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+
   // Load existing affiliation status
   useEffect(() => {
     async function loadCurrentAffiliation() {
@@ -100,12 +102,23 @@ export default function BusinessAffiliatePage() {
     }
   };
 
-  const handleSubmitAffiliation = async () => {
+  const handleButtonClick = () => {
+    if (!selectedCompany || !selectedCompany.name.trim()) return;
+    if (!selectedCompany.id) {
+      // Prompt confirmation modal for unregistered company
+      setShowConfirmModal(true);
+    } else {
+      executeAffiliationSubmit();
+    }
+  };
+
+  const executeAffiliationSubmit = async () => {
     if (!selectedCompany || !selectedCompany.name.trim()) {
       setErrorMessage("Please select or enter a company name.");
       return;
     }
 
+    setShowConfirmModal(false);
     setIsSubmitting(true);
     setErrorMessage(null);
     setSuccessMessage(null);
@@ -344,7 +357,7 @@ export default function BusinessAffiliatePage() {
         <div className="pb-8 pt-6">
           <button
             type="button"
-            onClick={handleSubmitAffiliation}
+            onClick={handleButtonClick}
             disabled={!selectedCompany || !selectedCompany.name.trim() || isSubmitting}
             className={cn(
               "w-full py-4 rounded-full font-bold text-sm sm:text-base text-white transition-all shadow-md flex items-center justify-center gap-2 select-none",
@@ -367,6 +380,42 @@ export default function BusinessAffiliatePage() {
         </div>
 
       </div>
+
+      {/* ── Unregistered Company Confirmation Modal ── */}
+      {showConfirmModal && selectedCompany && !selectedCompany.id && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
+          <div className="relative w-full max-w-sm sm:max-w-md bg-white rounded-3xl shadow-2xl border border-gray-100 p-6 sm:p-7 flex flex-col gap-4 animate-in zoom-in-95 duration-150">
+            {/* Title */}
+            <h3 className="text-lg sm:text-xl font-bold text-gray-900 leading-snug">
+              Add unregistered company?
+            </h3>
+
+            {/* Dynamic descriptive text with user typed text */}
+            <p className="text-xs sm:text-sm text-gray-600 leading-relaxed font-normal">
+              <strong>&quot;{selectedCompany.name}&quot;</strong> will appear as a self-reported company without a verified badge.
+            </p>
+
+            {/* Bottom buttons: CANCEL and ADD COMPANY */}
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowConfirmModal(false)}
+                className="py-2.5 px-5 rounded-full text-xs sm:text-sm font-bold text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-colors uppercase tracking-wider cursor-pointer"
+              >
+                CANCEL
+              </button>
+
+              <button
+                type="button"
+                onClick={executeAffiliationSubmit}
+                className="py-2.5 px-6 rounded-full text-xs sm:text-sm font-bold text-white bg-[#1d4ed8] hover:bg-[#1e40af] transition-all uppercase tracking-wider shadow-md active:scale-95 cursor-pointer"
+              >
+                ADD COMPANY
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
