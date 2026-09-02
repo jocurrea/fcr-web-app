@@ -96,7 +96,7 @@ export async function updateSession(request: NextRequest) {
   // -------------------------------------------------------------
   const { data: userRecord } = await supabase
     .from("users")
-    .select("id, onboarded, accountType, role")
+    .select("id, onboarded, accountType, role, professionalRole")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -107,39 +107,32 @@ export async function updateSession(request: NextRequest) {
     String(dbOnboardedVal) === "1" ||
     String(dbOnboardedVal).toLowerCase() === "true";
 
-  const isDbExplicitlyNotOnboarded =
-    dbOnboardedVal === 0 ||
-    dbOnboardedVal === false ||
-    String(dbOnboardedVal) === "0" ||
-    String(dbOnboardedVal).toLowerCase() === "false" ||
-    dbOnboardedVal === null ||
-    dbOnboardedVal === undefined;
-
   const metaOnboardedVal = user.user_metadata?.onboarded;
   const isMetaOnboarded =
     metaOnboardedVal === true ||
     String(metaOnboardedVal) === "1" ||
     String(metaOnboardedVal).toLowerCase() === "true";
 
-  const isMetaExplicitlyNotOnboarded =
-    metaOnboardedVal === false ||
-    String(metaOnboardedVal) === "0" ||
-    String(metaOnboardedVal).toLowerCase() === "false" ||
-    metaOnboardedVal === null ||
-    metaOnboardedVal === undefined;
+  const isCookieOnboarded = request.cookies.get("flightcrew_onboarded")?.value === "true";
 
+  // Database is authoritative; supplemented by fresh JWT metadata and cookies
   let isOnboarded = false;
-  if (isDbExplicitlyNotOnboarded || isMetaExplicitlyNotOnboarded) {
-    isOnboarded = false;
+  if (isDbOnboarded || isMetaOnboarded) {
+    isOnboarded = true;
+  } else if (isCookieOnboarded && dbOnboardedVal !== 0 && String(dbOnboardedVal) !== "0") {
+    isOnboarded = true;
   } else {
-    isOnboarded = isDbOnboarded || isMetaOnboarded;
+    isOnboarded = false;
   }
 
   const effectiveRole =
     userRecord?.accountType ||
     userRecord?.role ||
+    userRecord?.professionalRole ||
     user.user_metadata?.accountType ||
     user.user_metadata?.role ||
+    user.user_metadata?.professionalRole ||
+    user.user_metadata?.professional_role ||
     "";
 
   let hasRole = Boolean(

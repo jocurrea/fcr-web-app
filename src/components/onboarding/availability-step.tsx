@@ -103,12 +103,23 @@ export function AvailabilityStep({ onNext, onBack }: AvailabilityStepProps) {
             crew_data_saved: true,
           },
         });
+
+        try {
+          await supabase.auth.refreshSession();
+        } catch {}
+
+        try {
+          document.cookie = "flightcrew_onboarded=true; path=/; max-age=31536000; SameSite=Lax";
+          sessionStorage.setItem("flightcrew_onboarded", "true");
+          localStorage.setItem("flightcrew_onboarded", "true");
+        } catch {}
       }
 
       if (onNext) {
         onNext(selectedStatus);
       } else {
-        router.push("/onboarding-complete");
+        router.refresh();
+        router.push("/home");
       }
     } catch (err) {
       console.error("Error saving availability status:", err);

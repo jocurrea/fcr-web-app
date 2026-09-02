@@ -14,15 +14,17 @@ export default function OnboardingCompletePage() {
   useEffect(() => {
     try {
       // Set the cookie on this page as well (belt and suspenders)
-      document.cookie = "flightcrew_onboarded=true; path=/; max-age=31536000";
+      document.cookie = "flightcrew_onboarded=true; path=/; max-age=31536000; SameSite=Lax";
       
       // Also set in sessionStorage as another fallback
       sessionStorage.setItem("flightcrew_onboarded", "true");
+      localStorage.setItem("flightcrew_onboarded", "true");
     } catch (e) {
       console.error("Storage error in onboarding-complete:", e);
     }
     
-    // Use replace so they can't go back to this page
+    // Invalidate server cache and navigate to /home
+    router.refresh();
     router.replace("/home");
   }, [router]);
 

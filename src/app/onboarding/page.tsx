@@ -224,6 +224,7 @@ export default function OnboardingPage() {
           ? "Cabin Crew"
           : "Pilot");
 
+      // 1. Update DB records in parallel
       await Promise.allSettled([
         supabase.from("resumes").upsert(
           {
@@ -250,8 +251,11 @@ export default function OnboardingPage() {
           },
           { onConflict: "id" }
         ),
+      ]);
 
-        supabase.auth.updateUser({
+      // 2. Mandatory JWT update: update auth user metadata with onboarded: true and role
+      try {
+        await supabase.auth.updateUser({
           data: {
             onboarded: true,
             accountType: category,
@@ -260,15 +264,23 @@ export default function OnboardingPage() {
             professional_role: resolvedProfessionalRole,
             crew_data_saved: true,
           },
-        }),
-      ]);
+        });
+      } catch (authErr) {
+        console.warn("[Onboarding] Auth metadata update warning:", authErr);
+      }
 
-      supabase.auth.refreshSession().catch((e) => console.error("refresh error:", e));
+      // 3. Immediately refresh session so new JWT is issued and persisted to cookies
+      try {
+        await supabase.auth.refreshSession();
+      } catch (refErr) {
+        console.warn("[Onboarding] Refresh session error:", refErr);
+      }
     } catch (err: any) {
       console.error("[Onboarding] Sync error:", err);
     } finally {
+      // 4. Overwrite cookies and storage immediately before navigation
       try {
-        document.cookie = "flightcrew_onboarded=true; path=/; max-age=31536000";
+        document.cookie = "flightcrew_onboarded=true; path=/; max-age=31536000; SameSite=Lax";
         sessionStorage.setItem("flightcrew_onboarded", "true");
         localStorage.setItem("flightcrew_onboarded", "true");
       } catch (e) {
@@ -276,10 +288,21 @@ export default function OnboardingPage() {
       }
 
       setIsSaving(false);
+
       if (isEditMode) {
-        window.location.assign("/profile");
+        router.refresh();
+        router.push("/profile");
       } else {
-        window.location.assign("/onboarding-complete");
+        // 5. Invalidate Next.js server cache and navigate to /home
+        router.refresh();
+        router.push("/home");
+
+        // Fallback for full page refresh if client transition is delayed
+        setTimeout(() => {
+          if (typeof window !== "undefined" && window.location.pathname !== "/home") {
+            window.location.replace("/home");
+          }
+        }, 400);
       }
     }
   };
