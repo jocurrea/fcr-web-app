@@ -264,26 +264,47 @@ export default function BusinessAffiliatePage() {
               required={false}
             />
 
-            {/* Selected Company Feedback Box */}
+            {/* Selected Company Feedback Box — Highlighted Blue Border for Unregistered Company */}
             {selectedCompany && selectedCompany.name.trim() && (
-              <div className="p-4 rounded-2xl bg-blue-50/70 border border-blue-100 flex items-start justify-between gap-3 animate-in fade-in duration-150">
-                <div className="flex items-start gap-3 min-w-0">
-                  <div className="w-9 h-9 rounded-xl bg-white border border-blue-200 text-[#1d4ed8] flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
-                    <Building2 className="w-4 h-4" />
+              <div
+                className={cn(
+                  "p-4 sm:p-5 rounded-3xl transition-all shadow-xs flex items-center justify-between gap-3 animate-in fade-in zoom-in-95 duration-150",
+                  !selectedCompany.id
+                    ? "border-2 border-[#1d4ed8] bg-blue-50/50 shadow-sm"
+                    : "border border-blue-200 bg-white shadow-2xs"
+                )}
+              >
+                <div className="flex items-center gap-3.5 min-w-0">
+                  <div
+                    className={cn(
+                      "w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 shadow-2xs transition-colors",
+                      !selectedCompany.id
+                        ? "bg-[#1d4ed8] text-white"
+                        : "bg-blue-50 text-[#1d4ed8] border border-blue-100"
+                    )}
+                  >
+                    <Building2 className="w-5 h-5" />
                   </div>
                   <div className="flex flex-col min-w-0">
-                    <span className="text-sm font-bold text-gray-900 truncate">
-                      {selectedCompany.name}
-                    </span>
-                    <span className="text-xs text-blue-700 font-medium leading-relaxed mt-0.5">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm sm:text-base font-bold text-gray-900 truncate">
+                        {selectedCompany.name}
+                      </span>
+                      {!selectedCompany.id && (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-[#1d4ed8] uppercase tracking-wider shrink-0">
+                          Unregistered
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-xs text-gray-500 font-medium leading-relaxed mt-0.5">
                       {selectedCompany.id ? (
-                        <span className="flex items-center gap-1">
+                        <span className="flex items-center gap-1 text-blue-700">
                           <ShieldCheck className="w-3.5 h-3.5 text-blue-600 shrink-0" />
                           Official business account — Request will be sent for review.
                         </span>
                       ) : (
-                        <span>
-                          Unregistered company — Will be listed as self-declared on your profile.
+                        <span className="text-gray-600">
+                          Self-declared affiliation — No approval required.
                         </span>
                       )}
                     </span>
@@ -293,7 +314,7 @@ export default function BusinessAffiliatePage() {
                 <button
                   type="button"
                   onClick={() => setSelectedCompany(null)}
-                  className="p-1 rounded-full text-gray-400 hover:text-gray-600 hover:bg-white/80 transition-colors cursor-pointer"
+                  className="w-8 h-8 rounded-full text-gray-400 hover:text-gray-700 hover:bg-white flex items-center justify-center transition-colors cursor-pointer shrink-0"
                   title="Clear selection"
                 >
                   <X className="w-4 h-4" />
@@ -319,7 +340,7 @@ export default function BusinessAffiliatePage() {
           </div>
         </div>
 
-        {/* Bottom Action Button: Request Affiliation */}
+        {/* Bottom Action Button: Dynamic Request Affiliation vs Add Unregistered Company */}
         <div className="pb-8 pt-6">
           <button
             type="button"
@@ -337,6 +358,8 @@ export default function BusinessAffiliatePage() {
                 <Loader2 className="w-5 h-5 animate-spin" />
                 <span>Processing affiliation...</span>
               </>
+            ) : selectedCompany && !selectedCompany.id ? (
+              <span>Add unregistered company</span>
             ) : (
               <span>Request affiliation</span>
             )}

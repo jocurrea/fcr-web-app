@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { Search, Building2, Check, X, Loader2, AlertCircle } from "lucide-react";
+import { Search, Building2, Check, X, Loader2, AlertCircle, Plus } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
@@ -329,23 +329,53 @@ export function CompanySearchAutocomplete({
               ))}
 
               {/* Option to use custom typed name — E01-HU12 (AC 1) */}
-              <button
-                type="button"
-                onClick={handleSelectCustomName}
-                className="w-full px-3.5 py-2.5 text-left text-xs font-medium text-gray-600 hover:text-blue-600 hover:bg-gray-50 transition-colors"
-              >
-                Add &quot;<strong>{query.trim()}</strong>&quot; as Unregistered Company
-              </button>
+              <div className="p-2 bg-gray-50/50 border-t border-gray-100">
+                <button
+                  type="button"
+                  onClick={handleSelectCustomName}
+                  className="w-full p-2.5 hover:bg-blue-50/80 rounded-xl flex items-center gap-2.5 transition-colors cursor-pointer text-left group"
+                >
+                  <div className="w-7 h-7 rounded-full bg-blue-100 text-[#1d4ed8] flex items-center justify-center shrink-0 shadow-2xs group-hover:bg-[#1d4ed8] group-hover:text-white transition-colors">
+                    <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+                  </div>
+                  <div className="flex flex-col min-w-0">
+                    <span className="text-xs font-bold text-gray-800 group-hover:text-[#1d4ed8] truncate transition-colors">
+                      Add as Unregistered Company
+                    </span>
+                    <span className="text-[11px] text-gray-500 truncate">
+                      &quot;{query.trim()}&quot;
+                    </span>
+                  </div>
+                </button>
+              </div>
             </div>
           ) : (
-            <div className="p-3.5 text-center">
-              <p className="text-xs text-gray-500 mb-2">No registered business found matching &quot;{query}&quot;</p>
+            <div className="p-4 flex flex-col gap-3 text-left">
+              <div className="space-y-0.5">
+                <p className="text-xs sm:text-sm font-bold text-gray-900">
+                  No registered companies found
+                </p>
+                <p className="text-xs text-gray-500 leading-relaxed">
+                  Check the spelling and try another company name.
+                </p>
+              </div>
+
               <button
                 type="button"
                 onClick={handleSelectCustomName}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-xl text-xs font-semibold transition-colors"
+                className="w-full p-3 bg-blue-50/80 hover:bg-blue-100/80 border border-blue-200/80 rounded-2xl flex items-center gap-3 transition-all cursor-pointer text-left group active:scale-[0.99] shadow-2xs"
               >
-                <span>Add &quot;{query.trim()}&quot; as Unregistered Company</span>
+                <div className="w-8 h-8 rounded-full bg-[#1d4ed8] text-white flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-105 transition-transform">
+                  <Plus className="w-4 h-4 stroke-[2.5]" />
+                </div>
+                <div className="flex flex-col min-w-0">
+                  <span className="text-xs font-bold text-blue-900 truncate">
+                    Add as Unregistered Company
+                  </span>
+                  <span className="text-xs text-blue-700 font-semibold truncate">
+                    &quot;{query.trim()}&quot;
+                  </span>
+                </div>
               </button>
             </div>
           )}
