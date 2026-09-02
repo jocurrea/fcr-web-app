@@ -48,9 +48,18 @@ export function CompanySearchAutocomplete({
     value ? { id: selectedCompanyId, name: value, status: selectedCompanyId ? "pending" : "active" } : null
   );
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [showSuccessToast, setShowSuccessToast] = useState(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const toastTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Cleanup toast timer on unmount
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    };
+  }, []);
 
   // Sync with external value changes
   useEffect(() => {
@@ -228,6 +237,13 @@ export function CompanySearchAutocomplete({
     setSelectedCompany(selection);
     setShowConfirmModal(false);
 
+    // Show floating success toast
+    setShowSuccessToast(true);
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = setTimeout(() => {
+      setShowSuccessToast(false);
+    }, 3500);
+
     if (onSelectCompany) {
       onSelectCompany(selection);
     }
@@ -238,6 +254,7 @@ export function CompanySearchAutocomplete({
     setSelectedCompany(null);
     setResults([]);
     setIsOpen(false);
+    setShowSuccessToast(false);
     if (onSelectCompany) {
       onSelectCompany({ id: null, name: "", status: "active" });
     }
@@ -428,6 +445,29 @@ export function CompanySearchAutocomplete({
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ── Success Floating Toast ── */}
+      {showSuccessToast && (
+        <div className="fixed top-5 left-1/2 -translate-x-1/2 z-50 w-[90%] max-w-sm sm:max-w-md bg-white border border-gray-100 rounded-2xl py-3 px-4 sm:px-5 shadow-2xl flex items-center justify-between gap-3 animate-in slide-in-from-top-4 fade-in duration-200">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-7 h-7 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 shadow-2xs">
+              <Check className="w-4 h-4 stroke-[3]" />
+            </div>
+            <span className="text-xs sm:text-sm font-bold text-gray-900 truncate">
+              Unregistered company added
+            </span>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setShowSuccessToast(false)}
+            className="w-6 h-6 rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-100 flex items-center justify-center transition-colors cursor-pointer shrink-0"
+            title="Dismiss"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
         </div>
       )}
     </div>

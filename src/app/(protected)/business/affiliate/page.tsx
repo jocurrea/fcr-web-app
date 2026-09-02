@@ -416,6 +416,36 @@ export default function BusinessAffiliatePage() {
           </div>
         </div>
       )}
+
+      {/* ── Success Floating Toast ── */}
+      {successMessage && (
+        <div className="fixed top-5 left-1/2 -translate-x-1/2 z-50 w-[90%] max-w-sm sm:max-w-md bg-white border border-gray-100 rounded-2xl py-3 px-4 sm:px-5 shadow-2xl flex items-center justify-between gap-3 animate-in slide-in-from-top-4 fade-in duration-200">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-7 h-7 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 shadow-2xs">
+              <Check className="w-4 h-4 stroke-[3]" />
+            </div>
+            <div className="flex flex-col min-w-0">
+              <span className="text-xs sm:text-sm font-bold text-gray-900 truncate">
+                {selectedCompany && !selectedCompany.id
+                  ? "Unregistered company added"
+                  : "Affiliation request sent"}
+              </span>
+              <span className="text-[11px] text-gray-500 truncate font-medium">
+                {selectedCompany?.name}
+              </span>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setSuccessMessage(null)}
+            className="w-6 h-6 rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-100 flex items-center justify-center transition-colors cursor-pointer shrink-0"
+            title="Dismiss"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
     </div>
   );
 }
