@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ChevronLeft, Lock, EyeOff, Eye, AlertCircle, Building2, CheckCircle2 } from "lucide-react";
+import { ChevronLeft, Lock, EyeOff, Eye, AlertCircle, Building2, CheckCircle2, Mail } from "lucide-react";
 import { useState, useEffect, Suspense } from "react";
 import { supabase } from "@/lib/supabase";
 
@@ -12,6 +12,7 @@ function RegisterForm() {
 
   const inviteToken = searchParams.get("invite") || searchParams.get("code");
   const companyParam = searchParams.get("company");
+  const verifyEmailQuery = searchParams.get("verifyEmail");
 
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -23,6 +24,7 @@ function RegisterForm() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isDuplicateEmail, setIsDuplicateEmail] = useState(false);
+  const [emailConfirmationSent, setEmailConfirmationSent] = useState(false);
 
   // Corporate invite state
   const [invitedCompany, setInvitedCompany] = useState<{ id: string; name: string } | null>(null);
@@ -83,10 +85,15 @@ function RegisterForm() {
       const accountType = invitedCompany ? "corporate_member" : "individual";
       const employerName = invitedCompany ? invitedCompany.name : undefined;
 
+      const callbackUrl = typeof window !== "undefined"
+        ? `${window.location.origin}/auth/callback?next=/role-selection`
+        : "/auth/callback?next=/role-selection";
+
       const { data, error: authError } = await supabase.auth.signUp({
         email: email.trim().toLowerCase(),
         password,
         options: {
+          emailRedirectTo: callbackUrl,
           data: {
             accountType,
             platformRole: "user",
@@ -125,40 +132,42 @@ function RegisterForm() {
         console.warn("Storage cleanup error:", storageErr);
       }
 
-      const userId = data.session?.user.id || data.user?.id;
+      const userId = data.session?.user?.id || data.user?.id;
 
       if (userId) {
         localStorage.setItem("current_user_id", userId);
 
         // Ensure user record in users table has onboarded strictly set to 0 and no assigned role
-        try {
-          await supabase.from("users").upsert({
+        // Non-blocking best-effort execution so redirection is never halted
+        Promise.allSettled([
+          supabase.from("users").upsert({
             id: userId,
             email: email.trim().toLowerCase(),
             onboarded: 0,
             accountType: accountType || null,
             role: null,
             professionalRole: null,
-          }, { onConflict: "id" });
-        } catch (dbErr) {
-          console.warn("Could not upsert default user row:", dbErr);
-        }
-
-        // Scenario 2: Bind user profile to invited Business entity with Pre-linked status
-        if (invitedCompany?.id) {
-          try {
-            await supabase.from("company_members").insert({
-              company_id: invitedCompany.id,
-              user_id: userId,
-              role: "member",
-            });
-          } catch (err) {
-            console.warn("Could not insert company member association directly:", err);
-          }
-        }
+          }, { onConflict: "id" }),
+          invitedCompany?.id
+            ? supabase.from("company_members").insert({
+                company_id: invitedCompany.id,
+                user_id: userId,
+                role: "member",
+              })
+            : Promise.resolve(),
+        ]).catch((dbErr) => {
+          console.warn("Background user setup error:", dbErr);
+        });
       }
 
-      // Successful registration - proceed strictly to role selection
+      // If email confirmation is required (no session returned immediately)
+      if (!data.session) {
+        setEmailConfirmationSent(true);
+        setIsLoading(false);
+        return;
+      }
+
+      // Successful registration with active session - proceed strictly to role selection
       router.push("/role-selection");
     } catch (err: any) {
       setError(err.message || "An error occurred during registration");
@@ -166,6 +175,43 @@ function RegisterForm() {
       setIsLoading(false);
     }
   };
+
+  if (emailConfirmationSent || verifyEmailQuery) {
+    const displayEmail = email || verifyEmailQuery || "";
+    return (
+      <div className="flex flex-col min-h-screen px-6 py-12 items-center justify-center text-center max-w-md mx-auto">
+        <div className="w-16 h-16 rounded-full bg-blue-50 text-[#1d4ed8] flex items-center justify-center mb-6 shadow-sm ring-8 ring-blue-50/50">
+          <Mail className="w-8 h-8" />
+        </div>
+        <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight mb-3">
+          Check your email
+        </h1>
+        <p className="text-sm text-gray-600 mb-6 leading-relaxed">
+          We&apos;ve sent a verification link to{" "}
+          <span className="font-semibold text-gray-900">{displayEmail}</span>.
+          Please check your inbox and click the link to activate your account and proceed to select your role.
+        </p>
+        <div className="w-full space-y-3">
+          <Link
+            href="/login"
+            className="w-full py-3.5 px-4 rounded-xl bg-[#1d4ed8] hover:bg-[#1e40af] text-white font-semibold text-sm transition-colors block text-center shadow-sm"
+          >
+            Go to Login
+          </Link>
+          <button
+            type="button"
+            onClick={() => {
+              setEmailConfirmationSent(false);
+              router.replace("/register");
+            }}
+            className="text-xs text-gray-500 hover:text-gray-900 transition-colors"
+          >
+            Entered wrong email? Register again
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col min-h-screen px-6 py-8">

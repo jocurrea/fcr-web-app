@@ -102,7 +102,7 @@ export async function signUpWithPassword(formData: FormData) {
   }
 
   redirect(
-    `/login?message=${safeRedirectParam("Check your email to confirm your account.")}`
+    `/register?verifyEmail=${safeRedirectParam(email)}`
   );
 }
 
