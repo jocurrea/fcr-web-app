@@ -547,6 +547,33 @@ export function ComplementaryInfoStep({ onNext, onBack, onSkip }: ComplementaryI
     }
   }, []);
 
+  // Handle section deep-link query parameter (e.g. section=work, section=languages, section=location)
+  useEffect(() => {
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      const section = urlParams.get("section") || (typeof window !== "undefined" ? window.location.hash.replace("#", "") : "");
+      if (section === "work" || section === "experience" || section === "work-experience") {
+        setTimeout(() => {
+          setIsExperienceModalOpen(true);
+        }, 200);
+      } else if (section === "languages" || section === "language") {
+        setTimeout(() => {
+          setIsLanguageModalOpen(true);
+        }, 200);
+      } else if (section === "location" || section === "city") {
+        setTimeout(() => {
+          const el = document.getElementById("location-city-input");
+          if (el) {
+            el.focus();
+            el.scrollIntoView({ behavior: "smooth", block: "center" });
+          }
+        }, 200);
+      }
+    } catch (e) {
+      console.error("Error parsing section param:", e);
+    }
+  }, []);
+
   const handleSelectCountry = (country: CountryOption) => {
     setSelectedCountry(country);
     setIsCountryDropdownOpen(false);
@@ -810,14 +837,15 @@ export function ComplementaryInfoStep({ onNext, onBack, onSkip }: ComplementaryI
         <div className="flex flex-col gap-6 flex-1">
 
           {/* 1. Location: Stacked Inputs (City top, Custom Country Select bottom with flags) */}
-          <div className="space-y-2">
-            <Label className="font-semibold text-gray-900 text-sm">
+          <div id="location-section" className="space-y-2">
+            <Label htmlFor="location-city-input" className="font-semibold text-gray-900 text-sm">
               Location
             </Label>
             
             <div className="flex flex-col gap-2.5">
               {/* City Input */}
               <Input
+                id="location-city-input"
                 type="text"
                 value={city}
                 onChange={(e) => setCity(e.target.value)}
@@ -899,7 +927,7 @@ export function ComplementaryInfoStep({ onNext, onBack, onSkip }: ComplementaryI
           </div>
 
           {/* 2. Languages: 0 / 20 aligned right + Trigger Button launching Floating Modal */}
-          <div className="space-y-2">
+          <div id="languages-section" className="space-y-2">
             <div className="flex items-center justify-between px-0.5">
               <Label className="font-semibold text-gray-900 text-sm">
                 Languages
@@ -945,7 +973,7 @@ export function ComplementaryInfoStep({ onNext, onBack, onSkip }: ComplementaryI
           </div>
 
           {/* 3. Work experience: Label left + small outline button "+ Add" launching Modal */}
-          <div className="space-y-3">
+          <div id="work-experience-section" className="space-y-3">
             <div className="flex items-center justify-between px-0.5">
               <Label className="font-semibold text-gray-900 text-sm">
                 Work experience

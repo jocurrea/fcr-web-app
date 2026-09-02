@@ -47,6 +47,14 @@ export default function OnboardingPage() {
         const urlParams = new URLSearchParams(window.location.search);
         const editMode = urlParams.get("edit") === "true";
         setIsEditMode(editMode);
+
+        const urlStep = urlParams.get("step");
+        if (urlStep) {
+          const parsedStep = parseInt(urlStep, 10);
+          if (!isNaN(parsedStep) && parsedStep >= 1) {
+            setStep(parsedStep);
+          }
+        }
         
         // Fetch User and Resume records from database
         const [{ data: userRecord }, { data: resumeRecord }] = await Promise.all([
