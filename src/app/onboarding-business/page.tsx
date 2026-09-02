@@ -92,8 +92,22 @@ export default function OnboardingBusinessPage() {
     if (step > 1) {
       setStep(step - 1);
     } else {
-      // Step 1: go back to role selection
-      router.push("/role-selection");
+      // Step 1: clear in-memory role and go back to role selection
+      try {
+        const personalRaw = localStorage.getItem("onboarding_personal");
+        if (personalRaw) {
+          const parsed = JSON.parse(personalRaw);
+          delete parsed.category;
+          delete parsed.role;
+          delete parsed.professionalRole;
+          delete parsed.professional_role;
+          delete parsed.professionalTitle;
+          delete parsed.professionalRoleLabel;
+          localStorage.setItem("onboarding_personal", JSON.stringify(parsed));
+        }
+        localStorage.removeItem("onboarding_role");
+      } catch (e) {}
+      router.push("/role-selection?edit=true&from=onboarding");
     }
   };
 

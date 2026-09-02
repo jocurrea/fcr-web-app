@@ -77,6 +77,21 @@ export function ProfessionalTypeStep({ onNext, onBack }: ProfessionalTypeStepPro
   };
 
   const handleBackClick = () => {
+    try {
+      const personalRaw = localStorage.getItem("onboarding_personal");
+      if (personalRaw) {
+        const parsed = JSON.parse(personalRaw);
+        delete parsed.category;
+        delete parsed.role;
+        delete parsed.professionalRole;
+        delete parsed.professional_role;
+        delete parsed.professionalTitle;
+        delete parsed.professionalRoleLabel;
+        localStorage.setItem("onboarding_personal", JSON.stringify(parsed));
+      }
+      localStorage.removeItem("onboarding_role");
+    } catch (e) {}
+
     if (onBack) {
       onBack();
     } else {
