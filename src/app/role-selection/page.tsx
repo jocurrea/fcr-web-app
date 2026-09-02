@@ -79,16 +79,51 @@ export default function RoleSelectionPage() {
         return;
       }
 
-      // If user is actively on /role-selection (navigated here or went back to re-select):
-      // DO NOT auto-redirect to /onboarding-business or /onboarding!
-      // Instead, pre-populate selectedType so they see their current choice, and unlock the UI completely.
-      const currentRole = userRecord?.professionalRole || userRecord?.role || accountType || session.user.user_metadata?.role;
-      if (accountType === "business" || session.user.user_metadata?.accountType === "business") {
-        setSelectedType("business");
-      } else if (currentRole === "aviation_professional" || userRecord?.professionalRole === "aviation_professional") {
-        setSelectedType("aviation_professional");
-      } else if (currentRole === "pilot" || currentRole === "crew" || accountType === "flight_crew") {
-        setSelectedType("flight_crew");
+      // Only check for previous role pre-selection if the user explicitly navigated back or is in edit mode
+      const isBackOrEdit = isProfileEdit || params.get("from") === "onboarding" || params.get("edit") === "true";
+
+      if (isBackOrEdit) {
+        let rawRole: any = null;
+        try {
+          const personalRaw = localStorage.getItem("onboarding_personal");
+          if (personalRaw) {
+            const parsed = JSON.parse(personalRaw);
+            rawRole = parsed?.category || parsed?.role || parsed?.professionalRole;
+          }
+          if (!rawRole) {
+            rawRole = localStorage.getItem("onboarding_role");
+          }
+        } catch (e) {}
+
+        if (!rawRole) {
+          rawRole = userRecord?.accountType || userRecord?.role || session.user.user_metadata?.accountType || session.user.user_metadata?.role;
+        }
+
+        // Strict validation: Omit pre-selection if null, "null" (as string), empty, "undefined", or undefined
+        if (
+          rawRole !== null &&
+          rawRole !== undefined &&
+          rawRole !== "null" &&
+          rawRole !== "undefined" &&
+          typeof rawRole === "string" &&
+          rawRole.trim() !== ""
+        ) {
+          const normalized = rawRole.trim().toLowerCase();
+          if (normalized === "business") {
+            setSelectedType("business");
+          } else if (normalized === "aviation_professional") {
+            setSelectedType("aviation_professional");
+          } else if (normalized === "flight_crew" || normalized === "pilot" || normalized === "crew") {
+            setSelectedType("flight_crew");
+          } else {
+            setSelectedType(null);
+          }
+        } else {
+          setSelectedType(null);
+        }
+      } else {
+        // Fresh account / initial load: strictly empty, no pre-selected option
+        setSelectedType(null);
       }
 
       setIsCheckingAccess(false);
@@ -417,12 +452,13 @@ export default function RoleSelectionPage() {
         {/* Footer */}
         <div className="pb-8 pt-4">
           <button
+            type="button"
             onClick={handleContinue}
             disabled={!selectedType || isContinuing}
-            className={`w-full py-4 rounded-full font-bold text-white transition-all shadow-md ${
+            className={`w-full py-4 rounded-full font-bold transition-all shadow-md ${
               selectedType && !isContinuing
-                ? "bg-[#1d4ed8] hover:bg-[#1e40af] cursor-pointer" 
-                : "bg-[#85b0fa] cursor-not-allowed opacity-90"
+                ? "bg-blue-600 hover:bg-blue-700 text-white cursor-pointer" 
+                : "bg-gray-300 text-gray-500 cursor-not-allowed"
             }`}
           >
             {isContinuing ? "Please wait..." : "Next"}
