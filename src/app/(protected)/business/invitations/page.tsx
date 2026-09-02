@@ -130,6 +130,24 @@ export default function BusinessInvitationsPage() {
     setCopied(false);
 
     try {
+      // 1. Security Check: Prevent self-invitation (Business admin inviting themselves)
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user?.email && session.user.email.toLowerCase() === cleanEmail) {
+        setErrorMessage("You cannot send an affiliation invitation to your own business account email address.");
+        setIsSending(false);
+        return;
+      }
+
+      // 2. Duplicate Prevention: Check if there is already a pending invitation for this email
+      const alreadyPending = invitations.some(
+        (inv) => inv.email.toLowerCase() === cleanEmail && inv.status === "pending"
+      );
+      if (alreadyPending) {
+        setErrorMessage("A pending invitation has already been sent to this email address. You can copy or resend the existing link.");
+        setIsSending(false);
+        return;
+      }
+
       // Generate a secure unique token
       const token =
         Math.random().toString(36).substring(2, 15) +
