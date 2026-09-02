@@ -102,6 +102,14 @@ export default function BusinessAffiliatePage() {
     }
   };
 
+  const handleAffiliationSaved = (selection: CompanySelection) => {
+    setSelectedCompany(selection);
+    setSuccessMessage(`Unregistered company "${selection.name}" added successfully.`);
+    setTimeout(() => {
+      router.push("/profile");
+    }, 1200);
+  };
+
   const handleButtonClick = () => {
     if (!selectedCompany || !selectedCompany.name.trim()) return;
     if (!selectedCompany.id) {
@@ -274,6 +282,7 @@ export default function BusinessAffiliatePage() {
               value={selectedCompany?.name || ""}
               selectedCompanyId={selectedCompany?.id || null}
               onSelectCompany={handleSelectCompany}
+              onAffiliationSaved={handleAffiliationSaved}
               required={false}
             />
 

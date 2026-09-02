@@ -25,6 +25,7 @@ export interface CompanySearchAutocompleteProps {
   value?: string;
   selectedCompanyId?: string | null;
   onSelectCompany?: (company: CompanySelection) => void;
+  onAffiliationSaved?: (company: CompanySelection) => void;
   placeholder?: string;
   label?: string;
   className?: string;
@@ -35,14 +36,17 @@ export function CompanySearchAutocomplete({
   value = "",
   selectedCompanyId = null,
   onSelectCompany,
+  onAffiliationSaved,
   placeholder = "Search business or airline...",
   label = "Company / Current Employer",
   className = "",
   required = false,
 }: CompanySearchAutocompleteProps) {
   const [query, setQuery] = useState(value);
+  const [targetUnregisteredName, setTargetUnregisteredName] = useState("");
   const [results, setResults] = useState<CompanySearchResult[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [selectedCompany, setSelectedCompany] = useState<CompanySelection | null>(
     value ? { id: selectedCompanyId, name: value, status: selectedCompanyId ? "pending" : "active" } : null
@@ -53,6 +57,7 @@ export function CompanySearchAutocomplete({
   const containerRef = useRef<HTMLDivElement>(null);
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
   const toastTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const prevValueRef = useRef(value);
 
   // Cleanup toast timer on unmount
   useEffect(() => {
@@ -61,9 +66,10 @@ export function CompanySearchAutocomplete({
     };
   }, []);
 
-  // Sync with external value changes
+  // Sync ONLY when external value explicitly changes (avoid wiping user query on dropdown close)
   useEffect(() => {
-    if (value !== query && !isOpen) {
+    if (prevValueRef.current !== value) {
+      prevValueRef.current = value;
       setQuery(value);
       if (value) {
         setSelectedCompany({
@@ -73,7 +79,7 @@ export function CompanySearchAutocomplete({
         });
       }
     }
-  }, [value, selectedCompanyId, isOpen]);
+  }, [value, selectedCompanyId]);
 
   // Click outside listener to close dropdown
   useEffect(() => {
@@ -213,44 +219,89 @@ export function CompanySearchAutocomplete({
     }
   };
 
-  // Opens the confirmation modal before selecting unregistered company
+  // Opens the confirmation modal before selecting unregistered company (saving the exact typed name)
   const handleOpenConfirmModal = () => {
     const trimmed = query.trim();
     if (!trimmed) return;
+    setTargetUnregisteredName(trimmed);
     setIsOpen(false);
     setShowConfirmModal(true);
   };
 
-  // Confirms adding the unregistered company
-  const handleConfirmAddUnregistered = () => {
-    const trimmed = query.trim();
+  // Confirms adding the unregistered company, executes the save RPC, triggers Toast and updates local state
+  const handleConfirmAddUnregistered = async () => {
+    const trimmed = (targetUnregisteredName || query).trim();
     if (!trimmed) {
       setShowConfirmModal(false);
       return;
     }
 
-    const selection: CompanySelection = {
-      id: null,
-      name: trimmed,
-      status: "unverified",
-    };
-    setSelectedCompany(selection);
-    setShowConfirmModal(false);
+    setIsSaving(true);
+    try {
+      // 1. Execute unregistered affiliation save via RPC
+      const res1 = await supabase.rpc("create_unregistered_company_affiliation", {
+        company_name: trimmed,
+      });
 
-    // Show floating success toast
-    setShowSuccessToast(true);
-    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-    toastTimerRef.current = setTimeout(() => {
-      setShowSuccessToast(false);
-    }, 3500);
+      if (res1.error) {
+        const res2 = await supabase.rpc("create_unregistered_company_affiliation", {
+          text: trimmed,
+        });
+        if (res2.error) {
+          const res3 = await supabase.rpc("create_unregistered_company_affiliation", {
+            name: trimmed,
+          });
+          if (res3.error) {
+            console.warn("Could not save unregistered company via RPC:", res1.error);
+          }
+        }
+      }
 
-    if (onSelectCompany) {
-      onSelectCompany(selection);
+      // 2. Persist to local storage cache so profile immediately displays it
+      try {
+        const savedPersonal = localStorage.getItem("onboarding_personal");
+        const parsed = savedPersonal ? JSON.parse(savedPersonal) : {};
+        parsed.companyName = trimmed;
+        parsed.company = trimmed;
+        parsed.companyId = null;
+        parsed.companyStatus = "unverified";
+        localStorage.setItem("onboarding_personal", JSON.stringify(parsed));
+      } catch (e) {
+        console.warn("Error updating local storage cache:", e);
+      }
+
+      const selection: CompanySelection = {
+        id: null,
+        name: trimmed,
+        status: "unverified",
+      };
+      setSelectedCompany(selection);
+      setQuery(trimmed);
+      setShowConfirmModal(false);
+
+      // 3. Show floating success toast
+      setShowSuccessToast(true);
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+      toastTimerRef.current = setTimeout(() => {
+        setShowSuccessToast(false);
+      }, 3500);
+
+      if (onSelectCompany) {
+        onSelectCompany(selection);
+      }
+      if (onAffiliationSaved) {
+        onAffiliationSaved(selection);
+      }
+    } catch (err) {
+      console.error("Error saving unregistered company:", err);
+    } finally {
+      setIsSaving(false);
     }
   };
 
   const handleClear = () => {
     setQuery("");
+    setTargetUnregisteredName("");
     setSelectedCompany(null);
     setResults([]);
     setIsOpen(false);
@@ -296,7 +347,7 @@ export function CompanySearchAutocomplete({
             <button
               type="button"
               onClick={handleClear}
-              className="p-1 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100 transition-colors"
+              className="p-1 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100 transition-colors cursor-pointer"
               title="Clear"
             >
               <X className="w-4 h-4" />
@@ -372,7 +423,7 @@ export function CompanySearchAutocomplete({
                     <span className="text-xs font-bold text-gray-800 group-hover:text-[#1d4ed8] truncate transition-colors">
                       Add as Unregistered Company
                     </span>
-                    <span className="text-[11px] text-gray-500 truncate">
+                    <span className="text-[11px] text-gray-500 truncate font-semibold">
                       &quot;{query.trim()}&quot;
                     </span>
                   </div>
@@ -402,7 +453,7 @@ export function CompanySearchAutocomplete({
                   <span className="text-xs font-bold text-blue-900 truncate">
                     Add as Unregistered Company
                   </span>
-                  <span className="text-xs text-blue-700 font-semibold truncate">
+                  <span className="text-xs text-blue-700 font-bold truncate">
                     &quot;{query.trim()}&quot;
                   </span>
                 </div>
@@ -421,15 +472,16 @@ export function CompanySearchAutocomplete({
               Add unregistered company?
             </h3>
 
-            {/* Dynamic descriptive text with user typed text */}
+            {/* Dynamic descriptive text interpolating user entered company name */}
             <p className="text-xs sm:text-sm text-gray-600 leading-relaxed font-normal">
-              <strong>&quot;{query.trim()}&quot;</strong> will appear as a self-reported company without a verified badge.
+              &quot;<strong>{targetUnregisteredName || query.trim()}</strong>&quot; will appear as a self-reported company without a verified badge.
             </p>
 
             {/* Bottom buttons: CANCEL and ADD COMPANY */}
             <div className="flex items-center justify-end gap-3 pt-2">
               <button
                 type="button"
+                disabled={isSaving}
                 onClick={() => setShowConfirmModal(false)}
                 className="py-2.5 px-5 rounded-full text-xs sm:text-sm font-bold text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-colors uppercase tracking-wider cursor-pointer"
               >
@@ -438,10 +490,18 @@ export function CompanySearchAutocomplete({
 
               <button
                 type="button"
+                disabled={isSaving}
                 onClick={handleConfirmAddUnregistered}
-                className="py-2.5 px-6 rounded-full text-xs sm:text-sm font-bold text-white bg-[#1d4ed8] hover:bg-[#1e40af] transition-all uppercase tracking-wider shadow-md active:scale-95 cursor-pointer"
+                className="py-2.5 px-6 rounded-full text-xs sm:text-sm font-bold text-white bg-[#1d4ed8] hover:bg-[#1e40af] transition-all uppercase tracking-wider shadow-md active:scale-95 cursor-pointer flex items-center gap-1.5"
               >
-                ADD COMPANY
+                {isSaving ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>ADDING...</span>
+                  </>
+                ) : (
+                  <span>ADD COMPANY</span>
+                )}
               </button>
             </div>
           </div>
