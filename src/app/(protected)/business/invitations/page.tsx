@@ -148,49 +148,58 @@ export default function BusinessInvitationsPage() {
         return;
       }
 
-      // Generate a secure unique token
-      const token =
-        Math.random().toString(36).substring(2, 15) +
-        Math.random().toString(36).substring(2, 15) +
-        Date.now().toString(36);
+      // 3. Primary Dispatch: Invoke the official 'send-company-invitation' Supabase Edge Function
+      // This hashes the token, calls create_company_affiliation_invitation, and sends the actual transactional email via Resend
+      const { data: edgeData, error: edgeErr } = await supabase.functions.invoke(
+        "send-company-invitation",
+        {
+          body: {
+            companyId,
+            email: cleanEmail,
+            role: inviteRole,
+          },
+        }
+      );
 
+      if (edgeErr) {
+        console.error("Error calling send-company-invitation Edge Function:", edgeErr);
+        let errorMsg = edgeErr.message || "Failed to send invitation email.";
+        if ((edgeErr as any).context) {
+          try {
+            const body = await (edgeErr as any).context.json();
+            if (body?.error) errorMsg = body.error;
+            else if (body?.message) errorMsg = body.message;
+          } catch (e) {}
+        }
+        setErrorMessage(errorMsg);
+        setIsSending(false);
+        return;
+      }
+
+      const inviteToken = edgeData?.rawToken || edgeData?.token || "";
       const origin = typeof window !== "undefined" ? window.location.origin : "";
-      const inviteUrl = `${origin}/invitations/accept?token=${token}`;
+      const inviteUrl = edgeData?.inviteUrl || (inviteToken ? `${origin}/invitations/accept?token=${inviteToken}` : "");
 
       const newInvitation: SentInvitation = {
-        id: "inv-" + Date.now(),
+        id: edgeData?.invitationId || "inv-" + Date.now(),
         email: cleanEmail,
-        token,
+        token: inviteToken,
         status: "pending",
         created_at: new Date().toISOString(),
         role: inviteRole,
       };
 
-      // Try inserting into database
+      const updatedList = [newInvitation, ...invitations.filter((i) => i.email !== cleanEmail)];
+      setInvitations(updatedList);
       if (companyId) {
-        try {
-          await supabase.from("company_affiliation_invitations").insert({
-            company_id: companyId,
-            email: cleanEmail,
-            invited_email: cleanEmail,
-            token,
-            invitation_token: token,
-            role: inviteRole,
-            status: "pending",
-          });
-        } catch (dbErr) {
-          console.warn("Could not write invitation to DB, saving locally:", dbErr);
-        }
-
-        // Persist to local state and localStorage
-        const updatedList = [newInvitation, ...invitations];
-        setInvitations(updatedList);
         localStorage.setItem(`company_invitations_${companyId}`, JSON.stringify(updatedList));
       }
 
       setInviteEmail("");
-      setGeneratedLink(inviteUrl);
-      setSuccessMessage(`Invitation sent to ${cleanEmail}`);
+      if (inviteUrl) {
+        setGeneratedLink(inviteUrl);
+      }
+      setSuccessMessage(`Invitation email sent to ${cleanEmail}`);
     } catch (err: any) {
       console.error("Error sending invitation:", err);
       setErrorMessage(err?.message || "Failed to create invitation. Please try again.");
