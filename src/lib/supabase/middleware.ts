@@ -169,12 +169,18 @@ export async function updateSession(request: NextRequest) {
 
   // 1. User is NOT fully onboarded or has no role
   if (!isOnboarded || !hasRole) {
-    // If attempting to access /home or any protected route
-    if (pathname === "/home" || (!isOnboardingRoute && !isPublicStaticRoute)) {
-      return makeRedirect("/role-selection");
+    // Allow public welcome, auth routes, static legal pages, and onboarding flow
+    if (isPublicAuthRoute || isPublicStaticRoute || isOnboardingRoute) {
+      return response;
     }
-    // Allow onboarding flow and static legal pages
-    return response;
+
+    // Root route "/" always lands on /welcome as the primary landing page
+    if (isRoot) {
+      return makeRedirect("/welcome");
+    }
+
+    // Attempting to access /home or any protected route forces /role-selection
+    return makeRedirect("/role-selection");
   }
 
   // 2. User IS fully onboarded and has a role
