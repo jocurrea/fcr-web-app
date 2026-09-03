@@ -92,7 +92,7 @@ export function CompanySearchAutocomplete({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Debounced search query function using search_companies_for_affiliation RPC
+  // Debounced search query function using search_companies_for_affiliation RPC with resilient direct fallback
   const searchCompanies = useCallback(async (searchTerm: string) => {
     const trimmed = searchTerm.trim();
     if (!trimmed || trimmed.length < 2) {
@@ -103,51 +103,34 @@ export function CompanySearchAutocomplete({
 
     setIsLoading(true);
     try {
-      let rpcData: any = null;
-      let rpcError: any = null;
+      let rpcData: any[] | null = null;
 
-      // Invoke search_companies_for_affiliation RPC with search text and limit of 20 results
-      const res1 = await supabase.rpc("search_companies_for_affiliation", {
-        search_query: trimmed,
+      // 1. Primary: Invoke search_companies_for_affiliation RPC with search_text & result_limit
+      const res = await supabase.rpc("search_companies_for_affiliation", {
+        search_text: trimmed,
         result_limit: 20,
       });
 
-      if (!res1.error && res1.data) {
-        rpcData = res1.data;
-      } else if (res1.error) {
-        // Fallback parameter signatures in case of parameter naming differences
-        const res2 = await supabase.rpc("search_companies_for_affiliation", {
-          search_term: trimmed,
-          limit_count: 20,
-        });
-
-        if (!res2.error && res2.data) {
-          rpcData = res2.data;
-        } else {
-          const res3 = await supabase.rpc("search_companies_for_affiliation", {
-            query: trimmed,
-            limit: 20,
-          });
-
-          if (!res3.error && res3.data) {
-            rpcData = res3.data;
-          } else {
-            const res4 = await supabase.rpc("search_companies_for_affiliation", {
-              search_term: trimmed,
-              limit: 20,
-            });
-
-            if (!res4.error && res4.data) {
-              rpcData = res4.data;
-            } else {
-              rpcError = res1.error;
-            }
-          }
+      if (!res.error && res.data && Array.isArray(res.data) && res.data.length > 0) {
+        rpcData = res.data;
+      } else {
+        if (res.error) {
+          console.warn("Notice from search_companies_for_affiliation RPC:", res.error.message);
         }
-      }
 
-      if (rpcError) {
-        console.warn("RPC search_companies_for_affiliation returned error:", rpcError);
+        // 2. Resilient Fallback: Query active/approved companies directly from public.companies
+        const { data: directData, error: directErr } = await supabase
+          .from("companies")
+          .select("id, name, logo_url, location, owner_user_id, status")
+          .in("status", ["active", "approved"])
+          .ilike("name", `%${trimmed}%`)
+          .limit(20);
+
+        if (!directErr && directData && directData.length > 0) {
+          rpcData = directData;
+        } else if (res.data && Array.isArray(res.data)) {
+          rpcData = res.data;
+        }
       }
 
       if (rpcData && Array.isArray(rpcData)) {
@@ -171,7 +154,31 @@ export function CompanySearchAutocomplete({
         setResults([]);
       }
     } catch (err) {
-      console.error("Exception in search_companies_for_affiliation RPC:", err);
+      console.error("Exception in search_companies_for_affiliation:", err);
+      // Emergency fallback on network or unexpected exception
+      try {
+        const { data: directData } = await supabase
+          .from("companies")
+          .select("id, name, logo_url, location, owner_user_id, status")
+          .in("status", ["active", "approved"])
+          .ilike("name", `%${trimmed}%`)
+          .limit(20);
+
+        if (directData && Array.isArray(directData)) {
+          setResults(
+            directData.map((item: any) => ({
+              id: item.id,
+              name: item.name,
+              logo_url: item.logo_url || null,
+              location: item.location || null,
+              owner_user_id: item.owner_user_id || null,
+            }))
+          );
+          return;
+        }
+      } catch (fallbackErr) {
+        console.error("Direct fallback failed:", fallbackErr);
+      }
       setResults([]);
     } finally {
       setIsLoading(false);

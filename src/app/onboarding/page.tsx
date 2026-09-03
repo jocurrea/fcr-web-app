@@ -322,6 +322,23 @@ export default function OnboardingPage() {
       } catch (refErr) {
         console.warn("[Onboarding] Refresh session error:", refErr);
       }
+
+      // 4. Finalize company affiliation request if selected during onboarding
+      try {
+        const targetCompId = personalData?.linkedCompanyId || personalData?.companyId;
+        const targetCompName = personalData?.linkedCompany || personalData?.companyName || personalData?.company;
+        if (targetCompId) {
+          await supabase.rpc("request_company_affiliation", {
+            target_company_id: targetCompId,
+          });
+        } else if (targetCompName?.trim()) {
+          await supabase.rpc("create_unregistered_company_affiliation", {
+            company_name: targetCompName.trim(),
+          });
+        }
+      } catch (affErr) {
+        console.warn("[Onboarding] Finalize affiliation warning:", affErr);
+      }
     } catch (err: any) {
       console.error("[Onboarding] Sync error:", err);
     } finally {

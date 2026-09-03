@@ -144,7 +144,7 @@ export default function BusinessAffiliatePage() {
       if (selectedCompany.id) {
         // 1. Registered Business Account -> request official affiliation (pending review)
         const { error: rpcErr } = await supabase.rpc("request_company_affiliation", {
-          company_id: selectedCompany.id,
+          target_company_id: selectedCompany.id,
         });
 
         if (rpcErr) {

@@ -228,10 +228,10 @@ export function ContactCredentialsStep({ onNext, onBack }: ContactCredentialsSte
           if (companySelection.id) {
             // Registered company (UUID) -> request affiliation with 'pending' status
             const { error: rpcError } = await supabase.rpc("request_company_affiliation", {
-              company_id: companySelection.id,
+              target_company_id: companySelection.id,
             });
             if (rpcError) {
-              console.error("Error calling request_company_affiliation:", rpcError);
+              console.warn("Notice calling request_company_affiliation (will finalize upon onboarding completion):", rpcError.message);
             }
           } else {
             // E01-HU12: Unregistered / free-text company -> create unregistered affiliation (AC 2 & AC 3)
