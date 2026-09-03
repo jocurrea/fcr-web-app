@@ -37,9 +37,6 @@ export function ContactCredentialsStep({ onNext, onBack }: ContactCredentialsSte
           const parsed = JSON.parse(savedPersonal);
           if (parsed.email) setEmail(parsed.email);
           if (parsed.phone) setPhone(parsed.phone);
-          if (parsed.licenseCertification) {
-            setCurrentLicenseInput(parsed.licenseCertification);
-          }
           if (Array.isArray(parsed.licenses) && parsed.licenses.length > 0) {
             setLicensesList(parsed.licenses);
           } else if (parsed.licenseCertification) {
@@ -146,7 +143,8 @@ export function ContactCredentialsStep({ onNext, onBack }: ContactCredentialsSte
   const isPhoneFormatValid = PHONE_REGEX.test(phone.trim()) && (phone.match(/\d/g) || []).length >= 7;
   const isPhoneValid = !isPhoneEmpty && isPhoneFormatValid;
 
-  const isLicenseValid = licensesList.length > 0 || currentLicenseInput.trim().length > 0;
+  // Next button activates ONLY when at least one license is added to the list via the (+) button
+  const isLicenseValid = licensesList.length > 0;
 
   const isFormValid = isEmailValid && isPhoneValid && isLicenseValid;
 
@@ -155,12 +153,7 @@ export function ContactCredentialsStep({ onNext, onBack }: ContactCredentialsSte
 
     if (!isFormValid || isSaving) return;
 
-    // Combine any pending typed license with the list
-    let finalLicenses = [...licensesList];
-    if (currentLicenseInput.trim() && !finalLicenses.includes(currentLicenseInput.trim())) {
-      finalLicenses.push(currentLicenseInput.trim());
-    }
-
+    const finalLicenses = [...licensesList];
     const primaryLicense = finalLicenses[0] || "";
 
     setIsSaving(true);
@@ -272,7 +265,7 @@ export function ContactCredentialsStep({ onNext, onBack }: ContactCredentialsSte
     }
   };
 
-  const totalLicensesCount = licensesList.length + (currentLicenseInput.trim() && !licensesList.includes(currentLicenseInput.trim()) ? 1 : 0);
+  const totalLicensesCount = licensesList.length;
 
   return (
     <div className="min-h-screen bg-white">
@@ -437,11 +430,16 @@ export function ContactCredentialsStep({ onNext, onBack }: ContactCredentialsSte
                 )}
               />
 
-              {/* Circular blue button with white plus icon */}
               <button
                 type="button"
                 onClick={handleAddLicense}
-                className="shrink-0 w-12 h-12 rounded-full bg-blue-600 hover:bg-blue-700 active:scale-95 text-white flex items-center justify-center transition-colors cursor-pointer shadow-xs"
+                disabled={!currentLicenseInput.trim() || licensesList.length >= MAX_LICENSES}
+                className={cn(
+                  "shrink-0 w-12 h-12 rounded-full flex items-center justify-center transition-all shadow-xs",
+                  currentLicenseInput.trim() && licensesList.length < MAX_LICENSES
+                    ? "bg-blue-600 hover:bg-blue-700 active:scale-95 text-white cursor-pointer"
+                    : "bg-gray-200 text-gray-400 cursor-not-allowed"
+                )}
                 title="Add license"
               >
                 <Plus className="w-6 h-6 stroke-[2.5]" />
@@ -473,17 +471,18 @@ export function ContactCredentialsStep({ onNext, onBack }: ContactCredentialsSte
             {touched.license && !isLicenseValid && (
               <p className="text-xs text-red-600 font-medium flex items-center gap-1">
                 <AlertCircle className="w-3.5 h-3.5" />
-                This field is required.
+                Please add at least one license or certification using the (+) button.
               </p>
             )}
           </div>
 
           {/* Field 4: Company / Current Employer Autocomplete (AC 1) */}
-          <div className="pt-1">
+          <div className="space-y-1.5">
             <CompanySearchAutocomplete
               value={companySelection?.name || ""}
               selectedCompanyId={companySelection?.id || null}
               onSelectCompany={(selection) => setCompanySelection(selection)}
+              onAffiliationSaved={(selection) => setCompanySelection(selection)}
               label="Company / Current Employer"
               placeholder="Search business or airline..."
               required={false}
@@ -498,10 +497,10 @@ export function ContactCredentialsStep({ onNext, onBack }: ContactCredentialsSte
             type="button"
             onClick={handleNextClick}
             disabled={!isFormValid || isSaving}
-            className={`w-full py-4 rounded-full font-bold text-white transition-all shadow-md ${
+            className={`w-full py-4 rounded-full font-bold transition-all shadow-md ${
               isFormValid && !isSaving
-                ? "bg-[#1d4ed8] hover:bg-[#1e40af] cursor-pointer"
-                : "bg-[#85b0fa] cursor-not-allowed opacity-90"
+                ? "bg-blue-600 hover:bg-blue-700 text-white cursor-pointer"
+                : "bg-gray-300 text-gray-500 cursor-not-allowed"
             }`}
           >
             {isSaving ? "Please wait..." : "Next"}
