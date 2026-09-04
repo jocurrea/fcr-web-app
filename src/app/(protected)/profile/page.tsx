@@ -32,8 +32,11 @@ import { fetchPosts } from "@/lib/api/posts";
 import { PostCard } from "@/components/home/post-card";
 import { computeProfileAreas } from "@/utils/profileCompletion";
 import { revalidateProfileLayout } from "@/actions/profile";
+import { useUserProfile } from "@/components/providers/user-profile-provider";
 
 export default function ProfilePage() {
+  const { setProfileProgress, updateProfileData } = useUserProfile();
+
   // 1. All useState Hooks
   const [profilePhoto, setProfilePhoto] = useState<string | null>(null);
   const [coverPhoto, setCoverPhoto] = useState<string | null>(null);
@@ -180,12 +183,15 @@ export default function ProfilePage() {
   }, [loading]);
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      window.dispatchEvent(
-        new CustomEvent("profile-progress-updated", { detail: completionPercentage })
-      );
+    if (!loading && typeof completionPercentage === "number") {
+      setProfileProgress(completionPercentage);
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent("profile-progress-updated", { detail: completionPercentage })
+        );
+      }
     }
-  }, [completionPercentage]);
+  }, [completionPercentage, loading, setProfileProgress]);
 
   useEffect(() => {
     async function loadData() {
@@ -223,6 +229,10 @@ export default function ProfilePage() {
           const resumeData = resumeRes.status === "fulfilled" ? resumeRes.value.data : null;
           const userProfileData = userProfileRes.status === "fulfilled" ? userProfileRes.value.data : null;
           const myProfileData = myProfileRes.status === "fulfilled" ? myProfileRes.value.data : null;
+
+          if (myProfileData) {
+            updateProfileData(myProfileData);
+          }
 
           console.log("[ProfilePage] Supabase users table record:", userData);
           console.log("[ProfilePage] Supabase resumes table data:", resumeData?.data);

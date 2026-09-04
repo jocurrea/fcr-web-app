@@ -17,6 +17,8 @@ export interface UserProfileContextValue {
   accountType: string | null;
   isLoading: boolean;
   refetchProfile: () => Promise<number>;
+  setProfileProgress: (progress: number) => void;
+  updateProfileData: (data: any, computedProgress?: number) => void;
 }
 
 const UserProfileContext = createContext<UserProfileContextValue>({
@@ -26,6 +28,8 @@ const UserProfileContext = createContext<UserProfileContextValue>({
   accountType: null,
   isLoading: true,
   refetchProfile: async () => 0,
+  setProfileProgress: () => {},
+  updateProfileData: () => {},
 });
 
 export function UserProfileProvider({
@@ -33,7 +37,7 @@ export function UserProfileProvider({
 }: {
   children: React.ReactNode;
 }) {
-  const [profileProgress, setProfileProgress] = useState<number>(0);
+  const [profileProgress, setProfileProgressState] = useState<number>(0);
   const [profilePhoto, setProfilePhoto] = useState<string | null>(null);
   const [profileData, setProfileData] = useState<any | null>(null);
   const [accountType, setAccountType] = useState<string | null>(() => {
@@ -53,6 +57,27 @@ export function UserProfileProvider({
     return null;
   });
   const [isLoading, setIsLoading] = useState<boolean>(true);
+
+  const setProfileProgress = useCallback((progress: number) => {
+    setProfileProgressState(progress);
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(
+        new CustomEvent("profile-progress-updated", { detail: progress })
+      );
+    }
+  }, []);
+
+  const updateProfileData = useCallback(
+    (data: any, computedProgress?: number) => {
+      if (data) {
+        setProfileData(data);
+      }
+      if (typeof computedProgress === "number") {
+        setProfileProgressState(computedProgress);
+      }
+    },
+    []
+  );
 
   const refetchProfile = useCallback(async (): Promise<number> => {
     try {
@@ -102,12 +127,13 @@ export function UserProfileProvider({
       // 3. Compute canonical profile completion percentage (Business accounts do not use completion percentages)
       let progress = 0;
       if (resolvedType !== "business") {
-        progress = await fetchProfileProgress(session.user.id);
+        progress = await fetchProfileProgress(session.user.id, myProfile);
       }
-      setProfileProgress(progress);
+      setProfileProgressState(progress);
 
       // 4. Resolve profile avatar photo
       const resolvedPhoto =
+        myProfile?.profile_image ||
         myProfile?.profileImage ||
         myProfile?.avatar ||
         myProfile?.photo ||
@@ -142,7 +168,7 @@ export function UserProfileProvider({
     // Listen to real-time custom events dispatched anywhere in the app
     function handleProgressUpdate(e: any) {
       if (typeof e.detail === "number") {
-        setProfileProgress(e.detail);
+        setProfileProgressState(e.detail);
       } else {
         refetchProfile();
       }
@@ -173,6 +199,8 @@ export function UserProfileProvider({
         accountType,
         isLoading,
         refetchProfile,
+        setProfileProgress,
+        updateProfileData,
       }}
     >
       {children}

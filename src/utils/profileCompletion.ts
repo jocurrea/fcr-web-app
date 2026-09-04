@@ -203,8 +203,11 @@ export function calculateCompletionPercentage(profileData?: ProfileData | null):
  * users, user_profiles, resumes, and local storage fallback
  * to compute the accurate real-time completion percentage.
  */
-export async function fetchProfileProgress(userId?: string): Promise<number> {
-  let myProfileData: any = null;
+export async function fetchProfileProgress(
+  userId?: string,
+  existingProfileRpcData?: any
+): Promise<number> {
+  let myProfileData: any = existingProfileRpcData || null;
   let rData: any = null;
   let userRecord: any = null;
   let userProfileRecord: any = null;
@@ -217,34 +220,38 @@ export async function fetchProfileProgress(userId?: string): Promise<number> {
     }
 
     const [myProfileRes, resumeRes, userRes, userProfileRes] = await Promise.allSettled([
-      supabase.rpc("get_my_profile"),
-      effectiveUserId ? supabase.from("resumes").select("data").eq("userId", effectiveUserId).maybeSingle() : Promise.resolve({ data: null }),
+      !myProfileData ? Promise.resolve(supabase.rpc("get_my_profile")) : Promise.resolve({ data: myProfileData }),
+      effectiveUserId ? Promise.resolve(supabase.from("resumes").select("data").eq("userId", effectiveUserId).maybeSingle()) : Promise.resolve({ data: null }),
       effectiveUserId
-        ? supabase
-            .from("users")
-            .select("firstName, lastName, profileImage, phone, location, accountType, professionalRole")
-            .eq("id", effectiveUserId)
-            .maybeSingle()
+        ? Promise.resolve(
+            supabase
+              .from("users")
+              .select("firstName, lastName, profileImage, phone, location, accountType, professionalRole")
+              .eq("id", effectiveUserId)
+              .maybeSingle()
+          )
         : Promise.resolve({ data: null }),
       effectiveUserId
-        ? supabase
-            .from("user_profiles")
-            .select("*")
-            .eq("user_id", effectiveUserId)
-            .maybeSingle()
+        ? Promise.resolve(
+            supabase
+              .from("user_profiles")
+              .select("*")
+              .eq("user_id", effectiveUserId)
+              .maybeSingle()
+          )
         : Promise.resolve({ data: null }),
     ]);
 
-    if (myProfileRes.status === "fulfilled" && myProfileRes.value.data) {
+    if (myProfileRes.status === "fulfilled" && myProfileRes.value?.data) {
       myProfileData = myProfileRes.value.data;
     }
-    if (resumeRes.status === "fulfilled" && (resumeRes.value as any).data) {
+    if (resumeRes.status === "fulfilled" && (resumeRes.value as any)?.data) {
       rData = (resumeRes.value as any).data?.data || null;
     }
-    if (userRes.status === "fulfilled" && (userRes.value as any).data) {
+    if (userRes.status === "fulfilled" && (userRes.value as any)?.data) {
       userRecord = (userRes.value as any).data || null;
     }
-    if (userProfileRes.status === "fulfilled" && (userProfileRes.value as any).data) {
+    if (userProfileRes.status === "fulfilled" && (userProfileRes.value as any)?.data) {
       userProfileRecord = (userProfileRes.value as any).data || null;
     }
 
@@ -280,6 +287,7 @@ export async function fetchProfileProgress(userId?: string): Promise<number> {
   const savedPhoto = typeof window !== "undefined" ? localStorage.getItem("userProfilePhoto") : null;
 
   const photo =
+    myProfileData?.profile_image ||
     myProfileData?.profileImage ||
     myProfileData?.avatar ||
     myProfileData?.photo ||
@@ -291,10 +299,19 @@ export async function fetchProfileProgress(userId?: string): Promise<number> {
 
   const location =
     myProfileData?.location ||
+    myProfileData?.city_country ||
+    myProfileData?.cityCountry ||
+    myProfileData?.work_country ||
+    myProfileData?.nationality_country ||
     userProfileRecord?.location ||
+    userProfileRecord?.city_country ||
+    userProfileRecord?.cityCountry ||
     userRecord?.location ||
     localPersonal?.location ||
+    localPersonal?.cityCountry ||
+    localPersonal?.city ||
     rData?.personal?.location ||
+    rData?.personal?.cityCountry ||
     null;
 
   const work =
@@ -311,6 +328,7 @@ export async function fetchProfileProgress(userId?: string): Promise<number> {
     (Array.isArray(myProfileData?.spokenLanguages) && myProfileData.spokenLanguages.length > 0 ? myProfileData.spokenLanguages : null) ||
     (Array.isArray(myProfileData?.spoken_languages) && myProfileData.spoken_languages.length > 0 ? myProfileData.spoken_languages : null) ||
     (Array.isArray(myProfileData?.languages) && myProfileData.languages.length > 0 ? myProfileData.languages : null) ||
+    (Array.isArray(myProfileData?.resume_languages) && myProfileData.resume_languages.length > 0 ? myProfileData.resume_languages : null) ||
     (Array.isArray(userProfileRecord?.spokenLanguages) && userProfileRecord.spokenLanguages.length > 0 ? userProfileRecord.spokenLanguages : null) ||
     (Array.isArray(rData?.languages) && rData.languages.length > 0 ? rData.languages : null) ||
     (Array.isArray(localPersonal?.languages) && localPersonal.languages.length > 0 ? localPersonal.languages : null) ||
@@ -324,6 +342,7 @@ export async function fetchProfileProgress(userId?: string): Promise<number> {
     (Array.isArray(userProfileRecord?.userSkills) && userProfileRecord.userSkills.length > 0 ? userProfileRecord.userSkills : null) ||
     (Array.isArray(rData?.skills) && rData.skills.length > 0 ? rData.skills : null) ||
     (Array.isArray(localPersonal?.skills) && localPersonal.skills.length > 0 ? localPersonal.skills : null) ||
+    (Array.isArray(localPersonal?.structuredSkills) && localPersonal.structuredSkills.length > 0 ? localPersonal.structuredSkills : null) ||
     (Array.isArray(localResume?.skills) && localResume.skills.length > 0 ? localResume.skills : null) ||
     [];
 
@@ -331,6 +350,8 @@ export async function fetchProfileProgress(userId?: string): Promise<number> {
     (Array.isArray(myProfileData?.licenses) && myProfileData.licenses.length > 0 ? myProfileData.licenses : null) ||
     (Array.isArray(myProfileData?.professionalCredentials) && myProfileData.professionalCredentials.length > 0 ? myProfileData.professionalCredentials : null) ||
     (Array.isArray(myProfileData?.professional_credentials) && myProfileData.professional_credentials.length > 0 ? myProfileData.professional_credentials : null) ||
+    (Array.isArray(myProfileData?.license_ids) && myProfileData.license_ids.length > 0 ? myProfileData.license_ids : null) ||
+    (Array.isArray(myProfileData?.license_type_names) && myProfileData.license_type_names.length > 0 ? myProfileData.license_type_names : null) ||
     (Array.isArray(userProfileRecord?.professionalCredentials) && userProfileRecord.professionalCredentials.length > 0 ? userProfileRecord.professionalCredentials : null) ||
     (Array.isArray(rData?.licenses) && rData.licenses.length > 0 ? rData.licenses : null) ||
     (Array.isArray(localLicenses) && localLicenses.length > 0 ? localLicenses : null) ||

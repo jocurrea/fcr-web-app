@@ -25,15 +25,15 @@ export function ProtectedHeader() {
   const pathname = usePathname();
   const router = useRouter();
   const {
-    profileProgress: contextProgress,
+    profileProgress,
     profilePhoto: contextPhoto,
     accountType: contextAccountType,
     profileData,
+    isLoading: contextIsLoading,
     refetchProfile,
   } = useUserProfile();
 
   const [profilePhoto, setProfilePhoto] = useState<string | null>(null);
-  const [profileProgress, setProfileProgress] = useState(0);
   const [companyStatus, setCompanyStatus] = useState<string>('pending');
   const [accountTypeState, setAccountTypeState] = useState<string>(() => {
     if (typeof window !== "undefined") {
@@ -57,7 +57,7 @@ export function ProtectedHeader() {
   const [isDeleting, setIsDeleting] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Sync context progress, photo & accountType changes immediately
+  // Sync context photo & accountType changes immediately
   useEffect(() => {
     if (contextAccountType) {
       setAccountTypeState(contextAccountType);
@@ -65,29 +65,10 @@ export function ProtectedHeader() {
   }, [contextAccountType]);
 
   useEffect(() => {
-    if (typeof contextProgress === "number") {
-      setProfileProgress(contextProgress);
-    }
-  }, [contextProgress]);
-
-  useEffect(() => {
     if (contextPhoto) {
       setProfilePhoto(contextPhoto);
     }
   }, [contextPhoto]);
-
-  // Listen to real-time progress updates dispatched across the app
-  useEffect(() => {
-    function handleProgressUpdate(e: any) {
-      if (typeof e.detail === "number") {
-        setProfileProgress(e.detail);
-      }
-    }
-    window.addEventListener("profile-progress-updated", handleProgressUpdate);
-    return () => {
-      window.removeEventListener("profile-progress-updated", handleProgressUpdate);
-    };
-  }, []);
 
   useEffect(() => {
     async function syncLocalProfileToDatabase(session: any) {
@@ -455,6 +436,15 @@ export function ProtectedHeader() {
       effectiveAccountType === "aviation_professional" ||
       (!effectiveAccountType && !pathname.startsWith("/business")));
 
+  const effectiveAvatarPhoto =
+    contextPhoto ||
+    profilePhoto ||
+    (typeof window !== "undefined"
+      ? localStorage.getItem("userProfilePhoto")
+      : null);
+
+  const isLoading = contextIsLoading;
+
   if (pathname === "/notifications" || pathname === "/newEmail" || pathname === "/resume-preview" || pathname === "/termsAndConditions" || pathname === "/privacyPolicy" || pathname === "/community-safety" || pathname === "/blockedUsers" || pathname.startsWith("/post/")) {
     return null; // Hide the top header on these specific detail pages
   }
@@ -481,7 +471,23 @@ export function ProtectedHeader() {
               className="relative cursor-pointer group flex flex-col items-center justify-center focus:outline-none"
               title={isBusiness ? "Company Profile" : "Profile"}
             >
-              {showProgressRing ? (
+              {isLoading ? (
+                /* Loading State: Display avatar with subtle spinner ring without rendering intermediate/default numbers */
+                <div className="relative w-11 h-11 flex items-center justify-center">
+                  <div className="w-11 h-11 rounded-full border-2 border-gray-200 border-t-emerald-500 animate-spin" />
+                  <div className="absolute inset-[3.5px] rounded-full overflow-hidden bg-gray-100 flex items-center justify-center">
+                    {effectiveAvatarPhoto ? (
+                      <img 
+                        src={effectiveAvatarPhoto} 
+                        alt="Avatar" 
+                        className="w-full h-full object-cover" 
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-gray-200 animate-pulse" />
+                    )}
+                  </div>
+                </div>
+              ) : showProgressRing ? (
                 <>
                   <div className="relative w-11 h-11 flex items-center justify-center">
                     {/* SVG Green Progress Ring */}
@@ -513,9 +519,9 @@ export function ProtectedHeader() {
 
                     {/* Avatar Photo */}
                     <div className="absolute inset-[3.5px] rounded-full overflow-hidden bg-gray-100 flex items-center justify-center">
-                      {profilePhoto ? (
+                      {effectiveAvatarPhoto ? (
                         <img 
-                          src={profilePhoto} 
+                          src={effectiveAvatarPhoto} 
                           alt="Avatar" 
                           className="w-full h-full object-cover" 
                         />
@@ -535,9 +541,9 @@ export function ProtectedHeader() {
               ) : (
                 /* Business Account: Clean Avatar without percentage text or progress ring */
                 <div className="w-11 h-11 rounded-full overflow-hidden border border-gray-200 bg-gray-100 flex items-center justify-center shadow-2xs hover:border-gray-300 transition-all">
-                  {profilePhoto ? (
+                  {effectiveAvatarPhoto ? (
                     <img 
-                      src={profilePhoto} 
+                      src={effectiveAvatarPhoto} 
                       alt="Company Logo" 
                       className="w-full h-full object-cover" 
                     />
