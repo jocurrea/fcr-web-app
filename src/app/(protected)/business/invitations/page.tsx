@@ -16,7 +16,6 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import {
-  sendCompanyInvitationAction,
   revokeCompanyInvitationAction,
   getCompanyInvitationsAction,
 } from "@/actions/affiliations";
@@ -273,28 +272,39 @@ export default function BusinessInvitationsPage() {
         return;
       }
 
-      // 3. Dispatch via Next.js Server Action (strictly email-bound, role chosen by recipient on onboarding)
-      const actionRes = await sendCompanyInvitationAction({
-        companyId,
-        email: cleanEmail,
-        companyName,
-      });
+      // 3. Restore Edge Function Call: Invoke official send-company-invitation Edge Function using the authenticated client
+      const { data: edgeData, error: edgeErr } = await supabase.functions.invoke(
+        "send-company-invitation",
+        {
+          body: {
+            companyId,
+            email: cleanEmail,
+          },
+        }
+      );
 
-      if (!actionRes.success) {
-        setErrorMessage(
-          actionRes.error ||
-            "Fallo al enviar el correo. Verifica las credenciales del servidor."
-        );
+      if (edgeErr) {
+        console.error("Error calling send-company-invitation Edge Function:", edgeErr);
+        let errorMsg = edgeErr.message || "Failed to send invitation email.";
+        if ((edgeErr as any).context) {
+          try {
+            const body = await (edgeErr as any).context.json();
+            if (body?.error) errorMsg = body.error;
+            else if (body?.message) errorMsg = body.message;
+          } catch (e) {}
+        }
+        setErrorMessage(errorMsg);
         setIsSending(false);
         return;
       }
 
-      const defaultExpiresAt = new Date(
-        Date.now() + 7 * 24 * 60 * 60 * 1000
-      ).toISOString();
+      const defaultExpiresAt =
+        edgeData?.expiresAt ||
+        edgeData?.expires_at ||
+        new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
       const newInvitation: SentInvitation = {
-        id: actionRes.invitationId || "inv-" + Date.now(),
+        id: edgeData?.invitationId || edgeData?.id || "inv-" + Date.now(),
         email: cleanEmail,
         status: "pending",
         created_at: new Date().toISOString(),
