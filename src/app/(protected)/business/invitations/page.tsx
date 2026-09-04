@@ -9,7 +9,6 @@ import {
   Send,
   Clock,
   Lock,
-  ShieldCheck,
   CheckCircle2,
   AlertCircle,
   Loader2,
@@ -31,18 +30,85 @@ interface SentInvitation {
   role?: string;
 }
 
+const MONTHS_ES = [
+  "ene.",
+  "feb.",
+  "mar.",
+  "abr.",
+  "may.",
+  "jun.",
+  "jul.",
+  "ago.",
+  "sep.",
+  "oct.",
+  "nov.",
+  "dic.",
+];
+
+/**
+ * Safely parses any Supabase/SQL timestamp or ISO string into a valid Date object.
+ */
+function parseValidDate(val: any): Date | null {
+  if (!val) return null;
+  if (val instanceof Date) {
+    return isNaN(val.getTime()) ? null : val;
+  }
+  if (typeof val === "number") {
+    const d = new Date(val);
+    return isNaN(d.getTime()) ? null : d;
+  }
+  if (typeof val === "string") {
+    const trimmed = val.trim();
+    if (!trimmed || trimmed === "Invalid Date") return null;
+
+    // Convert SQL timestamp string 'YYYY-MM-DD HH:mm:ss' to ISO format
+    const normalized =
+      trimmed.includes(" ") && !trimmed.includes("T")
+        ? trimmed.replace(" ", "T")
+        : trimmed;
+
+    const d = new Date(normalized);
+    if (!isNaN(d.getTime())) return d;
+
+    const dRaw = new Date(trimmed);
+    if (!isNaN(dRaw.getTime())) return dRaw;
+
+    const num = Number(trimmed);
+    if (!isNaN(num) && num > 0) {
+      const dNum = new Date(num);
+      if (!isNaN(dNum.getTime())) return dNum;
+    }
+  }
+  return null;
+}
+
+/**
+ * Formats a date into the required localized format: '11 de sep. de 2026'
+ */
+function formatDateDisplay(val: any, fallbackDate?: any): string {
+  let date = parseValidDate(val);
+  if (!date && fallbackDate) {
+    date = parseValidDate(fallbackDate);
+  }
+  if (!date) {
+    date = new Date();
+  }
+
+  const day = date.getDate();
+  const month = MONTHS_ES[date.getMonth()];
+  const year = date.getFullYear();
+
+  return `${day} de ${month} de ${year}`;
+}
+
 export default function BusinessInvitationsPage() {
   const router = useRouter();
   const [companyName, setCompanyName] = useState<string>("Company");
   const [companyId, setCompanyId] = useState<string | null>(null);
   const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteRole, setInviteRole] = useState("Aviation Professional");
   const [isSending, setIsSending] = useState(false);
   const [invitations, setInvitations] = useState<SentInvitation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-
-  // Tab filter: "pending" by default
-  const [activeTab, setActiveTab] = useState<"pending" | "all">("pending");
 
   // Revocation modal state
   const [selectedInvitation, setSelectedInvitation] =
@@ -59,7 +125,7 @@ export default function BusinessInvitationsPage() {
     try {
       let invRecords: any[] = [];
 
-      // 1. Direct query from company_invitations table (using expires_at column directly)
+      // 1. Direct query from company_invitations table
       const { data: directData, error: directErr } = await supabase
         .from("company_invitations")
         .select("id, company_id, invited_email, status, expires_at, created_at")
@@ -69,7 +135,7 @@ export default function BusinessInvitationsPage() {
       if (!directErr && directData && directData.length > 0) {
         invRecords = directData;
       } else {
-        // 2. Try Server Action getCompanyInvitationsAction
+        // 2. Server Action getCompanyInvitationsAction fallback
         const serverRes = await getCompanyInvitationsAction(targetCompanyId);
         if (serverRes.success && serverRes.data && serverRes.data.length > 0) {
           invRecords = serverRes.data;
@@ -94,7 +160,7 @@ export default function BusinessInvitationsPage() {
             status: inv.status || "pending",
             created_at: inv.created_at,
             expires_at: inv.expires_at || null,
-            role: inv.role || "Aviation Professional",
+            role: inv.role,
           }))
         );
       } else {
@@ -207,11 +273,10 @@ export default function BusinessInvitationsPage() {
         return;
       }
 
-      // 3. Dispatch via Next.js Server Action
+      // 3. Dispatch via Next.js Server Action (strictly email-bound, role chosen by recipient on onboarding)
       const actionRes = await sendCompanyInvitationAction({
         companyId,
         email: cleanEmail,
-        role: inviteRole,
         companyName,
       });
 
@@ -234,7 +299,6 @@ export default function BusinessInvitationsPage() {
         status: "pending",
         created_at: new Date().toISOString(),
         expires_at: defaultExpiresAt,
-        role: inviteRole,
       };
 
       const updatedList = [
@@ -367,8 +431,6 @@ export default function BusinessInvitationsPage() {
   };
 
   const pendingInvitations = invitations.filter((i) => i.status === "pending");
-  const displayedInvitations =
-    activeTab === "pending" ? pendingInvitations : invitations;
 
   return (
     <div className="max-w-lg mx-auto flex flex-col w-full pb-12 bg-[#f8f9fa] min-h-screen px-4 sm:px-0 py-6 md:py-8 gap-5">
@@ -443,50 +505,47 @@ export default function BusinessInvitationsPage() {
           </div>
         )}
 
+        {/* Form without Role Dropdown */}
         <form onSubmit={handleSendInvitation} className="flex flex-col gap-4">
-          <div className="space-y-1.5">
-            <label className="text-xs font-bold text-gray-700">
-              Professional's Email Address
+          <div>
+            <label className="block text-xs font-bold text-gray-700 mb-1.5 ml-1">
+              Email address
             </label>
             <div className="relative">
+              <Mail className="w-4 h-4 text-gray-400 absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
                 type="email"
                 value={inviteEmail}
                 onChange={(e) => setInviteEmail(e.target.value)}
-                placeholder="colleague@aviation.com"
+                placeholder="professional@example.com"
                 required
-                className="w-full h-11 px-3.5 pl-10 rounded-xl bg-gray-50 border border-gray-200 text-sm text-gray-900 placeholder:text-gray-400 focus:bg-white focus:border-[#1d4ed8] focus:ring-2 focus:ring-blue-100 outline-none transition-all"
+                className="w-full pl-11 pr-4 py-3.5 bg-gray-50/70 border border-gray-200 rounded-2xl text-xs sm:text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[#1d4ed8] focus:bg-white focus:ring-1 focus:ring-[#1d4ed8] transition-all"
               />
-              <Mail className="w-4 h-4 text-gray-400 absolute left-3.5 top-3.5 pointer-events-none" />
             </div>
           </div>
 
-          <div className="space-y-1.5">
-            <label className="text-xs font-bold text-gray-700">
-              Role in Company
-            </label>
-            <select
-              value={inviteRole}
-              onChange={(e) => setInviteRole(e.target.value)}
-              className="w-full h-11 px-3.5 rounded-xl bg-gray-50 border border-gray-200 text-sm text-gray-900 focus:bg-white focus:border-[#1d4ed8] focus:ring-2 focus:ring-blue-100 outline-none transition-all cursor-pointer"
-            >
-              <option value="Pilot">Pilot</option>
-              <option value="Cabin Crew">Cabin Crew</option>
-              <option value="Aviation Professional">
-                Aviation Professional
-              </option>
-            </select>
+          {/* Restored Input Footer: Padlock icon with 'Email must match' and clock icon with 'Expires in 7 days' */}
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 text-[#1d4ed8] text-[11px] font-semibold border border-blue-100/80">
+              <Lock className="w-3 h-3" />
+              Email must match
+            </span>
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 text-[#1d4ed8] text-[11px] font-semibold border border-blue-100/80">
+              <Clock className="w-3 h-3" />
+              Expires in 7 days
+            </span>
           </div>
 
+          {/* Submit Button */}
           <button
             type="submit"
-            disabled={isSending}
-            className="w-full h-12 mt-2 rounded-xl bg-[#1d4ed8] hover:bg-blue-700 text-white font-bold text-sm flex items-center justify-center gap-2 shadow-sm shadow-blue-500/20 active:scale-[0.99] transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={isSending || !inviteEmail.trim()}
+            className="w-full py-3.5 rounded-full font-bold text-white text-xs sm:text-sm bg-[#1d4ed8] hover:bg-[#1e40af] disabled:bg-[#85b0fa] disabled:cursor-not-allowed transition-all shadow-xs flex items-center justify-center gap-2 cursor-pointer mt-1"
           >
             {isSending ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin" />
-                <span>Sending invitation...</span>
+                <span>Sending...</span>
               </>
             ) : (
               <>
@@ -498,36 +557,15 @@ export default function BusinessInvitationsPage() {
         </form>
       </div>
 
-      {/* 2. Pending Invitations List Card */}
+      {/* 2. Invitations List Card (Tabs removed, restored 'X pending' in orange) */}
       <div className="bg-white rounded-3xl p-6 sm:p-7 border border-gray-100 shadow-xs flex flex-col gap-4">
         <div className="flex items-center justify-between">
           <h2 className="font-extrabold text-base sm:text-lg text-gray-900">
-            Pending Invitations
+            Invitations
           </h2>
-          <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl">
-            <button
-              type="button"
-              onClick={() => setActiveTab("pending")}
-              className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                activeTab === "pending"
-                  ? "bg-white text-gray-900 shadow-2xs"
-                  : "text-gray-500 hover:text-gray-700"
-              }`}
-            >
-              Pending ({pendingInvitations.length})
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab("all")}
-              className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                activeTab === "all"
-                  ? "bg-white text-gray-900 shadow-2xs"
-                  : "text-gray-500 hover:text-gray-700"
-              }`}
-            >
-              All ({invitations.length})
-            </button>
-          </div>
+          <span className="text-xs sm:text-sm font-semibold text-orange-500">
+            {pendingInvitations.length} pending
+          </span>
         </div>
 
         {isLoading ? (
@@ -535,7 +573,7 @@ export default function BusinessInvitationsPage() {
             <Loader2 className="w-6 h-6 animate-spin text-[#1d4ed8]" />
             <p className="text-xs text-gray-400">Loading invitations...</p>
           </div>
-        ) : displayedInvitations.length === 0 ? (
+        ) : pendingInvitations.length === 0 ? (
           /* Empty State */
           <div className="py-8 flex flex-col items-center justify-center text-center gap-3">
             <div className="w-16 h-16 rounded-full bg-blue-50 border border-blue-100/80 flex items-center justify-center text-[#1d4ed8] shadow-2xs mb-1">
@@ -543,21 +581,17 @@ export default function BusinessInvitationsPage() {
             </div>
             <div className="space-y-1 max-w-sm">
               <h3 className="text-base sm:text-lg font-bold text-gray-900">
-                {activeTab === "pending"
-                  ? "No pending invitations"
-                  : "No invitations sent"}
+                No invitations sent
               </h3>
               <p className="text-xs sm:text-sm text-gray-500 leading-relaxed">
-                {activeTab === "pending"
-                  ? "Active pending invitations will appear here."
-                  : "New invitations will appear here."}
+                New invitations will appear here.
               </p>
             </div>
           </div>
         ) : (
           /* Populated List */
           <div className="space-y-3">
-            {displayedInvitations.map((inv) => (
+            {pendingInvitations.map((inv) => (
               <div
                 key={inv.id}
                 className="p-4 rounded-2xl bg-gray-50/70 border border-gray-100 flex items-center justify-between gap-3"
@@ -567,59 +601,34 @@ export default function BusinessInvitationsPage() {
                     <p className="text-xs sm:text-sm font-bold text-gray-900 truncate">
                       {inv.email}
                     </p>
-                    <span
-                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
-                        inv.status === "accepted"
-                          ? "bg-emerald-100 text-emerald-800"
-                          : inv.status === "declined"
-                          ? "bg-red-100 text-red-800"
-                          : inv.status === "revoked"
-                          ? "bg-gray-200 text-gray-600"
-                          : "bg-amber-100 text-amber-800"
-                      }`}
-                    >
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider bg-amber-100 text-amber-800">
                       {inv.status}
                     </span>
                   </div>
-                  {/* Sent on date */}
+                  {/* Sent on date with robust parsing */}
                   <p className="text-[11px] text-gray-400 mt-0.5">
-                    Sent on{" "}
-                    {new Date(inv.created_at).toLocaleDateString("en-US", {
-                      month: "short",
-                      day: "numeric",
-                      year: "numeric",
-                    })}
+                    Sent on {formatDateDisplay(inv.created_at)}
                   </p>
-                  {/* 1. Expiration Date: new line below 'Sent on' text */}
+                  {/* Expiration Date: new line below 'Sent on' formatted like '11 de sep. de 2026' */}
                   <p className="text-[11px] text-gray-400 mt-0.5">
                     Expires{" "}
-                    {inv.expires_at
-                      ? new Date(inv.expires_at).toLocaleDateString("en-US", {
-                          month: "short",
-                          day: "numeric",
-                          year: "numeric",
-                        })
-                      : new Date(
-                          new Date(inv.created_at).getTime() +
-                            7 * 24 * 60 * 60 * 1000
-                        ).toLocaleDateString("en-US", {
-                          month: "short",
-                          day: "numeric",
-                          year: "numeric",
-                        })}
+                    {formatDateDisplay(
+                      inv.expires_at,
+                      (parseValidDate(inv.created_at)?.getTime() ??
+                        Date.now()) +
+                        7 * 24 * 60 * 60 * 1000
+                    )}
                   </p>
                 </div>
 
-                {/* 2. UI Updates: Red 'Revoke' text button to the right side of each pending invitation card */}
-                {inv.status === "pending" && (
-                  <button
-                    type="button"
-                    onClick={() => handleOpenRevokeModal(inv)}
-                    className="text-xs sm:text-sm font-semibold text-red-600 hover:text-red-700 hover:underline transition-colors cursor-pointer px-2 py-1 shrink-0"
-                  >
-                    Revoke
-                  </button>
-                )}
+                {/* Red 'Revoke' text button to the right side of each pending invitation card */}
+                <button
+                  type="button"
+                  onClick={() => handleOpenRevokeModal(inv)}
+                  className="text-xs sm:text-sm font-semibold text-red-600 hover:text-red-700 hover:underline transition-colors cursor-pointer px-2 py-1 shrink-0"
+                >
+                  Revoke
+                </button>
               </div>
             ))}
           </div>
