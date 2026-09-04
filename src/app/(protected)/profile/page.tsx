@@ -977,7 +977,7 @@ export default function ProfilePage() {
         {/* =========================================================================
             3. WIDGET DE COMPLETITUD DE PERFIL (Profile Completion)
             ========================================================================= */}
-        {completionPercentage < 100 && (
+        {accountType !== "business" && completionPercentage < 100 && (
           <div className="bg-white rounded-3xl border border-gray-100 p-5 sm:p-6 shadow-xs flex flex-col gap-4">
             
             {/* Header with Title, Subtitle, and Circular Percentage Indicator */}

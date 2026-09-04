@@ -14,6 +14,7 @@ export interface UserProfileContextValue {
   profileProgress: number;
   profilePhoto: string | null;
   profileData: any | null;
+  accountType: string | null;
   isLoading: boolean;
   refetchProfile: () => Promise<number>;
 }
@@ -22,6 +23,7 @@ const UserProfileContext = createContext<UserProfileContextValue>({
   profileProgress: 0,
   profilePhoto: null,
   profileData: null,
+  accountType: null,
   isLoading: true,
   refetchProfile: async () => 0,
 });
@@ -34,6 +36,22 @@ export function UserProfileProvider({
   const [profileProgress, setProfileProgress] = useState<number>(0);
   const [profilePhoto, setProfilePhoto] = useState<string | null>(null);
   const [profileData, setProfileData] = useState<any | null>(null);
+  const [accountType, setAccountType] = useState<string | null>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("account_type") || localStorage.getItem("accountType");
+      if (saved) return saved;
+      try {
+        const personal = localStorage.getItem("onboarding_personal");
+        if (personal) {
+          const parsed = JSON.parse(personal);
+          if (parsed.category === "business" || parsed.accountType === "business") {
+            return "business";
+          }
+        }
+      } catch {}
+    }
+    return null;
+  });
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
   const refetchProfile = useCallback(async (): Promise<number> => {
@@ -56,11 +74,39 @@ export function UserProfileProvider({
         setProfileData(myProfile);
       }
 
-      // 2. Compute canonical profile completion percentage
-      const progress = await fetchProfileProgress(session.user.id);
+      // 2. Resolve accountType
+      let resolvedType =
+        myProfile?.account_type ||
+        myProfile?.accountType ||
+        session.user.user_metadata?.accountType ||
+        null;
+
+      if (!resolvedType) {
+        const { data: dbUser } = await supabase
+          .from("users")
+          .select("accountType")
+          .eq("id", session.user.id)
+          .maybeSingle();
+        if (dbUser?.accountType) {
+          resolvedType = dbUser.accountType;
+        }
+      }
+
+      if (resolvedType) {
+        setAccountType(resolvedType);
+        if (typeof window !== "undefined") {
+          localStorage.setItem("account_type", resolvedType);
+        }
+      }
+
+      // 3. Compute canonical profile completion percentage (Business accounts do not use completion percentages)
+      let progress = 0;
+      if (resolvedType !== "business") {
+        progress = await fetchProfileProgress(session.user.id);
+      }
       setProfileProgress(progress);
 
-      // 3. Resolve profile avatar photo
+      // 4. Resolve profile avatar photo
       const resolvedPhoto =
         myProfile?.profileImage ||
         myProfile?.avatar ||
@@ -74,7 +120,7 @@ export function UserProfileProvider({
         setProfilePhoto(resolvedPhoto);
       }
 
-      // 4. Broadcast the updated progress percentage to all global listeners
+      // 5. Broadcast the updated progress percentage to all global listeners
       if (typeof window !== "undefined") {
         window.dispatchEvent(
           new CustomEvent("profile-progress-updated", { detail: progress })
@@ -124,6 +170,7 @@ export function UserProfileProvider({
         profileProgress,
         profilePhoto,
         profileData,
+        accountType,
         isLoading,
         refetchProfile,
       }}

@@ -11,8 +11,10 @@ interface ProgressAvatarProps {
   className?: string;
   onClick?: () => void;
   showBadge?: boolean;
+  showRing?: boolean;
   showEditIcon?: boolean;
   editLink?: string;
+  accountType?: string;
 }
 
 export function ProgressAvatar({
@@ -22,9 +24,16 @@ export function ProgressAvatar({
   className = "",
   onClick,
   showBadge = true,
+  showRing = true,
   showEditIcon = false,
   editLink = "/onboarding?edit=true",
+  accountType,
 }: ProgressAvatarProps) {
+  // Business accounts do not use profile completion percentages or progress rings
+  const isBusiness = accountType === "business";
+  const shouldRenderRing = showRing && !isBusiness;
+  const shouldRenderBadge = showBadge && !isBusiness;
+
   // Enforce limits
   const safePercentage = Math.min(100, Math.max(0, percentage || 0));
   
@@ -33,7 +42,7 @@ export function ProgressAvatar({
   const isSmall = size <= 60;
   
   // padding around the image
-  const padding = isSmall ? 3 : 6;
+  const padding = shouldRenderRing ? (isSmall ? 3 : 6) : 0;
   const innerSize = size - (padding * 2);
 
   // SVG dimensions
@@ -50,35 +59,37 @@ export function ProgressAvatar({
       style={{ width: size, height: size, padding: padding }}
       onClick={onClick}
     >
-      {/* Progress Ring SVG */}
-      <svg 
-        className="absolute inset-0 w-full h-full pointer-events-none z-20" 
-        viewBox={`0 0 ${viewBoxSize} ${viewBoxSize}`}
-      >
-        {/* Background Track */}
-        <circle
-          cx={center}
-          cy={center}
-          r={radius}
-          fill="none"
-          stroke="#e2e8f0"
-          strokeWidth={strokeWidth}
-        />
-        {/* Active Progress Arc */}
-        <circle
-          cx={center}
-          cy={center}
-          r={radius}
-          fill="none"
-          stroke={strokeColor}
-          strokeWidth={strokeWidth}
-          strokeDasharray={circumference}
-          strokeDashoffset={offset}
-          strokeLinecap="round"
-          className="transition-all duration-500 ease-out"
-          style={{ transform: 'rotate(-90deg)', transformOrigin: '50% 50%' }}
-        />
-      </svg>
+      {/* Progress Ring SVG (Only if shouldRenderRing is true) */}
+      {shouldRenderRing && (
+        <svg 
+          className="absolute inset-0 w-full h-full pointer-events-none z-20" 
+          viewBox={`0 0 ${viewBoxSize} ${viewBoxSize}`}
+        >
+          {/* Background Track */}
+          <circle
+            cx={center}
+            cy={center}
+            r={radius}
+            fill="none"
+            stroke="#e2e8f0"
+            strokeWidth={strokeWidth}
+          />
+          {/* Active Progress Arc */}
+          <circle
+            cx={center}
+            cy={center}
+            r={radius}
+            fill="none"
+            stroke={strokeColor}
+            strokeWidth={strokeWidth}
+            strokeDasharray={circumference}
+            strokeDashoffset={offset}
+            strokeLinecap="round"
+            className="transition-all duration-500 ease-out"
+            style={{ transform: 'rotate(-90deg)', transformOrigin: '50% 50%' }}
+          />
+        </svg>
+      )}
 
       {/* Avatar Photo */}
       <div 
@@ -98,7 +109,7 @@ export function ProgressAvatar({
       </div>
 
       {/* Percentage Badge */}
-      {showBadge && (
+      {shouldRenderBadge && (
         <div 
           className={`absolute left-1/2 -translate-x-1/2 bg-white rounded-full font-bold border border-gray-200 shadow-lg z-50 flex items-center justify-center
             ${isSmall 

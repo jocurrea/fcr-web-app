@@ -247,6 +247,15 @@ export async function fetchProfileProgress(userId?: string): Promise<number> {
     if (userProfileRes.status === "fulfilled" && (userProfileRes.value as any).data) {
       userProfileRecord = (userProfileRes.value as any).data || null;
     }
+
+    // Business accounts do not use profile completion percentages
+    const accountType =
+      userRecord?.accountType ||
+      myProfileData?.account_type ||
+      myProfileData?.accountType;
+    if (accountType === "business") {
+      return 0;
+    }
   } catch (e) {
     console.error("Error fetching data for profile progress:", e);
   }
@@ -262,6 +271,9 @@ export async function fetchProfileProgress(userId?: string): Promise<number> {
   };
 
   const localPersonal = getLocal("onboarding_personal");
+  if (localPersonal?.category === "business" || localPersonal?.accountType === "business") {
+    return 0;
+  }
   const localLicenses = getLocal("onboarding_licenses");
   const localWork = getLocal("onboarding_work");
   const localResume = getLocal("onboarding_resume");

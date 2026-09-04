@@ -27,20 +27,43 @@ export function ProtectedHeader() {
   const {
     profileProgress: contextProgress,
     profilePhoto: contextPhoto,
+    accountType: contextAccountType,
+    profileData,
     refetchProfile,
   } = useUserProfile();
 
   const [profilePhoto, setProfilePhoto] = useState<string | null>(null);
   const [profileProgress, setProfileProgress] = useState(0);
   const [companyStatus, setCompanyStatus] = useState<string>('pending');
-  const [accountTypeState, setAccountTypeState] = useState<string>('');
+  const [accountTypeState, setAccountTypeState] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      const savedType = localStorage.getItem("account_type") || localStorage.getItem("accountType");
+      if (savedType) return savedType;
+      try {
+        const savedPersonal = localStorage.getItem("onboarding_personal");
+        if (savedPersonal) {
+          const parsed = JSON.parse(savedPersonal);
+          if (parsed.category === "business" || parsed.accountType === "business") {
+            return "business";
+          }
+        }
+      } catch {}
+    }
+    return "";
+  });
   const [userStatus, setUserStatus] = useState<string>('active');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Sync context progress & photo changes immediately
+  // Sync context progress, photo & accountType changes immediately
+  useEffect(() => {
+    if (contextAccountType) {
+      setAccountTypeState(contextAccountType);
+    }
+  }, [contextAccountType]);
+
   useEffect(() => {
     if (typeof contextProgress === "number") {
       setProfileProgress(contextProgress);
@@ -217,6 +240,12 @@ export function ProtectedHeader() {
 
         // Only treat as business if accountType is explicitly 'business'
         if (dbAccountType === 'business') {
+          accountType = 'business';
+          setAccountTypeState('business');
+          if (typeof window !== "undefined") {
+            localStorage.setItem("account_type", "business");
+          }
+
           const { data: companies } = await supabase
             .from('companies')
             .select('status, logo_url')
@@ -225,8 +254,6 @@ export function ProtectedHeader() {
             .limit(1);
 
           if (companies && companies.length > 0) {
-            accountType = 'business';
-            setAccountTypeState('business');
             const status = companies[0].status;
             setCompanyStatus(status || 'pending');
             onboarded = true;
@@ -406,6 +433,28 @@ export function ProtectedHeader() {
     }
   };
 
+  const effectiveAccountType =
+    contextAccountType ||
+    accountTypeState ||
+    (typeof window !== "undefined"
+      ? localStorage.getItem("account_type") || localStorage.getItem("accountType")
+      : "") ||
+    "";
+
+  const isBusiness =
+    effectiveAccountType === "business" ||
+    pathname.startsWith("/business") ||
+    pathname.startsWith("/onboarding-business");
+
+  // Architecture Rule: Business accounts do not use profile completion percentages.
+  // Percentage weights only apply to individual professional roles.
+  // Only display the ring for flight_crew; completely hide percentage text and ring for business.
+  const showProgressRing =
+    !isBusiness &&
+    (effectiveAccountType === "flight_crew" ||
+      effectiveAccountType === "aviation_professional" ||
+      (!effectiveAccountType && !pathname.startsWith("/business")));
+
   if (pathname === "/notifications" || pathname === "/newEmail" || pathname === "/resume-preview" || pathname === "/termsAndConditions" || pathname === "/privacyPolicy" || pathname === "/community-safety" || pathname === "/blockedUsers" || pathname.startsWith("/post/")) {
     return null; // Hide the top header on these specific detail pages
   }
@@ -425,61 +474,80 @@ export function ProtectedHeader() {
           <Link href="/new-post" className="text-gray-600 hover:text-black transition-colors">
             <Plus className="w-[26px] h-[26px]" />
           </Link>
-          {/* Avatar with Circular Green Progress Ring and Percentage Below */}
+          {/* Avatar with Circular Green Progress Ring and Percentage Below (Only for flight_crew) */}
           <div className="relative flex flex-col items-center justify-center shrink-0">
             <button
               onClick={() => setIsDropdownOpen(!isDropdownOpen)}
               className="relative cursor-pointer group flex flex-col items-center justify-center focus:outline-none"
-              title="Profile"
+              title={isBusiness ? "Company Profile" : "Profile"}
             >
-              <div className="relative w-11 h-11 flex items-center justify-center">
-                {/* SVG Green Progress Ring */}
-                <svg className="w-11 h-11 -rotate-90 pointer-events-none" viewBox="0 0 44 44">
-                  {/* Track */}
-                  <circle
-                    cx="22"
-                    cy="22"
-                    r="19"
-                    className="text-gray-200"
-                    strokeWidth="2.5"
-                    stroke="currentColor"
-                    fill="none"
-                  />
-                  {/* Progress Arc in Green */}
-                  <circle
-                    cx="22"
-                    cy="22"
-                    r="19"
-                    className="text-emerald-500 transition-all duration-500 ease-out"
-                    strokeWidth="2.5"
-                    strokeDasharray={2 * Math.PI * 19}
-                    strokeDashoffset={2 * Math.PI * 19 - (2 * Math.PI * 19 * Math.min(100, Math.max(0, profileProgress))) / 100}
-                    strokeLinecap="round"
-                    stroke="currentColor"
-                    fill="none"
-                  />
-                </svg>
+              {showProgressRing ? (
+                <>
+                  <div className="relative w-11 h-11 flex items-center justify-center">
+                    {/* SVG Green Progress Ring */}
+                    <svg className="w-11 h-11 -rotate-90 pointer-events-none" viewBox="0 0 44 44">
+                      {/* Track */}
+                      <circle
+                        cx="22"
+                        cy="22"
+                        r="19"
+                        className="text-gray-200"
+                        strokeWidth="2.5"
+                        stroke="currentColor"
+                        fill="none"
+                      />
+                      {/* Progress Arc in Green */}
+                      <circle
+                        cx="22"
+                        cy="22"
+                        r="19"
+                        className="text-emerald-500 transition-all duration-500 ease-out"
+                        strokeWidth="2.5"
+                        strokeDasharray={2 * Math.PI * 19}
+                        strokeDashoffset={2 * Math.PI * 19 - (2 * Math.PI * 19 * Math.min(100, Math.max(0, profileProgress))) / 100}
+                        strokeLinecap="round"
+                        stroke="currentColor"
+                        fill="none"
+                      />
+                    </svg>
 
-                {/* Avatar Photo */}
-                <div className="absolute inset-[3.5px] rounded-full overflow-hidden bg-gray-100 flex items-center justify-center">
+                    {/* Avatar Photo */}
+                    <div className="absolute inset-[3.5px] rounded-full overflow-hidden bg-gray-100 flex items-center justify-center">
+                      {profilePhoto ? (
+                        <img 
+                          src={profilePhoto} 
+                          alt="Avatar" 
+                          className="w-full h-full object-cover" 
+                        />
+                      ) : (
+                        <span className="w-full h-full flex items-center justify-center text-[#1d4ed8] font-extrabold bg-blue-50 text-xs">
+                          A
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Percentage text in small size & green centered directly below the avatar ring */}
+                  <span className="text-[10px] font-extrabold text-emerald-600 leading-none mt-0.5 tracking-tight">
+                    {Math.min(100, Math.max(0, profileProgress))}%
+                  </span>
+                </>
+              ) : (
+                /* Business Account: Clean Avatar without percentage text or progress ring */
+                <div className="w-11 h-11 rounded-full overflow-hidden border border-gray-200 bg-gray-100 flex items-center justify-center shadow-2xs hover:border-gray-300 transition-all">
                   {profilePhoto ? (
                     <img 
                       src={profilePhoto} 
-                      alt="Avatar" 
+                      alt="Company Logo" 
                       className="w-full h-full object-cover" 
                     />
                   ) : (
-                    <span className="w-full h-full flex items-center justify-center text-[#1d4ed8] font-extrabold bg-blue-50 text-xs">
-                      A
+                    <span className="w-full h-full flex items-center justify-center text-gray-700 font-bold bg-gray-100 text-sm">
+                      B
                     </span>
                   )}
                 </div>
-              </div>
-
-              {/* Percentage text in small size & green centered directly below the avatar ring */}
-              <span className="text-[10px] font-extrabold text-emerald-600 leading-none mt-0.5 tracking-tight">
-                {Math.min(100, Math.max(0, profileProgress))}%
-              </span>
+              )}
             </button>
           </div>
 
