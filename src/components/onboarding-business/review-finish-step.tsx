@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { 
   Users, User, MapPin, Mail, Phone, Globe, Calendar, Briefcase, Eye, Plane, Loader2
 } from "lucide-react";
@@ -33,6 +33,23 @@ export function ReviewFinishStep({ onNext }: ReviewFinishStepProps) {
   const [error, setError] = useState<string | null>(null);
 
   const { onboarding, error: loadError, submit } = useBusinessOnboarding();
+
+  const isEditMode = useMemo(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      if (
+        params.get("edit") === "true" ||
+        params.get("edit") === "company" ||
+        params.get("from") === "profile"
+      ) {
+        return true;
+      }
+    }
+    return (
+      onboarding?.company?.status === "active" ||
+      onboarding?.company?.status === "approved"
+    );
+  }, [onboarding?.company?.status]);
 
   useEffect(() => {
     if (!onboarding) return;
@@ -277,8 +294,10 @@ export function ReviewFinishStep({ onNext }: ReviewFinishStepProps) {
         >
           {isSubmitting ? (
             <Loader2 className="w-5 h-5 animate-spin" />
+          ) : isEditMode ? (
+            "Update profile"
           ) : (
-            onboarding?.company?.status === "active" || onboarding?.company?.status === "approved" || onboarding?.company?.name ? "Update profile" : "Create account"
+            "Complete onboarding"
           )}
         </button>
       </div>
@@ -288,12 +307,12 @@ export function ReviewFinishStep({ onNext }: ReviewFinishStepProps) {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-6">
           <div className="bg-[#383838] rounded-lg p-6 w-full max-w-sm shadow-2xl">
             <h3 className="text-white font-semibold text-lg mb-3">
-              {onboarding?.company?.status === "active" || onboarding?.company?.status === "approved" || onboarding?.company?.name ? "Profile Updated" : "Request Submitted"}
+              {isEditMode ? "Profile Updated" : "Company Submitted"}
             </h3>
             <p className="text-gray-300 text-[15px] leading-snug mb-8">
-              {onboarding?.company?.status === "active" || onboarding?.company?.status === "approved" || onboarding?.company?.name 
-                ? "Your company profile has been updated successfully." 
-                : "Your company account request has been submitted for platform approval."}
+              {isEditMode
+                ? "Your company profile has been updated successfully."
+                : "Your company profile has been submitted successfully."}
             </p>
             <div className="flex justify-end">
               <button
