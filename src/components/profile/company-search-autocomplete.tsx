@@ -198,6 +198,7 @@ export function CompanySearchAutocomplete({
       setResults([]);
       setIsLoading(false);
       setSelectedCompany(null);
+      setTargetUnregisteredName("");
       if (onSelectCompany) {
         onSelectCompany({ id: null, name: "", status: "active" });
       }
@@ -364,7 +365,7 @@ export function CompanySearchAutocomplete({
       </div>
 
       {/* Selected Company Pending Notice */}
-      {selectedCompany && selectedCompany.id && selectedCompany.status === "pending" && (
+      {query.trim() && selectedCompany && selectedCompany.id && selectedCompany.status === "pending" && (
         <div className="flex items-center gap-1.5 text-xs text-orange-600 bg-orange-50 border border-orange-200/70 px-3 py-1.5 rounded-xl">
           <AlertCircle className="w-3.5 h-3.5 shrink-0 text-orange-500" />
           <span>Affiliation request will be submitted as <strong>Pending Verification</strong>.</span>

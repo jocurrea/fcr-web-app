@@ -175,15 +175,14 @@ export function ContactCredentialsStep({ onNext, onBack }: ContactCredentialsSte
 
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
-        // 1. Save into users table (NO company columns — company handled by RPCs)
-        await supabase.from("users").upsert({
-          id: session.user.id,
-          email: email.trim(),
-          phone: phone.trim(),
-          accountType: "aviation_professional",
-        }, { onConflict: "id" });
+        // 1. Save into user_profiles table (contact info) instead of users table (auth)
+        await supabase.from("user_profiles").upsert({
+          user_id: session.user.id,
+          contactEmail: email.trim(),
+          contactPhone: phone.trim(),
+        }, { onConflict: "user_id" });
 
-        // 2. Save into resumes table (NO company columns in personal)
+        // 2. Save into resumes table using contactEmail and contactPhone keys
         const { data: currentResume } = await supabase
           .from("resumes")
           .select("data")
@@ -193,8 +192,8 @@ export function ContactCredentialsStep({ onNext, onBack }: ContactCredentialsSte
         const resumeData = (currentResume?.data as any) || {};
         const updatedPersonal = {
           ...(resumeData.personal || {}),
-          email: email.trim(),
-          phone: phone.trim(),
+          contactEmail: email.trim(),
+          contactPhone: phone.trim(),
           licenseCertification: primaryLicense,
           category: "aviation_professional",
           role: "aviation_professional",
@@ -215,6 +214,9 @@ export function ContactCredentialsStep({ onNext, onBack }: ContactCredentialsSte
             licenses: updatedLicenses
           }
         }, { onConflict: "userId" });
+
+        // Invalidate Next.js cache to ensure profile reflects changes immediately
+        router.refresh();
 
         // 3. E01-HU11: Company Affiliation via RPCs
         if (companySelection?.name?.trim()) {

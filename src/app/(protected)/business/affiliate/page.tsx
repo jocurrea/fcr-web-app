@@ -345,7 +345,7 @@ export default function BusinessAffiliatePage() {
             )}
 
             {/* Error Message */}
-            {errorMessage && (
+            {errorMessage && selectedCompany && selectedCompany.name.trim() && (
               <div className="p-3.5 rounded-2xl bg-red-50 border border-red-200 text-red-700 text-xs font-medium flex items-center gap-2 animate-in fade-in duration-150">
                 <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
                 <span>{errorMessage}</span>
