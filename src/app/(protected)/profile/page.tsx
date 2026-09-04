@@ -302,8 +302,25 @@ export default function ProfilePage() {
             ...(localPersonal || {}),
             firstName: userData?.firstName || localPersonal?.firstName || crewData?.personal?.firstName || "",
             lastName: userData?.lastName || localPersonal?.lastName || crewData?.personal?.lastName || "",
-            email: myProfileData?.contactEmail || userProfileData?.contactEmail || userData?.email || localPersonal?.email || crewData?.personal?.email || session.user.email || "",
-            phone: myProfileData?.contactPhone || userProfileData?.contactPhone || userData?.phone || localPersonal?.phone || crewData?.personal?.phone || "",
+            email:
+              userProfileData?.contactEmail ||
+              myProfileData?.contactEmail ||
+              crewData?.personal?.contactEmail ||
+              localPersonal?.contactEmail ||
+              localPersonal?.email ||
+              crewData?.personal?.email ||
+              userData?.email ||
+              session.user.email ||
+              "",
+            phone:
+              userProfileData?.contactPhone ||
+              myProfileData?.contactPhone ||
+              crewData?.personal?.contactPhone ||
+              localPersonal?.contactPhone ||
+              localPersonal?.phone ||
+              crewData?.personal?.phone ||
+              userData?.phone ||
+              "",
             location: userData?.location || localPersonal?.location || crewData?.personal?.location || "",
             professionalRole: userData?.professionalRole || localPersonal?.professionalRole || localPersonal?.professionalRoleLabel || localPersonal?.professionalTitle || crewData?.personal?.professionalRole || "",
             role: userData?.role || localPersonal?.role || crewData?.personal?.role || "",

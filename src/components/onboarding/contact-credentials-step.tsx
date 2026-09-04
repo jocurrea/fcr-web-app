@@ -32,11 +32,20 @@ export function ContactCredentialsStep({ onNext, onBack }: ContactCredentialsSte
   useEffect(() => {
     async function loadInitialData() {
       try {
+        let loadedEmail = "";
+        let loadedPhone = "";
+
         const savedPersonal = localStorage.getItem("onboarding_personal");
         if (savedPersonal) {
           const parsed = JSON.parse(savedPersonal);
-          if (parsed.email) setEmail(parsed.email);
-          if (parsed.phone) setPhone(parsed.phone);
+          if (parsed.contactEmail || parsed.email) {
+            loadedEmail = parsed.contactEmail || parsed.email;
+            setEmail(loadedEmail);
+          }
+          if (parsed.contactPhone || parsed.phone) {
+            loadedPhone = parsed.contactPhone || parsed.phone;
+            setPhone(loadedPhone);
+          }
           if (Array.isArray(parsed.licenses) && parsed.licenses.length > 0) {
             setLicensesList(parsed.licenses);
           } else if (parsed.licenseCertification) {
@@ -55,7 +64,30 @@ export function ContactCredentialsStep({ onNext, onBack }: ContactCredentialsSte
         }
 
         const { data: { session } } = await supabase.auth.getSession();
-        if (session?.user?.email && !email) {
+
+        // Load contact info from user_profiles (canonical source) BEFORE falling back to auth email
+        if (session?.user) {
+          try {
+            const { data: upData } = await supabase
+              .from("user_profiles")
+              .select("contactEmail, contactPhone")
+              .eq("user_id", session.user.id)
+              .maybeSingle();
+            if (upData?.contactEmail && !loadedEmail) {
+              loadedEmail = upData.contactEmail;
+              setEmail(loadedEmail);
+            }
+            if (upData?.contactPhone && !loadedPhone) {
+              loadedPhone = upData.contactPhone;
+              setPhone(loadedPhone);
+            }
+          } catch (e) {
+            console.warn("Could not load user_profiles contact info:", e);
+          }
+        }
+
+        // Only fall back to auth email if nothing else was found
+        if (!loadedEmail && session?.user?.email) {
           setEmail(session.user.email);
         }
 
@@ -165,6 +197,8 @@ export function ContactCredentialsStep({ onNext, onBack }: ContactCredentialsSte
         ...parsed,
         email: email.trim(),
         phone: phone.trim(),
+        contactEmail: email.trim(),
+        contactPhone: phone.trim(),
         licenseCertification: primaryLicense,
         licenses: finalLicenses,
         category: "aviation_professional",
@@ -176,26 +210,38 @@ export function ContactCredentialsStep({ onNext, onBack }: ContactCredentialsSte
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
         // 1. Save into user_profiles table (contact info + credentials).
-        // This relies on the `sync_legacy_user_profile_to_canonical_trigger` to sync
-        // professionalCredentials over to aviation_professional_profiles.
+        // Uses user_id (FK to auth.users) — the same column used for SELECT on the profile page.
         try {
           const payload = {
             contactEmail: email.trim(),
             contactPhone: phone.trim(),
             professionalCredentials: finalLicenses,
           };
-          console.log("Payload enviado:", payload);
+          console.log("Payload enviado a user_profiles:", payload, "user_id:", session.user.id);
 
-          const { error: upError } = await supabase
+          // Try update first (row already exists)
+          const { data: updateData, error: upError } = await supabase
             .from("user_profiles")
             .update(payload)
-            .eq("id", session.user.id);
+            .eq("user_id", session.user.id)
+            .select();
           
           if (upError) {
-            console.error("Supabase Error saving user_profiles:", upError.message, upError.details, upError.hint);
+            console.error("Supabase Error UPDATE user_profiles:", upError.message, upError.details, upError.hint);
+          }
+
+          // If update matched 0 rows (row doesn't exist yet), insert instead
+          if (!upError && (!updateData || updateData.length === 0)) {
+            console.log("UPDATE matched 0 rows, trying INSERT into user_profiles...");
+            const { error: insError } = await supabase
+              .from("user_profiles")
+              .insert({ user_id: session.user.id, ...payload });
+            if (insError) {
+              console.error("Supabase Error INSERT user_profiles:", insError.message, insError.details, insError.hint);
+            }
           }
         } catch (upErr: any) {
-          console.error("Exception saving user_profiles:", upErr?.message || upErr, upErr?.details, upErr?.hint);
+          console.error("Exception saving user_profiles:", upErr?.message || upErr);
         }
 
         // 2. Save into resumes table using contactEmail and contactPhone keys
@@ -208,6 +254,8 @@ export function ContactCredentialsStep({ onNext, onBack }: ContactCredentialsSte
         const resumeData = (currentResume?.data as any) || {};
         const updatedPersonal = {
           ...(resumeData.personal || {}),
+          email: email.trim(),
+          phone: phone.trim(),
           contactEmail: email.trim(),
           contactPhone: phone.trim(),
           licenseCertification: primaryLicense,
