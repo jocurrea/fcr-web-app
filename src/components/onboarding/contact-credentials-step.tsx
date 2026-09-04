@@ -182,6 +182,19 @@ export function ContactCredentialsStep({ onNext, onBack }: ContactCredentialsSte
           contactPhone: phone.trim(),
         }, { onConflict: "user_id" });
 
+        // 1.b Save professionalCredentials into aviation_professional_profiles
+        try {
+          const { error: apError } = await supabase.from("aviation_professional_profiles").update({
+            professionalCredentials: finalLicenses,
+          }).eq("id", session.user.id);
+          
+          if (apError) {
+            console.error("Supabase Error saving aviation_professional_profiles:", apError.message);
+          }
+        } catch (apErr: any) {
+          console.error("Exception saving aviation_professional_profiles:", apErr?.message || apErr);
+        }
+
         // 2. Save into resumes table using contactEmail and contactPhone keys
         const { data: currentResume } = await supabase
           .from("resumes")
