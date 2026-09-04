@@ -175,24 +175,22 @@ export function ContactCredentialsStep({ onNext, onBack }: ContactCredentialsSte
 
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
-        // 1. Save into user_profiles table (contact info) instead of users table (auth)
-        await supabase.from("user_profiles").upsert({
-          user_id: session.user.id,
-          contactEmail: email.trim(),
-          contactPhone: phone.trim(),
-        }, { onConflict: "user_id" });
-
-        // 1.b Save professionalCredentials into aviation_professional_profiles
+        // 1. Save into user_profiles table (contact info + credentials).
+        // This relies on the `sync_legacy_user_profile_to_canonical_trigger` to sync
+        // professionalCredentials over to aviation_professional_profiles.
         try {
-          const { error: apError } = await supabase.from("aviation_professional_profiles").update({
+          const { error: upError } = await supabase.from("user_profiles").upsert({
+            user_id: session.user.id,
+            contactEmail: email.trim(),
+            contactPhone: phone.trim(),
             professionalCredentials: finalLicenses,
-          }).eq("id", session.user.id);
+          }, { onConflict: "user_id" });
           
-          if (apError) {
-            console.error("Supabase Error saving aviation_professional_profiles:", apError.message);
+          if (upError) {
+            console.error("Supabase Error saving user_profiles:", upError.message, upError.details, upError.hint);
           }
-        } catch (apErr: any) {
-          console.error("Exception saving aviation_professional_profiles:", apErr?.message || apErr);
+        } catch (upErr: any) {
+          console.error("Exception saving user_profiles:", upErr?.message || upErr, upErr?.details, upErr?.hint);
         }
 
         // 2. Save into resumes table using contactEmail and contactPhone keys

@@ -198,8 +198,8 @@ export default function ProfilePage() {
           setCurrentUserId(session.user.id);
           setUserPosts(allPosts.filter((p) => p.user_id === session.user.id));
 
-          // Fetch user profile data from users and resumes
-          const [userRes, resumeRes, userProfileRes] = await Promise.allSettled([
+          // Fetch user profile data from users, resumes, user_profiles, AND the official get_my_profile RPC
+          const [userRes, resumeRes, userProfileRes, myProfileRes] = await Promise.allSettled([
             supabase
               .from("users")
               .select("*")
@@ -215,15 +215,18 @@ export default function ProfilePage() {
               .select("*")
               .eq("user_id", session.user.id)
               .maybeSingle(),
+            supabase.rpc("get_my_profile"),
           ]);
 
           const userData = userRes.status === "fulfilled" ? userRes.value.data : null;
           const resumeData = resumeRes.status === "fulfilled" ? resumeRes.value.data : null;
           const userProfileData = userProfileRes.status === "fulfilled" ? userProfileRes.value.data : null;
+          const myProfileData = myProfileRes.status === "fulfilled" ? myProfileRes.value.data : null;
 
           console.log("[ProfilePage] Supabase users table record:", userData);
           console.log("[ProfilePage] Supabase resumes table data:", resumeData?.data);
           console.log("[ProfilePage] Supabase user_profiles record:", userProfileData);
+          console.log("[ProfilePage] Supabase get_my_profile RPC:", myProfileData);
 
           const profileImage = userData?.profileImage || null;
           const crewData = (resumeData?.data as any) || null;
@@ -299,8 +302,8 @@ export default function ProfilePage() {
             ...(localPersonal || {}),
             firstName: userData?.firstName || localPersonal?.firstName || crewData?.personal?.firstName || "",
             lastName: userData?.lastName || localPersonal?.lastName || crewData?.personal?.lastName || "",
-            email: userData?.email || localPersonal?.email || crewData?.personal?.email || session.user.email || "",
-            phone: userData?.phone || localPersonal?.phone || crewData?.personal?.phone || "",
+            email: myProfileData?.contactEmail || userProfileData?.contactEmail || userData?.email || localPersonal?.email || crewData?.personal?.email || session.user.email || "",
+            phone: myProfileData?.contactPhone || userProfileData?.contactPhone || userData?.phone || localPersonal?.phone || crewData?.personal?.phone || "",
             location: userData?.location || localPersonal?.location || crewData?.personal?.location || "",
             professionalRole: userData?.professionalRole || localPersonal?.professionalRole || localPersonal?.professionalRoleLabel || localPersonal?.professionalTitle || crewData?.personal?.professionalRole || "",
             role: userData?.role || localPersonal?.role || crewData?.personal?.role || "",
@@ -313,10 +316,17 @@ export default function ProfilePage() {
 
           setPersonal(mergedPersonal);
 
-          const finalLicenses =
+          let finalLicenses =
             crewData?.licenses && crewData.licenses.length > 0
               ? crewData.licenses
               : localLicenses || [];
+              
+          if (resolvedAccountType === "aviation_professional" && (myProfileData?.professionalCredentials || userProfileData?.professionalCredentials)) {
+            const creds = myProfileData?.professionalCredentials || userProfileData?.professionalCredentials;
+            if (Array.isArray(creds) && creds.length > 0) {
+              finalLicenses = creds;
+            }
+          }
           setLicenses(finalLicenses);
 
           const finalRatings =
