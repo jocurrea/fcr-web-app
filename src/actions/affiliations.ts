@@ -17,10 +17,7 @@ export interface SendCompanyInvitationInput {
 export interface SendCompanyInvitationResult {
   success: boolean;
   invitationId?: string;
-  rawToken?: string;
-  inviteUrl?: string;
   error?: string;
-  warning?: string;
   emailSent?: boolean;
 }
 
@@ -258,106 +255,104 @@ export async function sendCompanyInvitationAction(
 
     // 6. Send transactional email using the Resend Node SDK
     const resendApiKey = process.env.RESEND_API_KEY;
+    if (!resendApiKey) {
+      console.error("RESEND_API_KEY is not defined in server environment variables.");
+      return {
+        success: false,
+        error: "Fallo al enviar el correo. Verifica las credenciales del servidor (RESEND_API_KEY no configurada).",
+      };
+    }
+
     const fromEmail =
       process.env.INVITATION_FROM_EMAIL || "Flight Crew <onboarding@resend.dev>";
 
-    let emailSent = false;
-    let warning: string | undefined;
+    try {
+      const resend = new Resend(resendApiKey);
+      const displayCompanyName = companyName || "Flight Crew Company";
+      const emailSubject = `Invitation to join ${displayCompanyName} on Flight Crew`;
 
-    if (resendApiKey) {
-      try {
-        const resend = new Resend(resendApiKey);
-        const displayCompanyName = companyName || "Flight Crew Company";
-        const emailSubject = `Invitation to join ${displayCompanyName} on Flight Crew`;
+      const { error: resendError } = await resend.emails.send({
+        from: fromEmail,
+        to: cleanEmail,
+        subject: emailSubject,
+        html: `
+          <!DOCTYPE html>
+          <html>
+            <head>
+              <meta charset="utf-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <title>${emailSubject}</title>
+            </head>
+            <body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+              <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f8fafc; padding: 40px 20px;">
+                <tr>
+                  <td align="center">
+                    <table width="100%" max-width="580" style="max-width: 580px; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03); border: 1px solid #e2e8f0;">
+                      <!-- Header -->
+                      <tr>
+                        <td style="background-color: #0f172a; padding: 28px 36px; text-align: center;">
+                          <span style="color: #38bdf8; font-size: 20px; font-weight: 700; letter-spacing: 0.5px;">FLIGHT CREW</span>
+                        </td>
+                      </tr>
+                      <!-- Content -->
+                      <tr>
+                        <td style="padding: 36px 36px 28px;">
+                          <h1 style="margin: 0 0 16px; font-size: 22px; font-weight: 700; color: #0f172a; line-height: 1.3;">
+                            Company Affiliation Invitation
+                          </h1>
+                          <p style="margin: 0 0 20px; font-size: 15px; line-height: 1.6; color: #475569;">
+                            <strong>${displayCompanyName}</strong> has invited you to join their official team on Flight Crew${role ? ` as a <strong>${role}</strong>` : ""}.
+                          </p>
+                          <p style="margin: 0 0 28px; font-size: 14px; line-height: 1.6; color: #64748b;">
+                            By accepting this invitation, your verified profile will display your official affiliation with ${displayCompanyName}.
+                          </p>
+                          <!-- CTA Button -->
+                          <div style="text-align: center; margin: 32px 0;">
+                            <a href="${inviteUrl}" style="background-color: #0284c7; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 8px; font-weight: 600; font-size: 15px; display: inline-block; letter-spacing: 0.2px;">
+                              Accept Invitation
+                            </a>
+                          </div>
+                          <p style="margin: 28px 0 8px; font-size: 13px; color: #94a3b8; line-height: 1.5;">
+                            If the button above does not work, copy and paste this link into your browser:
+                          </p>
+                          <p style="margin: 0 0 24px; font-size: 12px; color: #0284c7; word-break: break-all; line-height: 1.5;">
+                            ${inviteUrl}
+                          </p>
+                          <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 24px 0;" />
+                          <p style="margin: 0; font-size: 12px; color: #94a3b8;">
+                            This single-use invitation will expire in <strong>7 days</strong>. If you did not expect this invitation, you can safely ignore this email.
+                          </p>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+            </body>
+          </html>
+        `,
+        text: `You have been invited by ${displayCompanyName} to join their team on Flight Crew${role ? ` as ${role}` : ""}.\n\nAccept your invitation here:\n${inviteUrl}\n\nThis invitation expires in 7 days.`,
+      });
 
-        const { error: resendError } = await resend.emails.send({
-          from: fromEmail,
-          to: cleanEmail,
-          subject: emailSubject,
-          html: `
-            <!DOCTYPE html>
-            <html>
-              <head>
-                <meta charset="utf-8">
-                <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <title>${emailSubject}</title>
-              </head>
-              <body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
-                <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f8fafc; padding: 40px 20px;">
-                  <tr>
-                    <td align="center">
-                      <table width="100%" max-width="580" style="max-width: 580px; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03); border: 1px solid #e2e8f0;">
-                        <!-- Header -->
-                        <tr>
-                          <td style="background-color: #0f172a; padding: 28px 36px; text-align: center;">
-                            <span style="color: #38bdf8; font-size: 20px; font-weight: 700; letter-spacing: 0.5px;">FLIGHT CREW</span>
-                          </td>
-                        </tr>
-                        <!-- Content -->
-                        <tr>
-                          <td style="padding: 36px 36px 28px;">
-                            <h1 style="margin: 0 0 16px; font-size: 22px; font-weight: 700; color: #0f172a; line-height: 1.3;">
-                              Company Affiliation Invitation
-                            </h1>
-                            <p style="margin: 0 0 20px; font-size: 15px; line-height: 1.6; color: #475569;">
-                              <strong>${displayCompanyName}</strong> has invited you to join their official team on Flight Crew${role ? ` as a <strong>${role}</strong>` : ""}.
-                            </p>
-                            <p style="margin: 0 0 28px; font-size: 14px; line-height: 1.6; color: #64748b;">
-                              By accepting this invitation, your verified profile will display your official affiliation with ${displayCompanyName}.
-                            </p>
-                            <!-- CTA Button -->
-                            <div style="text-align: center; margin: 32px 0;">
-                              <a href="${inviteUrl}" style="background-color: #0284c7; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 8px; font-weight: 600; font-size: 15px; display: inline-block; letter-spacing: 0.2px;">
-                                Accept Invitation
-                              </a>
-                            </div>
-                            <p style="margin: 28px 0 8px; font-size: 13px; color: #94a3b8; line-height: 1.5;">
-                              If the button above does not work, copy and paste this link into your browser:
-                            </p>
-                            <p style="margin: 0 0 24px; font-size: 12px; color: #0284c7; word-break: break-all; line-height: 1.5;">
-                              ${inviteUrl}
-                            </p>
-                            <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 24px 0;" />
-                            <p style="margin: 0; font-size: 12px; color: #94a3b8;">
-                              This single-use invitation will expire in <strong>7 days</strong>. If you did not expect this invitation, you can safely ignore this email.
-                            </p>
-                          </td>
-                        </tr>
-                      </table>
-                    </td>
-                  </tr>
-                </table>
-              </body>
-            </html>
-          `,
-          text: `You have been invited by ${displayCompanyName} to join their team on Flight Crew${role ? ` as ${role}` : ""}.\n\nAccept your invitation here:\n${inviteUrl}\n\nThis invitation expires in 7 days.`,
-        });
-
-        if (resendError) {
-          console.error("Resend API error:", resendError);
-          warning = `Email delivery notice: ${resendError.message || "Failed to send email"}. You can share the link manually.`;
-        } else {
-          emailSent = true;
-        }
-      } catch (resendErr: any) {
-        console.error("Resend execution error:", resendErr);
-        warning = `Email delivery notice: ${resendErr?.message || "Failed to send email"}. You can share the link manually.`;
+      if (resendError) {
+        console.error("Resend API error:", resendError);
+        return {
+          success: false,
+          error: `Fallo al enviar el correo. Verifica las credenciales del servidor: ${resendError.message || ""}`.trim(),
+        };
       }
-    } else {
-      console.warn(
-        "RESEND_API_KEY is not defined in server environment variables. Email was not dispatched."
-      );
-      warning =
-        "RESEND_API_KEY is not configured in your Vercel/Netlify environment variables. The invitation was created, and you can copy the link below.";
+    } catch (resendErr: any) {
+      console.error("Resend execution error:", resendErr);
+      return {
+        success: false,
+        error: `Fallo al enviar el correo. Verifica las credenciales del servidor: ${resendErr?.message || ""}`.trim(),
+      };
     }
 
     return {
       success: true,
       invitationId: invitationId || "inv-" + Date.now(),
-      rawToken,
-      inviteUrl,
-      warning,
-      emailSent,
+      emailSent: true,
     };
   } catch (err: any) {
     console.error("sendCompanyInvitationAction unexpected error:", err);

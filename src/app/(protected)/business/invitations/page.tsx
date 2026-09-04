@@ -12,8 +12,6 @@ import {
   ShieldCheck,
   CheckCircle2,
   AlertCircle,
-  Copy,
-  Check,
   Loader2,
   X,
 } from "lucide-react";
@@ -23,7 +21,6 @@ import { sendCompanyInvitationAction } from "@/actions/affiliations";
 interface SentInvitation {
   id: string;
   email: string;
-  token?: string;
   status: "pending" | "accepted" | "declined" | "expired";
   created_at: string;
   role?: string;
@@ -41,8 +38,6 @@ export default function BusinessInvitationsPage() {
 
   // Feedback states
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [generatedLink, setGeneratedLink] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -85,7 +80,6 @@ export default function BusinessInvitationsPage() {
                 invData.map((inv: any) => ({
                   id: inv.id,
                   email: inv.email || inv.invited_email || "professional@example.com",
-                  token: inv.token || inv.invitation_token,
                   status: inv.status || "pending",
                   created_at: inv.created_at,
                   role: inv.role || "Aviation Professional",
@@ -127,8 +121,6 @@ export default function BusinessInvitationsPage() {
     setIsSending(true);
     setErrorMessage(null);
     setSuccessMessage(null);
-    setGeneratedLink(null);
-    setCopied(false);
 
     try {
       // 1. Security Check: Prevent self-invitation (Business admin inviting themselves)
@@ -150,7 +142,7 @@ export default function BusinessInvitationsPage() {
         (inv) => inv.email.toLowerCase() === cleanEmail && inv.status === "pending"
       );
       if (alreadyPending) {
-        setErrorMessage("A pending invitation has already been sent to this email address. You can copy or resend the existing link.");
+        setErrorMessage("A pending invitation has already been sent to this email address.");
         setIsSending(false);
         return;
       }
@@ -164,19 +156,14 @@ export default function BusinessInvitationsPage() {
       });
 
       if (!actionRes.success) {
-        setErrorMessage(actionRes.error || "Failed to create and send invitation.");
+        setErrorMessage(actionRes.error || "Fallo al enviar el correo. Verifica las credenciales del servidor.");
         setIsSending(false);
         return;
       }
 
-      const inviteToken = actionRes.rawToken || "";
-      const origin = typeof window !== "undefined" ? window.location.origin : "";
-      const inviteUrl = actionRes.inviteUrl || (inviteToken ? `${origin}/invitations/accept?token=${inviteToken}` : "");
-
       const newInvitation: SentInvitation = {
         id: actionRes.invitationId || "inv-" + Date.now(),
         email: cleanEmail,
-        token: inviteToken,
         status: "pending",
         created_at: new Date().toISOString(),
         role: inviteRole,
@@ -189,28 +176,12 @@ export default function BusinessInvitationsPage() {
       }
 
       setInviteEmail("");
-      if (inviteUrl) {
-        setGeneratedLink(inviteUrl);
-      }
-
-      if (actionRes.warning) {
-        setSuccessMessage(`Invitation link generated! (${actionRes.warning})`);
-      } else {
-        setSuccessMessage(`Invitation email sent to ${cleanEmail}`);
-      }
+      setSuccessMessage(`Invitación enviada exitosamente por correo electrónico a ${cleanEmail}.`);
     } catch (err: any) {
       console.error("Error sending invitation:", err);
       setErrorMessage(err?.message || "Failed to create invitation. Please try again.");
     } finally {
       setIsSending(false);
-    }
-  };
-
-  const handleCopyLink = () => {
-    if (generatedLink && typeof navigator !== "undefined") {
-      navigator.clipboard.writeText(generatedLink);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 3000);
     }
   };
 
@@ -267,35 +238,17 @@ export default function BusinessInvitationsPage() {
         )}
 
         {successMessage && (
-          <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 flex flex-col gap-2.5">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                <span className="text-xs sm:text-sm font-bold">{successMessage}</span>
-              </div>
-              <button onClick={() => setSuccessMessage(null)} className="p-1 text-emerald-500 hover:text-emerald-700">
-                <X className="w-3.5 h-3.5" />
-              </button>
+          <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span className="text-xs sm:text-sm font-bold">{successMessage}</span>
             </div>
-
-            {generatedLink && (
-              <div className="flex items-center gap-2 mt-1">
-                <input
-                  type="text"
-                  readOnly
-                  value={generatedLink}
-                  className="flex-1 px-3 py-2 bg-white border border-emerald-200 rounded-xl text-xs text-gray-700 select-all focus:outline-none"
-                />
-                <button
-                  type="button"
-                  onClick={handleCopyLink}
-                  className="px-3.5 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 flex items-center gap-1.5 transition-colors shrink-0"
-                >
-                  {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                  <span>{copied ? "Copied!" : "Copy link"}</span>
-                </button>
-              </div>
-            )}
+            <button
+              onClick={() => setSuccessMessage(null)}
+              className="p-1 text-emerald-500 hover:text-emerald-700 cursor-pointer"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
           </div>
         )}
 
@@ -418,22 +371,6 @@ export default function BusinessInvitationsPage() {
                     })}
                   </p>
                 </div>
-
-                {inv.token && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const origin = typeof window !== "undefined" ? window.location.origin : "";
-                      const link = `${origin}/invitations/accept?token=${inv.token}`;
-                      navigator.clipboard.writeText(link);
-                      alert("Invitation link copied to clipboard!");
-                    }}
-                    className="p-2 rounded-xl bg-white border border-gray-200 text-gray-600 hover:text-[#1d4ed8] hover:border-[#1d4ed8] transition-colors shadow-2xs shrink-0 cursor-pointer"
-                    title="Copy invitation link"
-                  >
-                    <Copy className="w-3.5 h-3.5" />
-                  </button>
-                )}
               </div>
             ))}
           </div>
