@@ -18,6 +18,7 @@ import {
   X,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { sendCompanyInvitationAction } from "@/actions/affiliations";
 
 interface SentInvitation {
   id: string;
@@ -132,6 +133,12 @@ export default function BusinessInvitationsPage() {
     try {
       // 1. Security Check: Prevent self-invitation (Business admin inviting themselves)
       const { data: { session } } = await supabase.auth.getSession();
+      if (!companyId) {
+        setErrorMessage("Active company profile not found. Please ensure your business profile is set up.");
+        setIsSending(false);
+        return;
+      }
+
       if (session?.user?.email && session.user.email.toLowerCase() === cleanEmail) {
         setErrorMessage("You cannot send an affiliation invitation to your own business account email address.");
         setIsSending(false);
@@ -148,40 +155,26 @@ export default function BusinessInvitationsPage() {
         return;
       }
 
-      // 3. Primary Dispatch: Invoke the official 'send-company-invitation' Supabase Edge Function
-      // This hashes the token, calls create_company_affiliation_invitation, and sends the actual transactional email via Resend
-      const { data: edgeData, error: edgeErr } = await supabase.functions.invoke(
-        "send-company-invitation",
-        {
-          body: {
-            companyId,
-            email: cleanEmail,
-            role: inviteRole,
-          },
-        }
-      );
+      // 3. Dispatch via Next.js Server Action (bypassing Supabase Edge Functions)
+      const actionRes = await sendCompanyInvitationAction({
+        companyId,
+        email: cleanEmail,
+        role: inviteRole,
+        companyName,
+      });
 
-      if (edgeErr) {
-        console.error("Error calling send-company-invitation Edge Function:", edgeErr);
-        let errorMsg = edgeErr.message || "Failed to send invitation email.";
-        if ((edgeErr as any).context) {
-          try {
-            const body = await (edgeErr as any).context.json();
-            if (body?.error) errorMsg = body.error;
-            else if (body?.message) errorMsg = body.message;
-          } catch (e) {}
-        }
-        setErrorMessage(errorMsg);
+      if (!actionRes.success) {
+        setErrorMessage(actionRes.error || "Failed to create and send invitation.");
         setIsSending(false);
         return;
       }
 
-      const inviteToken = edgeData?.rawToken || edgeData?.token || "";
+      const inviteToken = actionRes.rawToken || "";
       const origin = typeof window !== "undefined" ? window.location.origin : "";
-      const inviteUrl = edgeData?.inviteUrl || (inviteToken ? `${origin}/invitations/accept?token=${inviteToken}` : "");
+      const inviteUrl = actionRes.inviteUrl || (inviteToken ? `${origin}/invitations/accept?token=${inviteToken}` : "");
 
       const newInvitation: SentInvitation = {
-        id: edgeData?.invitationId || "inv-" + Date.now(),
+        id: actionRes.invitationId || "inv-" + Date.now(),
         email: cleanEmail,
         token: inviteToken,
         status: "pending",
@@ -199,7 +192,12 @@ export default function BusinessInvitationsPage() {
       if (inviteUrl) {
         setGeneratedLink(inviteUrl);
       }
-      setSuccessMessage(`Invitation email sent to ${cleanEmail}`);
+
+      if (actionRes.warning) {
+        setSuccessMessage(`Invitation link generated! (${actionRes.warning})`);
+      } else {
+        setSuccessMessage(`Invitation email sent to ${cleanEmail}`);
+      }
     } catch (err: any) {
       console.error("Error sending invitation:", err);
       setErrorMessage(err?.message || "Failed to create invitation. Please try again.");

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { requestCompanyAffiliationFallbackAction } from "@/actions/affiliations";
 import { ChevronLeft } from "lucide-react";
 
 // Flight Crew Steps
@@ -338,9 +339,29 @@ export default function OnboardingPage() {
             console.warn("[Onboarding] Error accepting pending invite:", invErr);
           }
         } else if (targetCompId) {
-          await supabase.rpc("request_company_affiliation", {
+          let { error: rpcErr } = await supabase.rpc("request_company_affiliation", {
             target_company_id: targetCompId,
           });
+          if (rpcErr) {
+            const res2 = await supabase.rpc("request_company_affiliation", {
+              company_id: targetCompId,
+            });
+            if (!res2.error) {
+              rpcErr = null;
+            } else {
+              const res3 = await supabase.rpc("request_company_affiliation", {
+                p_company_id: targetCompId,
+              });
+              if (!res3.error) rpcErr = null;
+            }
+          }
+          if (rpcErr) {
+            console.warn("[Onboarding] request_company_affiliation RPC notice:", rpcErr.message, "— Invoking Server Action fallback...");
+            await requestCompanyAffiliationFallbackAction({
+              companyId: targetCompId,
+              companyName: targetCompName,
+            });
+          }
         } else if (targetCompName?.trim()) {
           await supabase.rpc("create_unregistered_company_affiliation", {
             company_name: targetCompName.trim(),

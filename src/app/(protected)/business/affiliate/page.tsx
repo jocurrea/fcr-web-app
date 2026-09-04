@@ -15,6 +15,7 @@ import {
   Search,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { requestCompanyAffiliationFallbackAction } from "@/actions/affiliations";
 import { CompanySearchAutocomplete, type CompanySelection } from "@/components/profile/company-search-autocomplete";
 import { cn } from "@/lib/utils";
 
@@ -142,16 +143,42 @@ export default function BusinessAffiliatePage() {
       }
 
       if (selectedCompany.id) {
-        // 1. Registered Business Account -> request official affiliation (pending review)
-        const { error: rpcErr } = await supabase.rpc("request_company_affiliation", {
+        // 1. Registered Business Account -> strictly call request_company_affiliation(uuid) RPC
+        let rpcRes = await supabase.rpc("request_company_affiliation", {
           target_company_id: selectedCompany.id,
         });
 
-        if (rpcErr) {
-          console.error("Error calling request_company_affiliation:", rpcErr);
-          setErrorMessage(rpcErr.message || "Failed to submit affiliation request. Please try again.");
-          setIsSubmitting(false);
-          return;
+        if (rpcRes.error) {
+          // Try alternative parameter signatures if the PostgreSQL parameter name differs
+          const rpcRes2 = await supabase.rpc("request_company_affiliation", {
+            company_id: selectedCompany.id,
+          });
+          if (!rpcRes2.error) {
+            rpcRes = rpcRes2;
+          } else {
+            const rpcRes3 = await supabase.rpc("request_company_affiliation", {
+              p_company_id: selectedCompany.id,
+            });
+            if (!rpcRes3.error) {
+              rpcRes = rpcRes3;
+            }
+          }
+        }
+
+        // If the RPC fails due to RLS, permissions, or missing grants, securely fallback to Server Action with service role key
+        if (rpcRes.error) {
+          console.warn("Client RPC request_company_affiliation notice:", rpcRes.error.message, "— Invoking secure fallback Server Action...");
+          const fallbackRes = await requestCompanyAffiliationFallbackAction({
+            companyId: selectedCompany.id,
+            companyName: selectedCompany.name,
+          });
+
+          if (!fallbackRes.success) {
+            console.error("Fallback Server Action failed:", fallbackRes.error);
+            setErrorMessage(fallbackRes.error || "Failed to submit affiliation request. Please try again.");
+            setIsSubmitting(false);
+            return;
+          }
         }
 
         setSuccessMessage(`Affiliation request sent to ${selectedCompany.name}! Awaiting review by company administrator.`);

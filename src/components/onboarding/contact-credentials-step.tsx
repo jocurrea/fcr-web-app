@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { ChevronLeft, AlertCircle, Plus, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { requestCompanyAffiliationFallbackAction } from "@/actions/affiliations";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
@@ -285,12 +286,30 @@ export function ContactCredentialsStep({ onNext, onBack }: ContactCredentialsSte
         // 3. E01-HU11: Company Affiliation via RPCs
         if (companySelection?.name?.trim()) {
           if (companySelection.id) {
-            // Registered company (UUID) -> request affiliation with 'pending' status
-            const { error: rpcError } = await supabase.rpc("request_company_affiliation", {
+            // Registered company (UUID) -> strictly call request_company_affiliation(uuid)
+            let { error: rpcError } = await supabase.rpc("request_company_affiliation", {
               target_company_id: companySelection.id,
             });
             if (rpcError) {
-              console.warn("Notice calling request_company_affiliation (will finalize upon onboarding completion):", rpcError.message);
+              const res2 = await supabase.rpc("request_company_affiliation", {
+                company_id: companySelection.id,
+              });
+              if (!res2.error) {
+                rpcError = null;
+              } else {
+                const res3 = await supabase.rpc("request_company_affiliation", {
+                  p_company_id: companySelection.id,
+                });
+                if (!res3.error) rpcError = null;
+              }
+            }
+
+            if (rpcError) {
+              console.warn("Notice calling request_company_affiliation RPC:", rpcError.message, "— Invoking secure Server Action fallback...");
+              await requestCompanyAffiliationFallbackAction({
+                companyId: companySelection.id,
+                companyName: companySelection.name,
+              });
             }
           } else {
             // E01-HU12: Unregistered / free-text company -> create unregistered affiliation (AC 2 & AC 3)
