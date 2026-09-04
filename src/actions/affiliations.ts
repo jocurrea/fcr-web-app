@@ -82,7 +82,7 @@ export async function sendCompanyInvitationAction(
     const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
 
     // 3. Call create_company_affiliation_invitation RPC using the caller's authenticated session
-    // Defined in PostgreSQL schema as: create_company_affiliation_invitation(uuid, text, text)
+    // Defined in PostgreSQL schema as: create_company_affiliation_invitation(invitation_token_hash, invite_email, target_company_id)
     // Strictly passing (uuid, text, text)
     let invitationId: string | undefined;
     let rpcErrorOccurred = false;
@@ -91,20 +91,20 @@ export async function sendCompanyInvitationAction(
 
     // Strict parameter types: (uuid, text, text)
     const pCompanyId: string = String(companyId).trim();
-    const pInvitedEmail: string = String(cleanEmail).trim().toLowerCase();
+    const pCleanEmail: string = String(cleanEmail).trim().toLowerCase();
     const pTokenHash: string = String(tokenHash).trim();
 
-    // Primary signature using p_ prefix with p_invited_email (target table uses invited_email column)
+    // Verified PostgreSQL function signature: { target_company_id, invite_email, invitation_token_hash }
     let { data, error } = await supabase.rpc(
       "create_company_affiliation_invitation",
       {
-        p_company_id: pCompanyId,
-        p_invited_email: pInvitedEmail,
-        p_token_hash: pTokenHash,
+        target_company_id: pCompanyId,
+        invite_email: pCleanEmail,
+        invitation_token_hash: pTokenHash,
       }
     );
 
-    // If that throws a schema cache error or signature mismatch, retry using column names without 'p_' prefix
+    // If that throws a schema cache error or signature mismatch, retry using alternatives
     const isSchemaCacheError = (err: any) =>
       Boolean(
         err &&
@@ -117,18 +117,31 @@ export async function sendCompanyInvitationAction(
 
     if (error && isSchemaCacheError(error)) {
       console.warn(
-        "create_company_affiliation_invitation schema cache notice with p_ prefix. Retrying with { company_id, invited_email, token_hash }...",
+        "create_company_affiliation_invitation schema cache notice with target_company_id/invite_email/invitation_token_hash. Trying alternatives...",
         error.message
       );
 
-      const retryRes = await supabase.rpc(
+      // Attempt 1: { p_company_id, p_invited_email, p_token_hash }
+      let retryRes = await supabase.rpc(
         "create_company_affiliation_invitation",
         {
-          company_id: pCompanyId,
-          invited_email: pInvitedEmail,
-          token_hash: pTokenHash,
+          p_company_id: pCompanyId,
+          p_invited_email: pCleanEmail,
+          p_token_hash: pTokenHash,
         }
       );
+
+      // Attempt 2: { company_id, invited_email, token_hash }
+      if (retryRes.error && isSchemaCacheError(retryRes.error)) {
+        retryRes = await supabase.rpc(
+          "create_company_affiliation_invitation",
+          {
+            company_id: pCompanyId,
+            invited_email: pCleanEmail,
+            token_hash: pTokenHash,
+          }
+        );
+      }
 
       data = retryRes.data;
       error = retryRes.error;
@@ -163,6 +176,15 @@ export async function sendCompanyInvitationAction(
 
       // Attempt to execute with service role if available
       try {
+        if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+          return {
+            success: false,
+            error:
+              lastRpcError?.message ||
+              "Unable to create company invitation. Please ensure SUPABASE_SERVICE_ROLE_KEY is configured.",
+          };
+        }
+
         const adminClient = createAdminClient();
 
         // Check if an active pending invite already exists for this email & company
