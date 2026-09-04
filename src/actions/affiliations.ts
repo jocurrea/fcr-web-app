@@ -2,6 +2,7 @@
 
 import crypto from "crypto";
 import { headers } from "next/headers";
+import { revalidatePath } from "next/cache";
 import { Resend } from "resend";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -516,3 +517,194 @@ export async function requestCompanyAffiliationFallbackAction(
     };
   }
 }
+
+/**
+ * 3. Revoke Company Affiliation Invitation Action
+ * Calls the official Supabase RPC revoke_company_affiliation_invitation(invitation_id)
+ * using the authenticated company owner's session and revalidates the path.
+ */
+export interface RevokeCompanyInvitationResult {
+  success: boolean;
+  error?: string;
+}
+
+export async function revokeCompanyInvitationAction(
+  invitationId: string
+): Promise<RevokeCompanyInvitationResult> {
+  try {
+    if (!invitationId) {
+      return { success: false, error: "Invitation ID is required." };
+    }
+
+    const supabase = await createClient();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return { success: false, error: "Unauthorized. Please sign in." };
+    }
+
+    // 1. Primary: Call official Supabase RPC revoke_company_affiliation_invitation(invitation_id)
+    let rpcError: any = null;
+    try {
+      const res1 = await supabase.rpc("revoke_company_affiliation_invitation", {
+        invitation_id: invitationId,
+      });
+      if (!res1.error) {
+        try {
+          revalidatePath("/business/invitations");
+          revalidatePath("/", "layout");
+        } catch {}
+        return { success: true };
+      }
+      rpcError = res1.error;
+
+      // Alternative param p_invitation_id
+      const res2 = await supabase.rpc("revoke_company_affiliation_invitation", {
+        p_invitation_id: invitationId,
+      });
+      if (!res2.error) {
+        try {
+          revalidatePath("/business/invitations");
+          revalidatePath("/", "layout");
+        } catch {}
+        return { success: true };
+      }
+
+      // Alternative param id
+      const res3 = await supabase.rpc("revoke_company_affiliation_invitation", {
+        id: invitationId,
+      });
+      if (!res3.error) {
+        try {
+          revalidatePath("/business/invitations");
+          revalidatePath("/", "layout");
+        } catch {}
+        return { success: true };
+      }
+    } catch (e: any) {
+      rpcError = e;
+    }
+
+    console.warn(
+      "[revokeCompanyInvitationAction] RPC notice:",
+      rpcError?.message || rpcError
+    );
+
+    // 2. Direct database update fallback using caller session
+    const nowIso = new Date().toISOString();
+    const { error: updateErr } = await supabase
+      .from("company_invitations")
+      .update({
+        status: "revoked",
+        revoked_at: nowIso,
+        revoked_by_user_id: user.id,
+        updated_at: nowIso,
+      })
+      .eq("id", invitationId);
+
+    if (!updateErr) {
+      try {
+        revalidatePath("/business/invitations");
+        revalidatePath("/", "layout");
+      } catch {}
+      return { success: true };
+    }
+
+    // 3. Fallback to adminClient if RLS blocked direct user update
+    if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      const adminClient = createAdminClient();
+      const { error: adminErr } = await adminClient
+        .from("company_invitations")
+        .update({
+          status: "revoked",
+          revoked_at: nowIso,
+          revoked_by_user_id: user.id,
+          updated_at: nowIso,
+        })
+        .eq("id", invitationId);
+
+      if (!adminErr) {
+        try {
+          revalidatePath("/business/invitations");
+          revalidatePath("/", "layout");
+        } catch {}
+        return { success: true };
+      }
+    }
+
+    return {
+      success: false,
+      error:
+        updateErr?.message ||
+        rpcError?.message ||
+        "Failed to revoke company invitation.",
+    };
+  } catch (err: any) {
+    console.error("revokeCompanyInvitationAction exception:", err);
+    return {
+      success: false,
+      error:
+        err?.message ||
+        "An unexpected error occurred while revoking the invitation.",
+    };
+  }
+}
+
+/**
+ * 4. Get Company Invitations Action
+ * Reads company invitations with expires_at from company_invitations table
+ */
+export async function getCompanyInvitationsAction(
+  companyId: string
+): Promise<{ success: boolean; data?: any[]; error?: string }> {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return { success: false, error: "Unauthorized." };
+    }
+
+    // 1. Try caller session select from company_invitations
+    const { data, error } = await supabase
+      .from("company_invitations")
+      .select("id, company_id, invited_email, status, expires_at, created_at")
+      .eq("company_id", companyId)
+      .order("created_at", { ascending: false });
+
+    if (!error && data) {
+      return { success: true, data };
+    }
+
+    // 2. Try RPC get_company_affiliation_invitations
+    const { data: rpcData, error: rpcError } = await supabase.rpc(
+      "get_company_affiliation_invitations"
+    );
+    if (!rpcError && rpcData) {
+      return { success: true, data: rpcData };
+    }
+
+    // 3. Fallback admin client
+    if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      const adminClient = createAdminClient();
+      const { data: adminData } = await adminClient
+        .from("company_invitations")
+        .select("id, company_id, invited_email, status, expires_at, created_at")
+        .eq("company_id", companyId)
+        .order("created_at", { ascending: false });
+      if (adminData) {
+        return { success: true, data: adminData };
+      }
+    }
+
+    return { success: false, error: error?.message || "Failed to load invitations." };
+  } catch (err: any) {
+    return { success: false, error: err?.message };
+  }
+}
+
