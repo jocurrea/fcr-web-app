@@ -81,50 +81,75 @@ export async function sendCompanyInvitationAction(
     const rawToken = crypto.randomBytes(32).toString("hex");
     const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
 
-    // 3. Call the existing create_company_affiliation_invitation RPC using the caller's authenticated session
+    // 3. Call create_company_affiliation_invitation RPC using the caller's authenticated session
+    // Defined in PostgreSQL schema as: create_company_affiliation_invitation(uuid, text, text)
+    // Strictly passing (uuid, text, text)
     let invitationId: string | undefined;
     let rpcErrorOccurred = false;
     let lastRpcError: any = null;
-
-    // Candidate parameter signatures for the PostgreSQL function create_company_affiliation_invitation(uuid, text, text)
-    const paramVariations = [
-      { company_id: companyId, invited_email: cleanEmail, token_hash: tokenHash },
-      { target_company_id: companyId, email: cleanEmail, token_hash: tokenHash },
-      { p_company_id: companyId, p_invited_email: cleanEmail, p_token_hash: tokenHash },
-      { company_id: companyId, email: cleanEmail, token_hash: tokenHash },
-      { p_company_id: companyId, p_email: cleanEmail, p_token_hash: tokenHash },
-    ];
-
     let rpcSucceeded = false;
-    for (const params of paramVariations) {
-      const { data, error } = await supabase.rpc(
-        "create_company_affiliation_invitation",
-        params
+
+    // Strict parameter types: (uuid, text, text)
+    const pCompanyId: string = String(companyId).trim();
+    const pInvitedEmail: string = String(cleanEmail).trim().toLowerCase();
+    const pTokenHash: string = String(tokenHash).trim();
+
+    // Primary signature using p_ prefix with p_invited_email (target table uses invited_email column)
+    let { data, error } = await supabase.rpc(
+      "create_company_affiliation_invitation",
+      {
+        p_company_id: pCompanyId,
+        p_invited_email: pInvitedEmail,
+        p_token_hash: pTokenHash,
+      }
+    );
+
+    // If that throws a schema cache error or signature mismatch, retry using column names without 'p_' prefix
+    const isSchemaCacheError = (err: any) =>
+      Boolean(
+        err &&
+          (err.code === "PGRST202" ||
+            err.code === "42883" ||
+            err.message?.toLowerCase().includes("schema cache") ||
+            err.message?.toLowerCase().includes("could not find the function") ||
+            err.message?.toLowerCase().includes("parameter"))
       );
 
-      if (!error) {
-        rpcSucceeded = true;
-        invitationId = typeof data === "string" ? data : (data as any)?.id || (data as any)?.invitation_id;
-        break;
-      }
+    if (error && isSchemaCacheError(error)) {
+      console.warn(
+        "create_company_affiliation_invitation schema cache notice with p_ prefix. Retrying with { company_id, invited_email, token_hash }...",
+        error.message
+      );
 
-      lastRpcError = error;
-      // If error is NOT a missing parameter signature error (e.g., custom business logic exception), don't keep brute-forcing signatures
-      if (
-        error.code !== "42883" &&
-        !error.message?.includes("function") &&
-        !error.message?.includes("parameter")
-      ) {
-        // Business logic rejection: SELF_INVITATION, INELIGIBLE_INVITEE, ALREADY_AFFILIATED, duplicate, etc.
-        if (
-          error.message?.includes("SELF_INVITATION") ||
-          error.message?.includes("already affiliated") ||
-          error.message?.includes("duplicate") ||
-          error.message?.includes("INELIGIBLE")
-        ) {
-          return { success: false, error: error.message };
+      const retryRes = await supabase.rpc(
+        "create_company_affiliation_invitation",
+        {
+          company_id: pCompanyId,
+          invited_email: pInvitedEmail,
+          token_hash: pTokenHash,
         }
-        break;
+      );
+
+      data = retryRes.data;
+      error = retryRes.error;
+    }
+
+    if (!error) {
+      rpcSucceeded = true;
+      invitationId =
+        typeof data === "string"
+          ? data
+          : (data as any)?.id || (data as any)?.invitation_id || (data as any)?.invitationId;
+    } else {
+      lastRpcError = error;
+      // Business logic rejection: SELF_INVITATION, INELIGIBLE_INVITEE, ALREADY_AFFILIATED, duplicate, etc.
+      if (
+        error.message?.includes("SELF_INVITATION") ||
+        error.message?.includes("already affiliated") ||
+        error.message?.includes("duplicate") ||
+        error.message?.includes("INELIGIBLE")
+      ) {
+        return { success: false, error: error.message };
       }
     }
 
