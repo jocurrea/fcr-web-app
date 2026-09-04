@@ -226,7 +226,7 @@ export async function fetchProfileProgress(
         ? Promise.resolve(
             supabase
               .from("users")
-              .select("firstName, lastName, profileImage, phone, location, accountType, professionalRole")
+              .select("*")
               .eq("id", effectiveUserId)
               .maybeSingle()
           )
