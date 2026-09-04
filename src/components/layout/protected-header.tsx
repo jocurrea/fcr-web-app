@@ -3,367 +3,50 @@
 import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Bell, Plus, User, Search, Users, Bot, LogOut, Mail, FileText, Lock, ShieldCheck, Ban, Trash2, FileDown } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { Plus, User, Search, Users, Bot, LogOut, Mail, FileText, Lock, ShieldCheck, Ban, Trash2, FileDown } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { fetchProfileProgress } from "@/lib/profile-progress";
-import { ProgressAvatar } from "@/components/profile/progress-avatar";
 import { NotificationsBell } from "./notifications-bell";
 import { useUserProfile } from "@/components/providers/user-profile-provider";
-
-const hasValue = (obj: any) => {
-  if (!obj) return false;
-  if (Array.isArray(obj)) return obj.length > 0;
-  return Object.values(obj).some(val => {
-    if (typeof val === 'string') return val.trim().length > 0;
-    if (Array.isArray(val)) return val.length > 0;
-    return val !== null && val !== undefined;
-  });
-};
 
 export function ProtectedHeader() {
   const pathname = usePathname();
   const router = useRouter();
   const {
     profileProgress,
-    profilePhoto: contextPhoto,
-    accountType: contextAccountType,
-    profileData,
-    isLoading: contextIsLoading,
+    profilePhoto,
+    accountType,
+    isBusiness: contextIsBusiness,
+    companyStatus,
+    userStatus,
+    onboarded,
+    isLoading,
     refetchProfile,
   } = useUserProfile();
 
-  const [profilePhoto, setProfilePhoto] = useState<string | null>(null);
-  const [companyStatus, setCompanyStatus] = useState<string>('pending');
-  const [accountTypeState, setAccountTypeState] = useState<string>(() => {
-    if (typeof window !== "undefined") {
-      const savedType = localStorage.getItem("account_type") || localStorage.getItem("accountType");
-      if (savedType) return savedType;
-      try {
-        const savedPersonal = localStorage.getItem("onboarding_personal");
-        if (savedPersonal) {
-          const parsed = JSON.parse(savedPersonal);
-          if (parsed.category === "business" || parsed.accountType === "business") {
-            return "business";
-          }
-        }
-      } catch {}
-    }
-    return "";
-  });
-  const [userStatus, setUserStatus] = useState<string>('active');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Sync context photo & accountType changes immediately
+  // Authentication & Onboarding route guard
   useEffect(() => {
-    if (contextAccountType) {
-      setAccountTypeState(contextAccountType);
-    }
-  }, [contextAccountType]);
+    if (isLoading) return;
 
-  useEffect(() => {
-    if (contextPhoto) {
-      setProfilePhoto(contextPhoto);
-    }
-  }, [contextPhoto]);
+    const isOnboardingRoute =
+      pathname === "/welcome" ||
+      pathname === "/login" ||
+      pathname === "/role-selection" ||
+      pathname === "/onboarding" ||
+      pathname.startsWith("/onboarding-business");
 
-  useEffect(() => {
-    async function syncLocalProfileToDatabase(session: any) {
-      try {
-        const userId = session?.user?.id;
-        if (!userId) return;
-
-        const savedPhoto = localStorage.getItem("userProfilePhoto");
-        const savedPersonal = localStorage.getItem("onboarding_personal");
-        const localPersonal = savedPersonal ? JSON.parse(savedPersonal) : null;
-
-        // Sync status (active vs pending)
-        const rawStatus = localPersonal?.status || localPersonal?.approvalStatus || localPersonal?.availabilityStatus || 'active';
-        const isApproved = rawStatus === 'active' || rawStatus === 'approved';
-        setUserStatus(isApproved ? 'active' : 'pending');
-
-        // Step 1: Read own users row & company row
-        const [{ data: dbUser }, { data: companyData }] = await Promise.all([
-          supabase
-            .from('users')
-            .select('firstName, middleName, lastName, profileImage, accountType, professionalRole, role')
-            .eq('id', userId)
-            .maybeSingle(),
-          supabase
-            .from('companies')
-            .select('logo_url, status')
-            .eq('owner_user_id', userId)
-            .order('created_at', { ascending: false })
-            .maybeSingle()
-        ]);
-
-        if (companyData?.status) {
-          setCompanyStatus(companyData.status);
-        }
-
-        // Step 2: Merge — prefer company logo_url if business, then localStorage photo, then dbUser
-        const firstName = localPersonal?.firstName || dbUser?.firstName || '';
-        const middleName = localPersonal?.middleName || dbUser?.middleName || '';
-        const lastName = localPersonal?.lastName || dbUser?.lastName || '';
-        const profilePhoto = companyData?.logo_url || savedPhoto || dbUser?.profileImage || '';
-
-        if (!firstName && !lastName && !profilePhoto) return;
-
-        // Step 3: Save to users table
-        const effectiveAccountType = (session?.user?.user_metadata?.accountType === 'aviation_professional' || localPersonal?.category === 'aviation_professional' || localPersonal?.role === 'aviation_professional')
-          ? 'aviation_professional'
-          : (session?.user?.user_metadata?.accountType === 'business' || localPersonal?.category === 'business')
-            ? 'business'
-            : (localPersonal?.category || dbUser?.accountType || session?.user?.user_metadata?.accountType);
-
-        const isAviationPro =
-          effectiveAccountType === 'aviation_professional' ||
-          localPersonal?.category === 'aviation_professional' ||
-          localPersonal?.role === 'aviation_professional' ||
-          dbUser?.professionalRole === 'aviation_professional';
-
-        const isCrew =
-          localPersonal?.role === 'crew' ||
-          localPersonal?.role === 'cabin_crew' ||
-          dbUser?.professionalRole === 'crew' ||
-          dbUser?.role === 'crew';
-
-        const validProfessionalRole = isAviationPro
-          ? 'aviation_professional'
-          : isCrew
-          ? 'crew'
-          : (dbUser?.professionalRole || 'pilot');
-
-        const validAccountType = effectiveAccountType === 'business' ? 'business' : 'flight_crew';
-        const validRole = localPersonal?.role || dbUser?.role || (isAviationPro ? 'aviation_professional' : isCrew ? 'crew' : 'pilot');
-
-        const userPayload: any = { id: userId, onboarded: 1 };
-        if (firstName) userPayload.firstName = firstName;
-        if (middleName) userPayload.middleName = middleName;
-        if (lastName) userPayload.lastName = lastName;
-        if (profilePhoto) userPayload.profileImage = profilePhoto;
-        userPayload.accountType = validAccountType;
-        userPayload.professionalRole = validProfessionalRole;
-        userPayload.role = validRole;
-
-        const savedLicenses = localStorage.getItem("onboarding_licenses");
-        const savedRatings = localStorage.getItem("onboarding_ratings");
-        const savedWork = localStorage.getItem("onboarding_work");
-        const savedResume = localStorage.getItem("onboarding_resume");
-
-        const localLicenses = savedLicenses ? JSON.parse(savedLicenses) : null;
-        const localRatings = savedRatings ? JSON.parse(savedRatings) : null;
-        const localWork = savedWork ? JSON.parse(savedWork) : null;
-        const localResume = savedResume ? JSON.parse(savedResume) : null;
-
-        // Step 4: Safely merge resumes data so we NEVER wipe out licenses, ratings, work, etc.
-        const { data: existingResume } = await supabase
-          .from('resumes')
-          .select('data')
-          .eq('userId', userId)
-          .maybeSingle();
-
-        const currentData = (existingResume?.data as any) || {};
-        const mergedData = {
-          ...currentData,
-          personal: {
-            ...(currentData.personal || {}),
-            ...(localPersonal || {}),
-            firstName: firstName || currentData.personal?.firstName,
-            middleName: middleName || currentData.personal?.middleName,
-            lastName: lastName || currentData.personal?.lastName,
-            profilePhoto: profilePhoto || currentData.personal?.profilePhoto
-          },
-          licenses: (localLicenses && localLicenses.length > 0) ? localLicenses : (currentData.licenses || []),
-          ratings: (localRatings && localRatings.length > 0) ? localRatings : (currentData.ratings || []),
-          work: localWork || currentData.work || {},
-          resume: localResume || currentData.resume || {}
-        };
-
-        await Promise.allSettled([
-          supabase.from('users').upsert(userPayload, { onConflict: 'id' }),
-          supabase.from('resumes').upsert({
-            userId: userId,
-            data: mergedData
-          }, { onConflict: 'userId' })
-        ]);
-      } catch (e) {
-        console.error('[ProtectedHeader] Profile sync error:', e);
+    if (!onboarded && !isOnboardingRoute) {
+      if (accountType === "business" || contextIsBusiness) {
+        router.push("/onboarding-business");
+        return;
       }
+      router.push("/role-selection");
     }
-
-    async function loadProfile() {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        
-        if (!session) {
-          router.push("/welcome");
-          return;
-        }
-
-        // Always sync local profile to Supabase DB so other users can see name & photo
-        syncLocalProfileToDatabase(session);
-
-        let onboarded = false;
-        let accountType = '';
-
-        // 1. Check accountType from users table first to avoid misclassifying Flight Crew
-        const { data: userTypeData } = await supabase
-          .from('users')
-          .select('accountType')
-          .eq('id', session.user.id)
-          .maybeSingle();
-
-        const dbAccountType = userTypeData?.accountType || '';
-
-        // Only treat as business if accountType is explicitly 'business'
-        if (dbAccountType === 'business') {
-          accountType = 'business';
-          setAccountTypeState('business');
-          if (typeof window !== "undefined") {
-            localStorage.setItem("account_type", "business");
-          }
-
-          const { data: companies } = await supabase
-            .from('companies')
-            .select('status, logo_url')
-            .eq('owner_user_id', session.user.id)
-            .order('created_at', { ascending: false })
-            .limit(1);
-
-          if (companies && companies.length > 0) {
-            const status = companies[0].status;
-            setCompanyStatus(status || 'pending');
-            onboarded = true;
-
-            const companyLogo = companies[0].logo_url || localStorage.getItem("userProfilePhoto");
-            if (companyLogo) {
-              setProfilePhoto(companyLogo);
-              try {
-                localStorage.setItem("userProfilePhoto", companyLogo);
-                localStorage.setItem("company_logo", companyLogo);
-                supabase.from("users").update({ profileImage: companyLogo }).eq("id", session.user.id).then();
-              } catch (e) {}
-            }
-            return;
-          }
-        }
-
-        // ============================================================
-        // FAST PATH: Check client-side signals FIRST for Flight Crew
-        // ============================================================
-        const hasCookie = typeof document !== 'undefined' && document.cookie.includes('flightcrew_onboarded=true');
-        const hasMetadata = session.user.user_metadata?.onboarded === true;
-        const hasLocalStorageLegacy = typeof window !== 'undefined' && !!localStorage.getItem('onboarding_personal');
-        const hasSessionStorage = typeof window !== 'undefined' && sessionStorage.getItem('flightcrew_onboarded') === 'true';
-        const hasLocalStorageNew = typeof window !== 'undefined' && localStorage.getItem('flightcrew_onboarded') === 'true';
-
-        if (hasCookie || hasMetadata || hasSessionStorage || hasLocalStorageNew) {
-          onboarded = true;
-          const metaType = session.user.user_metadata?.accountType;
-          const localPersonalRaw = typeof window !== 'undefined' ? localStorage.getItem('onboarding_personal') : null;
-          const localPersonal = localPersonalRaw ? JSON.parse(localPersonalRaw) : null;
-          const localCategory = localPersonal?.category || localPersonal?.role;
-
-          let effectiveType = 'flight_crew';
-          if (metaType === 'aviation_professional' || localCategory === 'aviation_professional' || dbAccountType === 'aviation_professional') {
-            effectiveType = 'aviation_professional';
-          } else if (metaType === 'business' || dbAccountType === 'business') {
-            effectiveType = 'business';
-          }
-
-          accountType = effectiveType;
-          setAccountTypeState(effectiveType);
-          
-          supabase.from('users').select('profileImage, accountType').eq('id', session.user.id).maybeSingle()
-            .then(({ data }) => { 
-              if (data?.accountType === 'business') {
-                setAccountTypeState('business');
-              } else if (data?.accountType === 'aviation_professional') {
-                setAccountTypeState('aviation_professional');
-              }
-              if (data?.profileImage) {
-                setProfilePhoto(data.profileImage); 
-              } else {
-                const savedPhoto = localStorage.getItem("userProfilePhoto");
-                if (savedPhoto) setProfilePhoto(savedPhoto);
-              }
-            });
-
-          refetchProfile();
-          return;
-        }
-
-        // ============================================================
-        // SLOW PATH: DB queries for users without fast-path signal
-        // ============================================================
-        try {
-          const [userRes, resumeRes] = await Promise.all([
-            supabase.from('users').select('onboarded, accountType, profileImage').eq('id', session.user.id).maybeSingle(),
-            supabase.from('resumes').select('data').eq('userId', session.user.id).maybeSingle()
-          ]);
-            
-          const userRecord = userRes.data;
-          const resumeFallback = resumeRes.data;
-
-          if (userRecord) {
-            onboarded = !!userRecord.onboarded;
-            accountType = userRecord.accountType || 'flight_crew';
-            setAccountTypeState(accountType);
-            if (userRecord.profileImage) {
-              setProfilePhoto(userRecord.profileImage);
-            } else {
-              const savedPhoto = localStorage.getItem("userProfilePhoto");
-              if (savedPhoto) setProfilePhoto(savedPhoto);
-            }
-          } else {
-            setAccountTypeState('flight_crew');
-          }
-
-          refetchProfile();
-
-          if (resumeFallback?.data && !onboarded) {
-            accountType = 'flight_crew';
-            setAccountTypeState('flight_crew');
-            onboarded = true;
-          }
-        } catch (e) {
-          console.error("Failed to fetch from users/resumes", e);
-        }
-
-        // localStorage fallback: user filled step 1 but cookie wasn't set
-        if (!onboarded && hasLocalStorageLegacy && (pathname === '/home' || pathname.startsWith('/home'))) {
-          onboarded = true;
-          accountType = 'flight_crew';
-          setAccountTypeState('flight_crew');
-        }
-
-        console.log('[ProtectedHeader] DB path result:', { onboarded, accountType });
-
-        const isOnboardingRoute =
-          pathname === '/role-selection' ||
-          pathname === '/onboarding' ||
-          pathname.startsWith('/onboarding-business');
-
-        if (!onboarded && !isOnboardingRoute) {
-          if (accountType === 'business') {
-            router.push("/onboarding-business");
-            return;
-          }
-
-          // Let the user choose if not onboarded, even if DB says flight_crew by default
-          router.push("/role-selection");
-        }
-      } catch (e) {
-        console.error("Failed to load session/profile", e);
-      }
-    }
-
-    loadProfile();
-  }, [pathname, router]);
+  }, [isLoading, onboarded, pathname, router, accountType, contextIsBusiness]);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -415,21 +98,21 @@ export function ProtectedHeader() {
   };
 
   const effectiveAccountType =
-    contextAccountType ||
-    accountTypeState ||
+    accountType ||
     (typeof window !== "undefined"
       ? localStorage.getItem("account_type") || localStorage.getItem("accountType")
       : "") ||
     "";
 
   const isBusiness =
+    contextIsBusiness ||
     effectiveAccountType === "business" ||
     pathname.startsWith("/business") ||
     pathname.startsWith("/onboarding-business");
 
   // Architecture Rule: Business accounts do not use profile completion percentages.
   // Percentage weights only apply to individual professional roles.
-  // Only display the ring for flight_crew; completely hide percentage text and ring for business.
+  // Only display the ring for flight_crew / aviation_professional; completely hide percentage text and ring for business.
   const showProgressRing =
     !isBusiness &&
     (effectiveAccountType === "flight_crew" ||
@@ -437,13 +120,10 @@ export function ProtectedHeader() {
       (!effectiveAccountType && !pathname.startsWith("/business")));
 
   const effectiveAvatarPhoto =
-    contextPhoto ||
     profilePhoto ||
     (typeof window !== "undefined"
       ? localStorage.getItem("userProfilePhoto")
       : null);
-
-  const isLoading = contextIsLoading;
 
   if (pathname === "/notifications" || pathname === "/newEmail" || pathname === "/resume-preview" || pathname === "/termsAndConditions" || pathname === "/privacyPolicy" || pathname === "/community-safety" || pathname === "/blockedUsers" || pathname.startsWith("/post/")) {
     return null; // Hide the top header on these specific detail pages

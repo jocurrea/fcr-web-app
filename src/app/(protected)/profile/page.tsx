@@ -35,47 +35,40 @@ import { revalidateProfileLayout } from "@/actions/profile";
 import { useUserProfile } from "@/components/providers/user-profile-provider";
 
 export default function ProfilePage() {
-  const { setProfileProgress, updateProfileData } = useUserProfile();
+  const {
+    profileProgress,
+    profilePhoto,
+    coverPhoto,
+    personal: contextPersonal,
+    licenses,
+    ratings,
+    work,
+    languages,
+    skills,
+    resume,
+    accountType,
+    isBusiness,
+    companyInfo,
+    affiliationInfo,
+    completionAreas,
+    completedCount: completedAreasCount,
+    totalCount: totalAreasCount,
+    missingAreas,
+    isLoading: contextLoading,
+    refetchProfile,
+  } = useUserProfile();
 
-  // 1. All useState Hooks
-  const [profilePhoto, setProfilePhoto] = useState<string | null>(null);
-  const [coverPhoto, setCoverPhoto] = useState<string | null>(null);
+  // Local optimistic state for personal details (e.g. during availability modal toggles)
   const [personal, setPersonal] = useState<any>(null);
-  const [licenses, setLicenses] = useState<any[]>([]);
-  const [ratings, setRatings] = useState<any[]>([]);
-  const [work, setWork] = useState<any>(null);
-  const [languages, setLanguages] = useState<string[]>([]);
+
+  // Sync personal state whenever context loads or updates
+  useEffect(() => {
+    if (contextPersonal) {
+      setPersonal(contextPersonal);
+    }
+  }, [contextPersonal]);
+
   const [userPosts, setUserPosts] = useState<any[]>([]);
-  const [resume, setResume] = useState<any>(null);
-
-  // Account type & profile flags
-  const [accountType, setAccountType] = useState<string>("");
-  const [isBusiness, setIsBusiness] = useState(false);
-  const [companyInfo, setCompanyInfo] = useState<{
-    name: string;
-    status: string;
-    logo?: string | null;
-    location?: string | null;
-    email?: string | null;
-    phone?: string | null;
-    website?: string | null;
-    description?: string | null;
-    foundedYear?: number | string | null;
-    operatingAreas?: string[];
-    services?: string[];
-    fleetTypes?: string[];
-    types?: string[];
-  } | null>(null);
-
-  // Affiliation Info (E01-HU11 & E01-HU12 via get_my_profile RPC)
-  const [affiliationInfo, setAffiliationInfo] = useState<{
-    name: string;
-    id: string | null;
-    status: string;
-    logo?: string | null;
-  } | null>(null);
-
-  const [loading, setLoading] = useState(true);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   // Visitors, Likes & Availability modal states
@@ -86,6 +79,8 @@ export default function ProfilePage() {
   const [showAvailabilityModal, setShowAvailabilityModal] = useState(false);
   const [loadingVisitors, setLoadingVisitors] = useState(false);
   const [loadingLikers, setLoadingLikers] = useState(false);
+
+  const loading = contextLoading;
 
   // 2. Derived variables (evaluated unconditionally)
   const firstName = personal?.firstName || "";
@@ -118,7 +113,7 @@ export default function ProfilePage() {
 
   const rawLicenses =
     licenses.length > 0
-      ? licenses.map((l: any) => l.name || l.licenseName || l)
+      ? licenses.map((l: any) => l?.name || l?.licenseName || l)
       : personal?.licenses && Array.isArray(personal.licenses)
       ? personal.licenses
       : personal?.licenseCertification
@@ -133,13 +128,15 @@ export default function ProfilePage() {
     : [];
 
   const rawSkills =
-    personal?.skills && Array.isArray(personal.skills)
+    skills.length > 0
+      ? skills
+      : personal?.skills && Array.isArray(personal.skills)
       ? personal.skills
       : personal?.structuredSkills && Array.isArray(personal.structuredSkills)
       ? personal.structuredSkills.map((s: any) => s.name)
       : resume?.skills || [];
   const skillsList: string[] = Array.isArray(rawSkills)
-    ? rawSkills.map((s: any) => (typeof s === "string" ? s : s.name)).filter(Boolean)
+    ? rawSkills.map((s: any) => (typeof s === "string" ? s : s.name || s.label)).filter(Boolean)
     : [];
 
   const languagesList: string[] = Array.isArray(languages) && languages.length > 0
@@ -153,340 +150,37 @@ export default function ProfilePage() {
   const isAffiliationVerified = hasAffiliationId && (affiliationInfo?.status === "active" || affiliationInfo?.status === "approved");
   const isAffiliationPending = hasAffiliationId && affiliationInfo?.status === "pending";
 
-  // Dynamic Profile Completion Calculation (Single Source of Truth)
-  const {
-    areas: completionAreas,
-    completedCount: completedAreasCount,
-    totalCount: totalAreasCount,
-    percentage: completionPercentage,
-    missingAreas,
-  } = computeProfileAreas({
-    photo: profilePhoto,
-    location: locationValue,
-    work: workExperiences,
-    languages: languagesList,
-    skills: skillsList,
-    licenses: licensesList,
-  });
+  const completionPercentage = profileProgress;
 
-  // 3. All useEffect Hooks at the top of the component (Strictly before any early returns)
+  // 3. Scroll to top on mount and when loading finishes
   useEffect(() => {
-    // Force the page to always start from the top when mounting
     window.scrollTo(0, 0);
   }, []);
 
   useEffect(() => {
-    // Ensure clean top position when loading transition finishes
     if (!loading) {
       window.scrollTo(0, 0);
     }
   }, [loading]);
 
+  // Load user posts
   useEffect(() => {
-    if (!loading && typeof completionPercentage === "number") {
-      setProfileProgress(completionPercentage);
-      if (typeof window !== "undefined") {
-        window.dispatchEvent(
-          new CustomEvent("profile-progress-updated", { detail: completionPercentage })
-        );
-      }
-    }
-  }, [completionPercentage, loading, setProfileProgress]);
-
-  useEffect(() => {
-    async function loadData() {
+    async function loadUserPosts() {
       try {
         const {
           data: { session },
         } = await supabase.auth.getSession();
 
-        const allPosts = await fetchPosts();
         if (session?.user) {
           setCurrentUserId(session.user.id);
+          const allPosts = await fetchPosts();
           setUserPosts(allPosts.filter((p) => p.user_id === session.user.id));
-
-          // Fetch user profile data from users, resumes, user_profiles, AND the official get_my_profile RPC
-          const [userRes, resumeRes, userProfileRes, myProfileRes] = await Promise.allSettled([
-            supabase
-              .from("users")
-              .select("*")
-              .eq("id", session.user.id)
-              .maybeSingle(),
-            supabase
-              .from("resumes")
-              .select("data")
-              .eq("userId", session.user.id)
-              .maybeSingle(),
-            supabase
-              .from("user_profiles")
-              .select("*")
-              .eq("user_id", session.user.id)
-              .maybeSingle(),
-            supabase.rpc("get_my_profile"),
-          ]);
-
-          const userData = userRes.status === "fulfilled" ? userRes.value.data : null;
-          const resumeData = resumeRes.status === "fulfilled" ? resumeRes.value.data : null;
-          const userProfileData = userProfileRes.status === "fulfilled" ? userProfileRes.value.data : null;
-          const myProfileData = myProfileRes.status === "fulfilled" ? myProfileRes.value.data : null;
-
-          if (myProfileData) {
-            updateProfileData(myProfileData);
-          }
-
-          console.log("[ProfilePage] Supabase users table record:", userData);
-          console.log("[ProfilePage] Supabase resumes table data:", resumeData?.data);
-          console.log("[ProfilePage] Supabase user_profiles record:", userProfileData);
-          console.log("[ProfilePage] Supabase get_my_profile RPC:", myProfileData);
-
-          const profileImage = userData?.profileImage || null;
-          const crewData = (resumeData?.data as any) || null;
-
-          const localPersonalRaw = localStorage.getItem("onboarding_personal");
-          const localPersonal = localPersonalRaw ? JSON.parse(localPersonalRaw) : null;
-
-          const dbAccountType = userData?.accountType || "";
-          const authAccountType = session.user.user_metadata?.accountType || "";
-          const localAccountType = localPersonal?.category || localPersonal?.role || "";
-
-          let resolvedAccountType = "aviation_professional";
-          if (authAccountType === "business" || dbAccountType === "business") {
-            resolvedAccountType = "business";
-          } else if (authAccountType === "flight_crew" || dbAccountType === "flight_crew" || localAccountType === "flight_crew") {
-            resolvedAccountType = "flight_crew";
-          } else {
-            resolvedAccountType = "aviation_professional";
-          }
-
-          setAccountType(resolvedAccountType);
-          setIsBusiness(resolvedAccountType === "business");
-
-          setProfilePhoto(profileImage || localStorage.getItem("userProfilePhoto"));
-
-          const coverImage =
-            userData?.cover_image_url ||
-            userData?.cover_photo_url ||
-            userData?.coverImage ||
-            userData?.coverPhoto ||
-            userData?.cover_image ||
-            userData?.cover_photo ||
-            userData?.cover ||
-            userData?.banner_url ||
-            userData?.bannerImage ||
-            userProfileData?.cover_photo_url ||
-            userProfileData?.cover_image_url ||
-            userProfileData?.coverImage ||
-            userProfileData?.coverPhoto ||
-            session.user.user_metadata?.cover_image_url ||
-            session.user.user_metadata?.cover_photo_url ||
-            session.user.user_metadata?.coverPhoto ||
-            session.user.user_metadata?.coverImage ||
-            crewData?.personal?.cover_image_url ||
-            crewData?.personal?.cover_photo_url ||
-            crewData?.personal?.coverPhoto ||
-            crewData?.personal?.coverImage ||
-            crewData?.coverPhoto ||
-            crewData?.coverImage ||
-            localPersonal?.cover_image_url ||
-            localPersonal?.cover_photo_url ||
-            localPersonal?.coverPhoto ||
-            localPersonal?.coverImage ||
-            (typeof window !== "undefined" ? localStorage.getItem("userCoverPhoto") : null) ||
-            (typeof window !== "undefined" ? localStorage.getItem("userCoverImage") : null) ||
-            null;
-
-          console.log("[ProfilePage] Resolved coverPhoto URL:", coverImage);
-          setCoverPhoto(coverImage);
-
-          const savedLicenses = localStorage.getItem("onboarding_licenses");
-          const savedRatings = localStorage.getItem("onboarding_ratings");
-          const savedWork = localStorage.getItem("onboarding_work");
-          const savedResume = localStorage.getItem("onboarding_resume");
-
-          const localLicenses = savedLicenses ? JSON.parse(savedLicenses) : null;
-          const localRatings = savedRatings ? JSON.parse(savedRatings) : null;
-          const localWork = savedWork ? JSON.parse(savedWork) : null;
-          const localResume = savedResume ? JSON.parse(savedResume) : null;
-
-          const mergedPersonal = {
-            ...(crewData?.personal || {}),
-            ...(localPersonal || {}),
-            firstName: userData?.firstName || localPersonal?.firstName || crewData?.personal?.firstName || "",
-            lastName: userData?.lastName || localPersonal?.lastName || crewData?.personal?.lastName || "",
-            email:
-              userProfileData?.contactEmail ||
-              myProfileData?.contactEmail ||
-              crewData?.personal?.contactEmail ||
-              localPersonal?.contactEmail ||
-              localPersonal?.email ||
-              crewData?.personal?.email ||
-              userData?.email ||
-              session.user.email ||
-              "",
-            phone:
-              userProfileData?.contactPhone ||
-              myProfileData?.contactPhone ||
-              crewData?.personal?.contactPhone ||
-              localPersonal?.contactPhone ||
-              localPersonal?.phone ||
-              crewData?.personal?.phone ||
-              userData?.phone ||
-              "",
-            location: userData?.location || localPersonal?.location || crewData?.personal?.location || "",
-            professionalRole: userData?.professionalRole || localPersonal?.professionalRole || localPersonal?.professionalRoleLabel || localPersonal?.professionalTitle || crewData?.personal?.professionalRole || "",
-            role: userData?.role || localPersonal?.role || crewData?.personal?.role || "",
-            availabilityStatus:
-              userData?.availability_status ||
-              localPersonal?.availabilityStatus ||
-              crewData?.personal?.availabilityStatus ||
-              "active",
-          };
-
-          setPersonal(mergedPersonal);
-
-          let finalLicenses =
-            crewData?.licenses && crewData.licenses.length > 0
-              ? crewData.licenses
-              : localLicenses || [];
-              
-          if (resolvedAccountType === "aviation_professional" && (myProfileData?.professionalCredentials || userProfileData?.professionalCredentials)) {
-            const creds = myProfileData?.professionalCredentials || userProfileData?.professionalCredentials;
-            if (Array.isArray(creds) && creds.length > 0) {
-              finalLicenses = creds;
-            }
-          }
-          setLicenses(finalLicenses);
-
-          const finalRatings =
-            crewData?.ratings && crewData.ratings.length > 0
-              ? crewData.ratings
-              : localRatings || [];
-          setRatings(finalRatings);
-
-          const finalWork = crewData?.work || localWork || mergedPersonal?.workExperiences || [];
-          setWork(finalWork);
-
-          const finalResume = crewData?.resume || localResume;
-          if (finalResume) setResume(finalResume);
-
-          const rawLanguages = mergedPersonal?.languages || finalResume?.languages || [];
-          if (Array.isArray(rawLanguages)) {
-            setLanguages(
-              rawLanguages.map((l: any) => (typeof l === "string" ? l : l.name || l.label || String(l)))
-            );
-          }
-
-          // E01-HU11: Read company affiliation using get_my_profile RPC
-          try {
-            const { data: profileRpc, error: profileRpcErr } = await supabase.rpc("get_my_profile");
-            if (!profileRpcErr && profileRpc) {
-              const aff =
-                profileRpc.affiliation ||
-                profileRpc.company_affiliation ||
-                (Array.isArray(profileRpc.affiliations) ? profileRpc.affiliations[0] : null) ||
-                (profileRpc.company_name || profileRpc.company ? profileRpc : null);
-
-              const compName =
-                aff?.company_name ||
-                aff?.company?.name ||
-                aff?.name ||
-                profileRpc.company_name ||
-                profileRpc.company?.name ||
-                null;
-
-              const compId =
-                aff?.company_id ||
-                aff?.company?.id ||
-                aff?.id ||
-                profileRpc.company_id ||
-                null;
-
-              const affStatus =
-                aff?.status ||
-                aff?.affiliation_status ||
-                profileRpc.affiliation_status ||
-                profileRpc.company_link_status ||
-                (compId ? "pending" : "active");
-
-              if (compName) {
-                setAffiliationInfo({
-                  name: compName,
-                  id: compId,
-                  status: affStatus,
-                  logo: aff?.logo_url || aff?.company?.logo_url || null,
-                });
-              }
-            }
-          } catch (rpcErr) {
-            console.warn("Could not load affiliation from get_my_profile:", rpcErr);
-          }
-
-          if (resolvedAccountType === "business") {
-            const { data: companies } = await supabase
-              .from("companies")
-              .select("id, name, status, logo_url, location, contact_email, phone, website, description, founded_year, operating_areas, services, fleet_types")
-              .eq("owner_user_id", session.user.id)
-              .order("created_at", { ascending: false })
-              .limit(1);
-
-            if (companies && companies.length > 0) {
-              const comp = companies[0] as any;
-              
-              let resolvedTypes: string[] = [];
-              if (Array.isArray(comp.services) && comp.services.length > 0) {
-                resolvedTypes = comp.services;
-              }
-              if (resolvedTypes.length === 0 && typeof window !== "undefined") {
-                try {
-                  const saved = localStorage.getItem("company_types_" + comp.id);
-                  if (saved) {
-                    const parsed = JSON.parse(saved);
-                    if (Array.isArray(parsed) && parsed.length > 0) resolvedTypes = parsed;
-                  }
-                } catch (e) {}
-              }
-              if (resolvedTypes.length === 0) {
-                try {
-                  const { data: sel } = await supabase
-                    .from("company_type_selections")
-                    .select("company_type_id, company_types(label, name, key)")
-                    .eq("company_id", comp.id);
-                  if (sel && sel.length > 0) {
-                    resolvedTypes = sel
-                      .map((s: any) => s.company_types?.label || s.company_types?.name || s.company_types?.key)
-                      .filter(Boolean);
-                  }
-                } catch (e) {}
-              }
-              if (resolvedTypes.length === 0) {
-                resolvedTypes = ["Airline / Operator"];
-              }
-
-              setCompanyInfo({
-                name: comp.name || "Company Name",
-                status: comp.status,
-                logo: comp.logo_url || profileImage,
-                location: comp.location,
-                email: comp.contact_email,
-                phone: comp.phone,
-                website: comp.website,
-                description: comp.description,
-                foundedYear: comp.founded_year,
-                operatingAreas: comp.operating_areas || [],
-                services: comp.services || [],
-                fleetTypes: comp.fleet_types || [],
-                types: resolvedTypes,
-              });
-            }
-          }
         }
       } catch (err) {
-        console.error("Error loading profile data:", err);
-      } finally {
-        setLoading(false);
+        console.error("Error loading user posts:", err);
       }
     }
-    loadData();
+    loadUserPosts();
   }, []);
 
   // Handlers for Modals
@@ -1583,6 +1277,7 @@ export default function ProfilePage() {
                       // Re-fetch get_my_profile RPC and revalidate server layout
                       await supabase.rpc("get_my_profile");
                       await revalidateProfileLayout();
+                      await refetchProfile();
                       if (typeof window !== "undefined") {
                         window.dispatchEvent(new CustomEvent("profile-updated"));
                       }
@@ -1648,6 +1343,7 @@ export default function ProfilePage() {
                       // Re-fetch get_my_profile RPC and revalidate server layout
                       await supabase.rpc("get_my_profile");
                       await revalidateProfileLayout();
+                      await refetchProfile();
                       if (typeof window !== "undefined") {
                         window.dispatchEvent(new CustomEvent("profile-updated"));
                       }

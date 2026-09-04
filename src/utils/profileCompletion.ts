@@ -236,7 +236,7 @@ export async function fetchProfileProgress(
             supabase
               .from("user_profiles")
               .select("*")
-              .eq("user_id", effectiveUserId)
+              .eq("userId", effectiveUserId)
               .maybeSingle()
           )
         : Promise.resolve({ data: null }),
@@ -246,7 +246,8 @@ export async function fetchProfileProgress(
       myProfileData = myProfileRes.value.data;
     }
     if (resumeRes.status === "fulfilled" && (resumeRes.value as any)?.data) {
-      rData = (resumeRes.value as any).data?.data || null;
+      const rawResumeData = (resumeRes.value as any).data;
+      rData = rawResumeData?.data || rawResumeData || null;
     }
     if (userRes.status === "fulfilled" && (userRes.value as any)?.data) {
       userRecord = (userRes.value as any).data || null;
@@ -295,6 +296,7 @@ export async function fetchProfileProgress(
     savedPhoto ||
     localPersonal?.profileImage ||
     rData?.personal?.profilePhoto ||
+    rData?.profilePhoto ||
     null;
 
   const location =
@@ -306,18 +308,21 @@ export async function fetchProfileProgress(
     userProfileRecord?.location ||
     userProfileRecord?.city_country ||
     userProfileRecord?.cityCountry ||
+    ([userProfileRecord?.locationCity, userProfileRecord?.locationCountry].filter(Boolean).join(", ") || null) ||
     userRecord?.location ||
     localPersonal?.location ||
     localPersonal?.cityCountry ||
     localPersonal?.city ||
     rData?.personal?.location ||
     rData?.personal?.cityCountry ||
+    rData?.location ||
     null;
 
   const work =
     (Array.isArray(myProfileData?.workExperience) && myProfileData.workExperience.length > 0 ? myProfileData.workExperience : null) ||
     (Array.isArray(myProfileData?.work_experiences) && myProfileData.work_experiences.length > 0 ? myProfileData.work_experiences : null) ||
     (Array.isArray(myProfileData?.work) && myProfileData.work.length > 0 ? myProfileData.work : null) ||
+    (Array.isArray(userProfileRecord?.professionalWorkExperiences) && userProfileRecord.professionalWorkExperiences.length > 0 ? userProfileRecord.professionalWorkExperiences : null) ||
     (Array.isArray(userProfileRecord?.workExperiences) && userProfileRecord.workExperiences.length > 0 ? userProfileRecord.workExperiences : null) ||
     (Array.isArray(rData?.work) && rData.work.length > 0 ? rData.work : null) ||
     (Array.isArray(localWork) && localWork.length > 0 ? localWork : null) ||
@@ -331,6 +336,7 @@ export async function fetchProfileProgress(
     (Array.isArray(myProfileData?.resume_languages) && myProfileData.resume_languages.length > 0 ? myProfileData.resume_languages : null) ||
     (Array.isArray(userProfileRecord?.spokenLanguages) && userProfileRecord.spokenLanguages.length > 0 ? userProfileRecord.spokenLanguages : null) ||
     (Array.isArray(rData?.languages) && rData.languages.length > 0 ? rData.languages : null) ||
+    (Array.isArray(rData?.personal?.languages) && rData.personal.languages.length > 0 ? rData.personal.languages : null) ||
     (Array.isArray(localPersonal?.languages) && localPersonal.languages.length > 0 ? localPersonal.languages : null) ||
     (Array.isArray(localResume?.languages) && localResume.languages.length > 0 ? localResume.languages : null) ||
     [];
@@ -354,9 +360,11 @@ export async function fetchProfileProgress(
     (Array.isArray(myProfileData?.license_type_names) && myProfileData.license_type_names.length > 0 ? myProfileData.license_type_names : null) ||
     (Array.isArray(userProfileRecord?.professionalCredentials) && userProfileRecord.professionalCredentials.length > 0 ? userProfileRecord.professionalCredentials : null) ||
     (Array.isArray(rData?.licenses) && rData.licenses.length > 0 ? rData.licenses : null) ||
+    (Array.isArray(rData?.personal?.licenses) && rData.personal.licenses.length > 0 ? rData.personal.licenses : null) ||
     (Array.isArray(localLicenses) && localLicenses.length > 0 ? localLicenses : null) ||
     (Array.isArray(localPersonal?.licenses) && localPersonal.licenses.length > 0 ? localPersonal.licenses : null) ||
     (localPersonal?.licenseCertification ? [localPersonal.licenseCertification] : []) ||
+    (rData?.personal?.licenseCertification ? [rData.personal.licenseCertification] : []) ||
     [];
 
   const result = computeProfileAreas({
