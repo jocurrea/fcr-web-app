@@ -327,7 +327,17 @@ export default function OnboardingPage() {
       try {
         const targetCompId = personalData?.linkedCompanyId || personalData?.companyId;
         const targetCompName = personalData?.linkedCompany || personalData?.companyName || personalData?.company;
-        if (targetCompId) {
+        
+        // Check for pending invite before standard affiliation requests
+        const pendingToken = sessionStorage.getItem("pending_invite_token");
+        if (pendingToken) {
+          try {
+            await supabase.rpc("accept_company_affiliation_invitation", { token: pendingToken });
+            sessionStorage.removeItem("pending_invite_token");
+          } catch (invErr) {
+            console.warn("[Onboarding] Error accepting pending invite:", invErr);
+          }
+        } else if (targetCompId) {
           await supabase.rpc("request_company_affiliation", {
             target_company_id: targetCompId,
           });

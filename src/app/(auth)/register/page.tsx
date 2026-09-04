@@ -32,6 +32,15 @@ function RegisterForm() {
   const [isCheckingInvite, setIsCheckingInvite] = useState(false);
 
   useEffect(() => {
+    // Capture invitation token if present in URL
+    if (typeof window !== "undefined") {
+      const urlParams = new URLSearchParams(window.location.search);
+      const tokenParam = urlParams.get("invite_id") || urlParams.get("token") || urlParams.get("invite") || urlParams.get("code");
+      if (tokenParam) {
+        sessionStorage.setItem("pending_invite_token", tokenParam);
+      }
+    }
+
     async function checkInvite() {
       if (!inviteToken && !companyParam) return;
 

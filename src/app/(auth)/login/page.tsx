@@ -126,6 +126,17 @@ export default function LoginPage() {
         }
       }
 
+      // Check for pending invite before redirecting
+      const pendingToken = sessionStorage.getItem("pending_invite_token");
+      if (pendingToken) {
+        try {
+          await supabase.rpc("accept_company_affiliation_invitation", { token: pendingToken });
+          sessionStorage.removeItem("pending_invite_token");
+        } catch (e) {
+          console.error("[Login] Error accepting invite:", e);
+        }
+      }
+
       // 2. Ruta Correcta: Si el usuario ya tiene su cuenta configurada y rol asignado,
       // fuerza la redirección directamente hacia el panel principal (/home)
       if (isOnboarded && hasRole) {
@@ -154,6 +165,15 @@ export default function LoginPage() {
   }, [cleanResidualParams]);
 
   useEffect(() => {
+    // Capture invitation token if present in URL
+    if (typeof window !== "undefined") {
+      const urlParams = new URLSearchParams(window.location.search);
+      const tokenParam = urlParams.get("invite_id") || urlParams.get("token") || urlParams.get("invite");
+      if (tokenParam) {
+        sessionStorage.setItem("pending_invite_token", tokenParam);
+      }
+    }
+
     cleanResidualParams();
 
     // If an existing session is already active, redirect according to onboarded status
