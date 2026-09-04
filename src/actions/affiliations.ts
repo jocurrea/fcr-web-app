@@ -324,7 +324,15 @@ export async function getCompanyInvitationsAction(
       return { success: false, error: "Unauthorized." };
     }
 
-    // 1. Try caller session select from company_invitations
+    // 1. Try RPC get_company_affiliation_invitations (canonical authorized RPC)
+    const { data: rpcData, error: rpcError } = await supabase.rpc(
+      "get_company_affiliation_invitations"
+    );
+    if (!rpcError && rpcData && Array.isArray(rpcData)) {
+      return { success: true, data: rpcData };
+    }
+
+    // 2. Try caller session select from company_invitations
     const { data, error } = await supabase
       .from("company_invitations")
       .select("id, company_id, invited_email, status, expires_at, created_at")
@@ -333,14 +341,6 @@ export async function getCompanyInvitationsAction(
 
     if (!error && data) {
       return { success: true, data };
-    }
-
-    // 2. Try RPC get_company_affiliation_invitations
-    const { data: rpcData, error: rpcError } = await supabase.rpc(
-      "get_company_affiliation_invitations"
-    );
-    if (!rpcError && rpcData) {
-      return { success: true, data: rpcData };
     }
 
     // 3. Fallback admin client

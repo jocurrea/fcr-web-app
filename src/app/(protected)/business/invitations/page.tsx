@@ -119,72 +119,79 @@ export default function BusinessInvitationsPage() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // Load invitations using company_invitations table (with expires_at)
-  const loadInvitations = useCallback(async (targetCompanyId: string) => {
+  // Load invitations strictly using authorized get_company_affiliation_invitations() RPC
+  const loadInvitations = useCallback(async (targetCompanyId?: string) => {
     try {
       let invRecords: any[] = [];
 
-      // 1. Direct query from company_invitations table
-      const { data: directData, error: directErr } = await supabase
-        .from("company_invitations")
-        .select("id, company_id, invited_email, status, expires_at, created_at")
-        .eq("company_id", targetCompanyId)
-        .order("created_at", { ascending: false });
+      // 1. Primary architecture requirement: authorized get_company_affiliation_invitations() RPC
+      const { data: rpcData, error: rpcErr } = await supabase.rpc(
+        "get_company_affiliation_invitations"
+      );
 
-      if (!directErr && directData && directData.length > 0) {
-        invRecords = directData;
+      if (!rpcErr && Array.isArray(rpcData)) {
+        invRecords = rpcData;
       } else {
-        // 2. Server Action getCompanyInvitationsAction fallback
-        const serverRes = await getCompanyInvitationsAction(targetCompanyId);
-        if (serverRes.success && serverRes.data && serverRes.data.length > 0) {
-          invRecords = serverRes.data;
-        } else if (!directErr && directData) {
-          invRecords = directData;
-        } else {
-          // 3. Fallback: get_company_affiliation_invitations RPC
-          const { data: rpcData, error: rpcErr } = await supabase.rpc(
-            "get_company_affiliation_invitations"
+        if (rpcErr) {
+          console.warn(
+            "[loadInvitations] get_company_affiliation_invitations RPC notice:",
+            rpcErr.message || rpcErr
           );
-          if (!rpcErr && Array.isArray(rpcData)) {
-            invRecords = rpcData;
+        }
+        // Fallback to Server Action if needed
+        if (targetCompanyId) {
+          const serverRes = await getCompanyInvitationsAction(targetCompanyId);
+          if (serverRes.success && Array.isArray(serverRes.data)) {
+            invRecords = serverRes.data;
           }
         }
       }
 
       if (invRecords && invRecords.length > 0) {
-        setInvitations(
-          invRecords.map((inv: any) => ({
-            id: inv.id,
-            email: inv.invited_email || inv.email || "professional@example.com",
+        const mappedRecords: SentInvitation[] = invRecords
+          .filter((inv: any) => inv && (inv.invited_email || inv.email))
+          .map((inv: any) => ({
+            id: String(inv.id),
+            email: String(inv.invited_email || inv.email).trim().toLowerCase(),
             status: inv.status || "pending",
-            created_at: inv.created_at,
+            created_at: inv.created_at || new Date().toISOString(),
             expires_at: inv.expires_at || null,
             role: inv.role,
-          }))
-        );
+          }));
+
+        setInvitations((prev) => {
+          // Merge dynamic DB records while ensuring any just-sent pending invitation is not wiped out
+          const dbIds = new Set(mappedRecords.map((r) => r.id));
+          const dbEmails = new Set(mappedRecords.map((r) => r.email.toLowerCase()));
+          const pendingUncommitted = prev.filter(
+            (p) =>
+              p.status === "pending" &&
+              !dbIds.has(p.id) &&
+              !dbEmails.has(p.email.toLowerCase())
+          );
+          return [...pendingUncommitted, ...mappedRecords];
+        });
       } else {
-        const localInv = localStorage.getItem(
-          `company_invitations_${targetCompanyId}`
-        );
-        if (localInv) {
-          setInvitations(JSON.parse(localInv));
-        } else {
-          setInvitations([]);
-        }
+        setInvitations((prev) => prev.filter((p) => p.status === "pending"));
       }
     } catch (e) {
       console.warn("Failed to load invitations:", e);
-      const localInv = localStorage.getItem(
-        `company_invitations_${targetCompanyId}`
-      );
-      if (localInv) {
-        setInvitations(JSON.parse(localInv));
-      }
     }
   }, []);
 
   useEffect(() => {
     window.scrollTo(0, 0);
+
+    // Purge any legacy localStorage mock keys
+    if (typeof window !== "undefined") {
+      try {
+        Object.keys(localStorage).forEach((k) => {
+          if (k.startsWith("company_invitations_")) {
+            localStorage.removeItem(k);
+          }
+        });
+      } catch {}
+    }
 
     async function loadCompanyAndInvitations() {
       setIsLoading(true);
@@ -304,30 +311,29 @@ export default function BusinessInvitationsPage() {
         new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
       const newInvitation: SentInvitation = {
-        id: edgeData?.invitationId || edgeData?.id || "inv-" + Date.now(),
+        id: String(edgeData?.invitationId || edgeData?.id || `inv-${Date.now()}`),
         email: cleanEmail,
         status: "pending",
         created_at: new Date().toISOString(),
         expires_at: defaultExpiresAt,
       };
 
-      const updatedList = [
+      // Instantly update React state array so UI immediately reflects the newly created invitation
+      setInvitations((prev) => [
         newInvitation,
-        ...invitations.filter((i) => i.email !== cleanEmail),
-      ];
-      setInvitations(updatedList);
-      if (companyId) {
-        localStorage.setItem(
-          `company_invitations_${companyId}`,
-          JSON.stringify(updatedList)
-        );
-        await loadInvitations(companyId);
-      }
+        ...prev.filter(
+          (i) => i.id !== newInvitation.id && i.email.toLowerCase() !== cleanEmail
+        ),
+      ]);
 
       setInviteEmail("");
-      setSuccessMessage(
-        `Invitación enviada exitosamente por correo electrónico a ${cleanEmail}.`
-      );
+      setSuccessMessage(`Invitation sent successfully to ${cleanEmail}.`);
+
+      // Immediately trigger router refresh and re-fetch from database
+      router.refresh();
+      if (companyId) {
+        await loadInvitations(companyId);
+      }
     } catch (err: any) {
       console.error("Error sending invitation:", err);
       setErrorMessage(
