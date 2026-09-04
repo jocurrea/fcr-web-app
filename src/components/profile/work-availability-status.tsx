@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
+import { revalidateProfileLayout } from "@/actions/profile";
 
 export type AvailabilityStatus = "active" | "available_for_work";
 
@@ -125,6 +126,13 @@ export function WorkAvailabilityStatus({
                 },
               })
               .eq("userId", session.user.id);
+          }
+
+          // Re-fetch get_my_profile RPC and revalidate server layout
+          await supabase.rpc("get_my_profile");
+          await revalidateProfileLayout();
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(new CustomEvent("profile-updated"));
           }
         }
       } catch (err) {

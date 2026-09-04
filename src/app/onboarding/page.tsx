@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { requestCompanyAffiliationFallbackAction } from "@/actions/affiliations";
+import { revalidateProfileLayout } from "@/actions/profile";
 import { ChevronLeft } from "lucide-react";
 
 // Flight Crew Steps
@@ -382,13 +383,26 @@ export default function OnboardingPage() {
         console.error("Storage error:", e);
       }
 
+      // 5. Explicit architecture rule: Re-fetch canonical user data via get_my_profile() RPC
+      // and revalidate server layouts so the Navbar/Avatar immediately updates with fresh percentage
+      try {
+        await supabase.rpc("get_my_profile");
+        await revalidateProfileLayout();
+      } catch (rErr) {
+        console.warn("[Onboarding] get_my_profile sync notice:", rErr);
+      }
+
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("profile-updated"));
+      }
+
       setIsSaving(false);
 
       if (isEditMode) {
         router.refresh();
         router.push("/profile");
       } else {
-        // 5. Invalidate Next.js server cache and navigate to /home
+        // Invalidate Next.js server cache and navigate to /home
         router.refresh();
         router.push("/home");
 

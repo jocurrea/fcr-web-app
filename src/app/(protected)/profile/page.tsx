@@ -31,6 +31,7 @@ import { supabase } from "@/lib/supabase";
 import { fetchPosts } from "@/lib/api/posts";
 import { PostCard } from "@/components/home/post-card";
 import { computeProfileAreas } from "@/utils/profileCompletion";
+import { revalidateProfileLayout } from "@/actions/profile";
 
 export default function ProfilePage() {
   // 1. All useState Hooks
@@ -1568,6 +1569,13 @@ export default function ProfilePage() {
                           },
                         }).eq("userId", session.user.id);
                       }
+
+                      // Re-fetch get_my_profile RPC and revalidate server layout
+                      await supabase.rpc("get_my_profile");
+                      await revalidateProfileLayout();
+                      if (typeof window !== "undefined") {
+                        window.dispatchEvent(new CustomEvent("profile-updated"));
+                      }
                     }
                   } catch (err) {
                     console.error("Error syncing availability:", err);
@@ -1625,6 +1633,13 @@ export default function ProfilePage() {
                             personal: { ...(currentData.personal || {}), availabilityStatus: "active", workAvailability: "active" },
                           },
                         }).eq("userId", session.user.id);
+                      }
+
+                      // Re-fetch get_my_profile RPC and revalidate server layout
+                      await supabase.rpc("get_my_profile");
+                      await revalidateProfileLayout();
+                      if (typeof window !== "undefined") {
+                        window.dispatchEvent(new CustomEvent("profile-updated"));
                       }
                     }
                   } catch (err) {

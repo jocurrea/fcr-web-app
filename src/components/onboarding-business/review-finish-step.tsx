@@ -3,6 +3,8 @@ import {
   Users, User, MapPin, Mail, Phone, Globe, Calendar, Briefcase, Eye, Plane, Loader2
 } from "lucide-react";
 import { useBusinessOnboarding } from "@/components/onboarding-business/business-onboarding-context";
+import { supabase } from "@/lib/supabase";
+import { revalidateProfileLayout } from "@/actions/profile";
 
 interface ReviewFinishStepProps {
   onNext: () => void;
@@ -110,6 +112,16 @@ export function ReviewFinishStep({ onNext }: ReviewFinishStepProps) {
     setIsSubmitting(false);
 
     if (res.success) {
+      // Re-fetch get_my_profile RPC, revalidate layout, and dispatch event for immediate navbar sync
+      try {
+        await supabase.rpc("get_my_profile");
+        await revalidateProfileLayout();
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("profile-updated"));
+        }
+      } catch (syncErr) {
+        console.warn("[ReviewFinishStep] get_my_profile sync error:", syncErr);
+      }
       setShowModal(true);
     } else {
       setError(res.error || "Failed to create account.");

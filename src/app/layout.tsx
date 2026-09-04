@@ -4,6 +4,7 @@ import { Inter } from "next/font/google";
 import { cn } from "@/lib/utils";
 import { StorageProvider } from "@/components/storage-provider";
 import { OneSignalProvider } from "@/components/providers/onesignal-provider";
+import { UserProfileProvider } from "@/components/providers/user-profile-provider";
 
 const inter = Inter({subsets:['latin'],variable:'--font-sans'});
 
@@ -22,7 +23,9 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col" suppressHydrationWarning>
         <OneSignalProvider>
           <StorageProvider />
-          {children}
+          <UserProfileProvider>
+            {children}
+          </UserProfileProvider>
         </OneSignalProvider>
       </body>
     </html>

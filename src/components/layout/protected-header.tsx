@@ -9,6 +9,7 @@ import { supabase } from "@/lib/supabase";
 import { fetchProfileProgress } from "@/lib/profile-progress";
 import { ProgressAvatar } from "@/components/profile/progress-avatar";
 import { NotificationsBell } from "./notifications-bell";
+import { useUserProfile } from "@/components/providers/user-profile-provider";
 
 const hasValue = (obj: any) => {
   if (!obj) return false;
@@ -23,6 +24,12 @@ const hasValue = (obj: any) => {
 export function ProtectedHeader() {
   const pathname = usePathname();
   const router = useRouter();
+  const {
+    profileProgress: contextProgress,
+    profilePhoto: contextPhoto,
+    refetchProfile,
+  } = useUserProfile();
+
   const [profilePhoto, setProfilePhoto] = useState<string | null>(null);
   const [profileProgress, setProfileProgress] = useState(0);
   const [companyStatus, setCompanyStatus] = useState<string>('pending');
@@ -32,6 +39,19 @@ export function ProtectedHeader() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Sync context progress & photo changes immediately
+  useEffect(() => {
+    if (typeof contextProgress === "number") {
+      setProfileProgress(contextProgress);
+    }
+  }, [contextProgress]);
+
+  useEffect(() => {
+    if (contextPhoto) {
+      setProfilePhoto(contextPhoto);
+    }
+  }, [contextPhoto]);
 
   // Listen to real-time progress updates dispatched across the app
   useEffect(() => {
@@ -265,7 +285,7 @@ export function ProtectedHeader() {
               }
             });
 
-          fetchProfileProgress(session.user.id).then((progress) => setProfileProgress(progress));
+          refetchProfile();
           return;
         }
 
@@ -295,8 +315,7 @@ export function ProtectedHeader() {
             setAccountTypeState('flight_crew');
           }
 
-          const progress = await fetchProfileProgress(session.user.id);
-          setProfileProgress(progress);
+          refetchProfile();
 
           if (resumeFallback?.data && !onboarded) {
             accountType = 'flight_crew';
