@@ -179,12 +179,17 @@ export function ContactCredentialsStep({ onNext, onBack }: ContactCredentialsSte
         // This relies on the `sync_legacy_user_profile_to_canonical_trigger` to sync
         // professionalCredentials over to aviation_professional_profiles.
         try {
-          const { error: upError } = await supabase.from("user_profiles").upsert({
-            user_id: session.user.id,
+          const payload = {
             contactEmail: email.trim(),
             contactPhone: phone.trim(),
             professionalCredentials: finalLicenses,
-          }, { onConflict: "user_id" });
+          };
+          console.log("Payload enviado:", payload);
+
+          const { error: upError } = await supabase
+            .from("user_profiles")
+            .update(payload)
+            .eq("id", session.user.id);
           
           if (upError) {
             console.error("Supabase Error saving user_profiles:", upError.message, upError.details, upError.hint);
