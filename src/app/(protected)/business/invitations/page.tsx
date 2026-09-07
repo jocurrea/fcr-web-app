@@ -231,9 +231,9 @@ export default function BusinessInvitationsPage() {
 
   const handleSendInvitation = async (e: React.FormEvent) => {
     e.preventDefault();
-    const cleanEmail = inviteEmail.trim().toLowerCase();
+    const email = inviteEmail.trim().toLowerCase();
 
-    if (!cleanEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       setErrorMessage("Please enter a valid email address.");
       return;
     }
@@ -243,11 +243,34 @@ export default function BusinessInvitationsPage() {
     setSuccessMessage(null);
 
     try {
-      // 1. Security Check: Prevent self-invitation
+      // 1. Parameters: Verify active companyId and normalized lowercase email using authenticated user's session
       const {
         data: { session },
       } = await supabase.auth.getSession();
-      if (!companyId) {
+
+      if (!session?.user) {
+        setErrorMessage("You must be logged in to send invitations.");
+        setIsSending(false);
+        return;
+      }
+
+      let activeCompanyId = companyId;
+      if (!activeCompanyId) {
+        const { data: companies } = await supabase
+          .from("companies")
+          .select("id, name")
+          .eq("owner_user_id", session.user.id)
+          .order("created_at", { ascending: false })
+          .limit(1);
+
+        if (companies && companies.length > 0) {
+          activeCompanyId = companies[0].id;
+          setCompanyId(companies[0].id);
+          if (companies[0].name) setCompanyName(companies[0].name);
+        }
+      }
+
+      if (!activeCompanyId) {
         setErrorMessage(
           "Active company profile not found. Please ensure your business profile is set up."
         );
@@ -255,9 +278,10 @@ export default function BusinessInvitationsPage() {
         return;
       }
 
+      // Security check: Prevent self-invitation to caller's own business account email
       if (
-        session?.user?.email &&
-        session.user.email.toLowerCase() === cleanEmail
+        session.user.email &&
+        session.user.email.toLowerCase() === email
       ) {
         setErrorMessage(
           "You cannot send an affiliation invitation to your own business account email address."
@@ -266,10 +290,10 @@ export default function BusinessInvitationsPage() {
         return;
       }
 
-      // 2. Duplicate Prevention: Check if there is already a pending invitation for this email
+      // Duplicate Prevention: Check if there is already a pending invitation for this email
       const alreadyPending = invitations.some(
         (inv) =>
-          inv.email.toLowerCase() === cleanEmail && inv.status === "pending"
+          inv.email.toLowerCase() === email && inv.status === "pending"
       );
       if (alreadyPending) {
         setErrorMessage(
@@ -279,23 +303,19 @@ export default function BusinessInvitationsPage() {
         return;
       }
 
-      // 3. Restore Edge Function Call: Invoke official send-company-invitation Edge Function using the authenticated client
-      const { data: edgeData, error: edgeErr } = await supabase.functions.invoke(
+      // 2. Strictly invoke the official Supabase Edge Function as defined in the system architecture
+      const { data, error } = await supabase.functions.invoke(
         "send-company-invitation",
-        {
-          body: {
-            companyId,
-            email: cleanEmail,
-          },
-        }
+        { body: { companyId: activeCompanyId, email: email.trim().toLowerCase() } },
       );
 
-      if (edgeErr) {
-        console.error("Error calling send-company-invitation Edge Function:", edgeErr);
-        let errorMsg = edgeErr.message || "Failed to send invitation email.";
-        if ((edgeErr as any).context) {
+      // 3. Error Handling: Properly capture error returned by the Edge Function
+      if (error) {
+        console.error("Error calling send-company-invitation Edge Function:", error);
+        let errorMsg = error.message || "Failed to send invitation email.";
+        if ((error as any).context) {
           try {
-            const body = await (edgeErr as any).context.json();
+            const body = await (error as any).context.json();
             if (body?.error) errorMsg = body.error;
             else if (body?.message) errorMsg = body.message;
           } catch (e) {}
@@ -305,35 +325,40 @@ export default function BusinessInvitationsPage() {
         return;
       }
 
+      if (data?.error) {
+        setErrorMessage(data.error);
+        setIsSending(false);
+        return;
+      }
+
+      // 4. Success Handling: Clear the input, show clean English success message, and immediately refresh
+      setInviteEmail("");
+      setSuccessMessage(`Invitation sent successfully to ${email}.`);
+
+      // Optimistic record for instant UI feedback
       const defaultExpiresAt =
-        edgeData?.expiresAt ||
-        edgeData?.expires_at ||
+        data?.expiresAt ||
+        data?.expires_at ||
         new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
       const newInvitation: SentInvitation = {
-        id: String(edgeData?.invitationId || edgeData?.id || `inv-${Date.now()}`),
-        email: cleanEmail,
+        id: String(data?.invitationId || data?.id || `inv-${Date.now()}`),
+        email,
         status: "pending",
         created_at: new Date().toISOString(),
         expires_at: defaultExpiresAt,
       };
 
-      // Instantly update React state array so UI immediately reflects the newly created invitation
       setInvitations((prev) => [
         newInvitation,
         ...prev.filter(
-          (i) => i.id !== newInvitation.id && i.email.toLowerCase() !== cleanEmail
+          (i) => i.id !== newInvitation.id && i.email.toLowerCase() !== email
         ),
       ]);
 
-      setInviteEmail("");
-      setSuccessMessage(`Invitation sent successfully to ${cleanEmail}.`);
-
-      // Immediately trigger router refresh and re-fetch from database
+      // Immediately refresh the pending invitations list using get_company_affiliation_invitations() RPC
+      await loadInvitations(activeCompanyId);
       router.refresh();
-      if (companyId) {
-        await loadInvitations(companyId);
-      }
     } catch (err: any) {
       console.error("Error sending invitation:", err);
       setErrorMessage(
