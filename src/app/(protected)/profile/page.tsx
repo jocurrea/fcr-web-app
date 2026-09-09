@@ -267,44 +267,44 @@ export default function ProfilePage() {
   };
 
   const PENDING_AREA_SUBTITLES: Record<string, string> = {
-    personal_profile: "Add your basic details and contact info.",
+    personal_profile: "Complete your identity, profile photo, nationality, date of birth, marital status, and children.",
     aircraft_ratings: "Add at least one aircraft type rating.",
-    work_qualifications: "Add your aviation licenses or credentials.",
-    professional_profile: "Add your flight hours and career summary.",
-    career_skills: "Add your work history, skills, or languages.",
-    company_affiliation: "Link your airline or employer.",
+    work_qualifications: "Complete your work location, experience, and role details.",
+    professional_profile: "Complete your contact details, summary, and English proficiency.",
+    career_skills: "Add experience, training, languages, and at least one skill.",
+    company_affiliation: "Search registered companies and request verification.",
   };
 
   const ALL_CANONICAL_AREAS = [
     {
       key: "personal_profile",
       label: "Personal profile",
-      desc: "Basic details, photo, and contact information",
+      desc: "Complete your identity, profile photo, nationality, date of birth, marital status, and children.",
     },
     {
       key: "aircraft_ratings",
       label: "Aircraft ratings",
-      desc: "Type ratings and aircraft certifications",
+      desc: "Add at least one aircraft type rating.",
     },
     {
       key: "work_qualifications",
       label: "Work and qualifications",
-      desc: "Aviation licenses, credentials, and medicals",
+      desc: "Complete your work location, experience, and role details.",
     },
     {
       key: "professional_profile",
       label: "Professional profile",
-      desc: "Flight hours, role, and professional summary",
+      desc: "Complete your contact details, summary, and English proficiency.",
     },
     {
       key: "career_skills",
       label: "Career and skills",
-      desc: "Work history, skills, and languages",
+      desc: "Add experience, training, languages, and at least one skill.",
     },
     {
       key: "company_affiliation",
       label: "Company affiliation",
-      desc: "Associate your profile with your airline or company",
+      desc: "Search registered companies and request verification.",
     },
   ];
 
