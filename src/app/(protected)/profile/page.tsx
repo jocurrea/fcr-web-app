@@ -27,6 +27,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
 import { fetchPosts } from "@/lib/api/posts";
@@ -36,6 +37,9 @@ import { revalidateProfileLayout } from "@/actions/profile";
 import { useUserProfile } from "@/components/providers/user-profile-provider";
 
 export default function ProfilePage() {
+  const router = useRouter();
+  const PlusIcon = Plus;
+  const ChevronRightIcon = ChevronRight;
   const {
     profileProgress,
     profilePhoto,
@@ -284,6 +288,16 @@ export default function ProfilePage() {
     ...CANONICAL_AREA_KEYS.map((key) => missingAreas.find((item: any) => item.key === key)).filter(Boolean),
     ...missingAreas.filter((item: any) => !CANONICAL_AREA_KEYS.includes(item?.key as any)),
   ];
+
+  const pendingAreas = sortedMissingAreas.map((item: any) => ({
+    id: item.key,
+    key: item.key,
+    title: item.label,
+    description: PENDING_AREA_SUBTITLES[item.key] || item.desc,
+    href: getMissingAreaLink(item),
+  }));
+
+  const completedCount = completedAreasCount;
 
   const workExperiences: any[] = Array.isArray(work) && work.length > 0
     ? work
@@ -842,41 +856,40 @@ export default function ProfilePage() {
             ========================================================================= */}
         {accountType !== "business" && completionPercentage < 100 && (
           <>
-            {/* 1. HEADER SECTION (No bg-white, sits directly on the page background) */}
-            <div className="flex justify-between items-start mb-4 px-1 bg-transparent">
+            {/* 1. HEADER: Flat on the gray background */}
+            <div className="flex justify-between items-center mb-4 px-1 bg-transparent">
               <div>
                 <h2 className="text-xl font-bold text-gray-900">Complete your profile</h2>
-                <p className="text-sm text-gray-500 mt-0.5">{completedAreasCount} of {totalAreasCount} profile areas complete</p>
+                <p className="text-sm text-gray-500 mt-0.5">{completedCount} of 6 profile areas complete</p>
               </div>
-              {/* 2. THE PERCENTAGE PILL (Light green bg, bright green text, slightly rounded) */}
-              <div className="bg-green-100/50 text-green-500 px-3 py-1 rounded-lg text-sm font-bold">
-                {completionPercentage}%
+              {/* PERCENTAGE PILL: Light green background, NO borders, NO rings */}
+              <div className="bg-[#E6F4EA] text-[#137333] px-3 py-1 rounded-lg text-sm font-bold">
+                {profileProgress}%
               </div>
             </div>
 
-            {/* 3. INDIVIDUAL PENDING CARDS */}
+            {/* 2. PENDING CARDS LIST */}
             <div className="flex flex-col gap-3 mb-6">
-              {/* Map through the strictly ordered pending areas here */}
-              {sortedMissingAreas.map((area: any) => (
-                <Link
-                  key={area.key}
-                  href={getMissingAreaLink(area)}
-                  className="bg-white rounded-2xl p-4 flex items-center gap-4 border border-gray-100 shadow-sm cursor-pointer hover:border-blue-200 transition-all group"
+              {pendingAreas.map((area) => (
+                <div
+                  key={area.id}
+                  onClick={() => router.push(area.href)}
+                  className="bg-white rounded-[20px] p-4 flex items-center gap-4 border border-gray-100 shadow-sm cursor-pointer"
                 >
-                  {/* Left: + Icon (White circle, light blue border, blue icon) */}
-                  <div className="w-10 h-10 rounded-full border-2 border-blue-100 flex items-center justify-center flex-shrink-0 bg-white">
-                    <Plus className="w-5 h-5 text-blue-500" />
+                  
+                  {/* EXACT ICON STYLING: Pale blue background, NO border */}
+                  <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center flex-shrink-0">
+                    <PlusIcon className="w-5 h-5 text-blue-500" />
                   </div>
                   
-                  {/* Middle: Text Stack */}
-                  <div className="flex-1 min-w-0">
-                    <h3 className="text-base font-bold text-gray-900">{area.label}</h3>
-                    <p className="text-sm text-gray-500 leading-snug mt-0.5">{PENDING_AREA_SUBTITLES[area.key] || area.desc}</p>
+                  {/* TEXT STACK */}
+                  <div className="flex-1">
+                    <h3 className="text-[15px] font-bold text-gray-900">{area.title}</h3>
+                    <p className="text-[13px] text-gray-500 leading-tight mt-0.5">{area.description}</p>
                   </div>
                   
-                  {/* Right: Chevron */}
-                  <ChevronRight className="w-5 h-5 text-gray-400 flex-shrink-0" />
-                </Link>
+                  <ChevronRightIcon className="w-5 h-5 text-gray-400 flex-shrink-0" />
+                </div>
               ))}
             </div>
           </>
