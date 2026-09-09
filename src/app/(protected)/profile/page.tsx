@@ -87,13 +87,35 @@ export default function ProfilePage() {
   const lastName = personal?.lastName || "";
   const fullName = [firstName, lastName].filter(Boolean).join(" ").trim() || "Not added";
 
-  const roleLabel =
+  // Distinguish Aviation Professional vs Flight Crew
+  const isAviationProfessional =
+    accountType === "aviation_professional" ||
+    personal?.professionalRole === "aviation_professional" ||
+    personal?.category === "aviation_professional" ||
+    personal?.role === "aviation_professional";
+
+  const isFlightCrew = !isBusiness && !isAviationProfessional;
+
+  const rawRole =
     personal?.professionalRole ||
     personal?.roleTitle ||
     personal?.role ||
     personal?.category ||
-    personal?.professionalTitle ||
-    "Operations Officer";
+    personal?.professionalTitle;
+
+  const roleLabel = isFlightCrew
+    ? (rawRole === "crew" || rawRole === "Cabin Crew"
+        ? "Cabin Crew"
+        : rawRole === "pilot" || rawRole === "Pilot"
+        ? "Pilot"
+        : rawRole || "Pilot")
+    : (rawRole || "Operations Officer");
+
+  const flightHoursValue =
+    personal?.totalFlightHours ||
+    personal?.flightHours ||
+    personal?.flight_hours ||
+    null;
 
   const summaryText =
     personal?.aboutMe ||
@@ -120,6 +142,94 @@ export default function ProfilePage() {
       ? [personal.licenseCertification]
       : [];
   const licensesList: string[] = rawLicenses.filter(Boolean);
+
+  const ratingsList: string[] = Array.isArray(ratings)
+    ? ratings
+        .map((r: any) => (typeof r === "string" ? r : r?.ratingName || r?.name || ""))
+        .filter(Boolean)
+    : [];
+
+  interface RichLicense {
+    id?: string;
+    name: string;
+    number?: string | null;
+    expiryDate?: string | null;
+    isPermanent?: boolean;
+    isExpired?: boolean;
+  }
+
+  const richLicenses: RichLicense[] = (
+    licenses.length > 0
+      ? licenses
+      : Array.isArray(personal?.licenses) && personal.licenses.length > 0
+      ? personal.licenses
+      : personal?.licenseCertification
+      ? [{ name: personal.licenseCertification }]
+      : []
+  )
+    .map((lic: any) => {
+      if (!lic) return null;
+      if (typeof lic === "string") {
+        return { name: lic, number: null, expiryDate: null, isPermanent: false, isExpired: false };
+      }
+      const name = lic.licenseName || lic.name || "Aviation License";
+      const number = lic.licenseNumber || lic.number || null;
+      const expiryDate = lic.expiryDate || lic.expiry || null;
+      const isPermanent = expiryDate === "Permanent" || expiryDate === "N/A";
+      let isExpired = false;
+      if (expiryDate && !isPermanent) {
+        const d = new Date(expiryDate);
+        if (!isNaN(d.getTime())) {
+          d.setHours(23, 59, 59, 999);
+          isExpired = new Date() > d;
+        }
+      }
+      return {
+        id: lic.id,
+        name,
+        number,
+        expiryDate,
+        isPermanent,
+        isExpired,
+      };
+    })
+    .filter(Boolean) as RichLicense[];
+
+  const getOnboardingStep = (key: string) => {
+    if (isFlightCrew) {
+      switch (key) {
+        case "photo":
+        case "location":
+          return 1;
+        case "licenses":
+          return 2;
+        case "ratings":
+          return 3;
+        case "work":
+          return 4;
+        case "languages":
+        case "skills":
+          return 5;
+        default:
+          return 1;
+      }
+    }
+    // Aviation Professional
+    switch (key) {
+      case "photo":
+        return 2;
+      case "licenses":
+        return 4;
+      case "location":
+      case "work":
+      case "languages":
+        return 5;
+      case "skills":
+        return 6;
+      default:
+        return 5;
+    }
+  };
 
   const workExperiences: any[] = Array.isArray(work) && work.length > 0
     ? work
@@ -589,7 +699,7 @@ export default function ProfilePage() {
 
               {/* Edit Pencil Icon on Avatar */}
               <Link
-                href="/onboarding?edit=true&step=2"
+                href={isFlightCrew ? "/onboarding?edit=true&step=1" : "/onboarding?edit=true&step=2"}
                 className="absolute bottom-1 right-1 w-8 h-8 rounded-full bg-white border border-gray-200 shadow-sm flex items-center justify-center text-gray-700 hover:text-[#1d4ed8] hover:bg-gray-50 transition-colors cursor-pointer"
                 title="Edit photo"
               >
@@ -614,7 +724,7 @@ export default function ProfilePage() {
           {/* Location subtext with interactive navigation shortcut */}
           {locationValue ? (
             <Link
-              href="/onboarding?edit=true&step=5&section=location"
+              href={isFlightCrew ? "/onboarding?edit=true&step=1" : "/onboarding?edit=true&step=5&section=location"}
               className="text-xs sm:text-sm text-gray-500 hover:text-[#1d4ed8] mt-1 inline-flex items-center justify-center gap-1 transition-colors group cursor-pointer"
               title="Edit Location"
             >
@@ -624,7 +734,7 @@ export default function ProfilePage() {
             </Link>
           ) : (
             <Link
-              href="/onboarding?edit=true&step=5&section=location"
+              href={isFlightCrew ? "/onboarding?edit=true&step=1" : "/onboarding?edit=true&step=5&section=location"}
               className="text-xs text-[#1d4ed8] hover:text-[#1e40af] font-semibold mt-1 inline-flex items-center justify-center gap-1 transition-colors cursor-pointer"
             >
               <MapPin className="w-3.5 h-3.5" />
@@ -706,7 +816,7 @@ export default function ProfilePage() {
               {missingAreas.map((item) => (
                 <Link
                   key={item.key}
-                  href={`/onboarding?edit=true&step=${item.step || 5}`}
+                  href={`/onboarding?edit=true&step=${getOnboardingStep(item.key)}`}
                   className="w-full text-left p-3.5 rounded-2xl bg-gray-50/80 hover:bg-blue-50/40 border border-gray-100 hover:border-blue-200 transition-all flex items-center justify-between gap-3 shadow-2xs group cursor-pointer"
                 >
                   <div className="flex items-center gap-3 min-w-0">
@@ -782,72 +892,250 @@ export default function ProfilePage() {
           </Link>
         </div>
 
-        {/* CARD: Professional details */}
-        <div className="bg-white rounded-3xl border border-gray-100 p-5 sm:p-6 shadow-xs flex flex-col gap-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-base sm:text-lg font-extrabold text-gray-900">
-              Professional details
-            </h2>
-            <Link
-              href="/onboarding?edit=true&step=5"
-              className="text-xs sm:text-sm font-bold text-[#1d4ed8] hover:text-[#1e40af] cursor-pointer"
-            >
-              Edit all
-            </Link>
-          </div>
-
-          <div className="divide-y divide-gray-100 space-y-4 pt-1">
-            
-            {/* Location: Interactive navigation shortcut */}
-            <Link
-              href="/onboarding?edit=true&step=5&section=location"
-              className="pt-2 flex items-center justify-between group p-2.5 -mx-2.5 rounded-2xl hover:bg-blue-50/40 transition-all cursor-pointer"
-              title="Edit Location"
-            >
-              <div className="flex flex-col gap-1 min-w-0">
-                <span className="text-xs text-gray-400 font-bold uppercase tracking-wider group-hover:text-[#1d4ed8] transition-colors">
-                  Location
-                </span>
-                <p className={cn("text-sm font-semibold truncate", locationValue ? "text-gray-900" : "text-gray-400 font-normal")}>
-                  {locationValue || "Add your location"}
-                </p>
-              </div>
-              <div className="w-8 h-8 rounded-full bg-gray-50 border border-gray-100 text-gray-400 group-hover:border-blue-200 group-hover:bg-blue-50 group-hover:text-[#1d4ed8] flex items-center justify-center shrink-0 transition-all">
-                {locationValue ? <ChevronRight className="w-4 h-4" /> : <Plus className="w-4 h-4 stroke-[2.5]" />}
-              </div>
-            </Link>
-
-            {/* Work experience: Interactive navigation shortcut */}
-            <div className="pt-3.5 flex flex-col gap-2">
+        {isFlightCrew ? (
+          <>
+            {/* 1. FLIGHT CREW CARD: Total Flight Hours */}
+            <div className="bg-white rounded-3xl border border-gray-100 p-5 sm:p-6 shadow-xs flex flex-col gap-4">
               <div className="flex items-center justify-between">
-                <span className="text-xs text-gray-400 font-bold uppercase tracking-wider">
-                  Work experience
-                </span>
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-2xl bg-blue-50 text-[#1d4ed8] border border-blue-100 flex items-center justify-center shrink-0">
+                    <Clock className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h2 className="text-base sm:text-lg font-extrabold text-gray-900">
+                      Total Flight Hours
+                    </h2>
+                    <span className="text-[11px] text-gray-400 font-medium">Logged flight time</span>
+                  </div>
+                </div>
                 <Link
-                  href="/onboarding?edit=true&step=5&section=work"
-                  className="inline-flex items-center gap-1 px-3 py-1 rounded-full border border-[#1d4ed8] text-[#1d4ed8] hover:bg-blue-50 text-xs font-bold transition-all cursor-pointer shadow-2xs active:scale-95"
+                  href="/onboarding?edit=true&step=1"
+                  className="inline-flex items-center gap-1 px-3.5 py-1 rounded-full border border-[#1d4ed8] text-[#1d4ed8] hover:bg-blue-50 text-xs font-bold transition-all cursor-pointer shadow-2xs active:scale-95"
                 >
-                  <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-                  <span>Add</span>
+                  <Pencil className="w-3 h-3" />
+                  <span>Edit</span>
                 </Link>
               </div>
+
+              <div className="p-4 rounded-2xl bg-gradient-to-br from-blue-50/60 to-slate-50 border border-blue-100/80 flex items-center justify-between">
+                <div className="flex flex-col">
+                  <span className="text-3xl font-extrabold text-gray-900 tracking-tight">
+                    {flightHoursValue ? `${Number(flightHoursValue).toLocaleString()} hrs` : "0 hrs"}
+                  </span>
+                  <span className="text-xs text-gray-500 font-medium mt-0.5">
+                    {flightHoursValue ? "Total cumulative flight hours" : "No flight hours recorded yet"}
+                  </span>
+                </div>
+                <div className="w-12 h-12 rounded-2xl bg-white border border-blue-100 shadow-2xs flex items-center justify-center text-[#1d4ed8]">
+                  <Plane className="w-6 h-6" />
+                </div>
+              </div>
+            </div>
+
+            {/* 2. FLIGHT CREW CARD: Type Ratings & Aircraft */}
+            <div className="bg-white rounded-3xl border border-gray-100 p-5 sm:p-6 shadow-xs flex flex-col gap-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-2xl bg-blue-50 text-[#1d4ed8] border border-blue-100 flex items-center justify-center shrink-0">
+                    <Plane className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h2 className="text-base sm:text-lg font-extrabold text-gray-900">
+                      Type Ratings & Aircraft
+                    </h2>
+                    <span className="text-[11px] text-gray-400 font-medium">Certified aircraft types</span>
+                  </div>
+                </div>
+                <Link
+                  href="/onboarding?edit=true&step=3"
+                  className="inline-flex items-center gap-1 px-3.5 py-1 rounded-full border border-[#1d4ed8] text-[#1d4ed8] hover:bg-blue-50 text-xs font-bold transition-all cursor-pointer shadow-2xs active:scale-95"
+                >
+                  {ratingsList.length > 0 ? (
+                    <>
+                      <Pencil className="w-3 h-3" />
+                      <span>Edit</span>
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+                      <span>Add</span>
+                    </>
+                  )}
+                </Link>
+              </div>
+
+              {ratingsList.length > 0 ? (
+                <Link
+                  href="/onboarding?edit=true&step=3"
+                  className="flex flex-wrap gap-2 pt-1 p-2 -mx-2 rounded-2xl hover:bg-blue-50/40 transition-all cursor-pointer group"
+                  title="Manage Type Ratings"
+                >
+                  {ratingsList.map((rating, idx) => (
+                    <div
+                      key={idx}
+                      className="inline-flex items-center gap-2 bg-blue-50/70 border border-blue-200/80 text-[#1d4ed8] group-hover:bg-blue-100/70 rounded-2xl px-4 py-2 text-xs font-bold shadow-2xs transition-colors"
+                    >
+                      <Plane className="w-3.5 h-3.5 text-[#1d4ed8] shrink-0" />
+                      <span>{rating}</span>
+                    </div>
+                  ))}
+                </Link>
+              ) : (
+                <Link
+                  href="/onboarding?edit=true&step=3"
+                  className="flex items-center justify-between p-3.5 rounded-2xl bg-gray-50/70 border border-gray-100 hover:bg-blue-50/40 hover:border-blue-200 transition-all cursor-pointer group"
+                >
+                  <div className="flex flex-col">
+                    <span className="text-sm font-bold text-gray-900 group-hover:text-[#1d4ed8] transition-colors">Add type ratings</span>
+                    <span className="text-xs text-gray-400">Add certified aircraft models (e.g. A320, B737, Embraer)</span>
+                  </div>
+                  <div className="w-8 h-8 rounded-full bg-white border border-gray-200 text-gray-400 group-hover:border-blue-200 group-hover:bg-[#1d4ed8] group-hover:text-white flex items-center justify-center transition-all">
+                    <Plus className="w-4 h-4 stroke-[2.5]" />
+                  </div>
+                </Link>
+              )}
+            </div>
+
+            {/* 3. FLIGHT CREW CARD: Aviation Licenses */}
+            <div className="bg-white rounded-3xl border border-gray-100 p-5 sm:p-6 shadow-xs flex flex-col gap-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-2xl bg-blue-50 text-[#1d4ed8] border border-blue-100 flex items-center justify-center shrink-0">
+                    <ShieldCheck className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h2 className="text-base sm:text-lg font-extrabold text-gray-900">
+                      Aviation Licenses
+                    </h2>
+                    <span className="text-[11px] text-gray-400 font-medium">Pilot & crew credentials</span>
+                  </div>
+                </div>
+                <Link
+                  href="/onboarding?edit=true&step=2"
+                  className="inline-flex items-center gap-1 px-3.5 py-1 rounded-full border border-[#1d4ed8] text-[#1d4ed8] hover:bg-blue-50 text-xs font-bold transition-all cursor-pointer shadow-2xs active:scale-95"
+                >
+                  {richLicenses.length > 0 ? (
+                    <>
+                      <Pencil className="w-3 h-3" />
+                      <span>Manage</span>
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+                      <span>Add</span>
+                    </>
+                  )}
+                </Link>
+              </div>
+
+              {richLicenses.length > 0 ? (
+                <div className="divide-y divide-gray-100 space-y-3 pt-1">
+                  {richLicenses.map((lic, idx) => (
+                    <Link
+                      key={lic.id || idx}
+                      href="/onboarding?edit=true&step=2"
+                      className="flex items-start justify-between p-2.5 -mx-2.5 rounded-2xl hover:bg-blue-50/40 border border-transparent hover:border-blue-100 transition-all cursor-pointer group"
+                      title="Manage License"
+                    >
+                      <div className="flex items-start gap-3 min-w-0">
+                        <div className="w-9 h-9 rounded-2xl bg-blue-50 border border-blue-100 text-[#1d4ed8] group-hover:bg-[#1d4ed8] group-hover:text-white flex items-center justify-center shrink-0 transition-colors mt-0.5">
+                          <ShieldCheck className="w-5 h-5" />
+                        </div>
+                        <div className="flex flex-col min-w-0">
+                          <span className="text-sm font-bold text-gray-900 group-hover:text-[#1d4ed8] transition-colors truncate">
+                            {lic.name}
+                          </span>
+                          <div className="flex flex-wrap items-center gap-2 mt-0.5">
+                            {lic.number && (
+                              <span className="text-xs text-gray-500 font-medium">
+                                #{lic.number}
+                              </span>
+                            )}
+                            {lic.isPermanent ? (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                Permanent
+                              </span>
+                            ) : lic.isExpired ? (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-600 border border-rose-200">
+                                Expired ({lic.expiryDate})
+                              </span>
+                            ) : lic.expiryDate ? (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-gray-100 text-gray-600 border border-gray-200">
+                                Expires {lic.expiryDate}
+                              </span>
+                            ) : null}
+                          </div>
+                        </div>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-[#1d4ed8] shrink-0 transition-colors mt-2" />
+                    </Link>
+                  ))}
+                </div>
+              ) : (
+                <Link
+                  href="/onboarding?edit=true&step=2"
+                  className="flex items-center justify-between p-3.5 rounded-2xl bg-gray-50/70 border border-gray-100 hover:bg-blue-50/40 hover:border-blue-200 transition-all cursor-pointer group"
+                >
+                  <div className="flex flex-col">
+                    <span className="text-sm font-bold text-gray-900 group-hover:text-[#1d4ed8] transition-colors">Add aviation license</span>
+                    <span className="text-xs text-gray-400">Add ATPL, CPL, Cabin Crew Attestation, or Medical</span>
+                  </div>
+                  <div className="w-8 h-8 rounded-full bg-white border border-gray-200 text-gray-400 group-hover:border-blue-200 group-hover:bg-[#1d4ed8] group-hover:text-white flex items-center justify-center transition-all">
+                    <Plus className="w-4 h-4 stroke-[2.5]" />
+                  </div>
+                </Link>
+              )}
+            </div>
+
+            {/* 4. FLIGHT CREW CARD: Flight & Airline Experience */}
+            <div className="bg-white rounded-3xl border border-gray-100 p-5 sm:p-6 shadow-xs flex flex-col gap-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-2xl bg-blue-50 text-[#1d4ed8] border border-blue-100 flex items-center justify-center shrink-0">
+                    <Briefcase className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h2 className="text-base sm:text-lg font-extrabold text-gray-900">
+                      Flight & Airline Experience
+                    </h2>
+                    <span className="text-[11px] text-gray-400 font-medium">Airlines & operators</span>
+                  </div>
+                </div>
+                <Link
+                  href="/onboarding?edit=true&step=4"
+                  className="inline-flex items-center gap-1 px-3.5 py-1 rounded-full border border-[#1d4ed8] text-[#1d4ed8] hover:bg-blue-50 text-xs font-bold transition-all cursor-pointer shadow-2xs active:scale-95"
+                >
+                  {workExperiences.length > 0 ? (
+                    <>
+                      <Pencil className="w-3 h-3" />
+                      <span>Edit</span>
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+                      <span>Add</span>
+                    </>
+                  )}
+                </Link>
+              </div>
+
               {workExperiences.length > 0 ? (
-                <div className="space-y-1.5">
+                <div className="space-y-1.5 pt-1">
                   {workExperiences.map((exp: any, idx: number) => (
                     <Link
                       key={exp.id || idx}
-                      href="/onboarding?edit=true&step=5&section=work"
+                      href="/onboarding?edit=true&step=4"
                       className="flex items-start justify-between p-2.5 -mx-2.5 rounded-2xl hover:bg-blue-50/40 border border-transparent hover:border-blue-100 transition-all cursor-pointer group"
-                      title="Manage Work Experience"
+                      title="Manage Flight Experience"
                     >
                       <div className="flex items-start gap-2.5 min-w-0">
                         <Briefcase className="w-4 h-4 text-gray-400 group-hover:text-[#1d4ed8] shrink-0 mt-0.5 transition-colors" />
                         <div className="flex flex-col min-w-0">
                           <span className="text-sm font-bold text-gray-900 group-hover:text-[#1d4ed8] transition-colors truncate">
-                            {exp.roleTitle || exp.jobTitle || "Aviation Professional"}
+                            {exp.roleTitle || exp.jobTitle || "Flight Crew Member"}
                           </span>
                           <span className="text-xs text-gray-500 font-medium truncate">
-                            {exp.companyName || exp.company} {exp.startDate ? `• ${exp.startDate} - ${exp.endDate || "Present"}` : ""}
+                            {exp.companyName || exp.company || "Airline"} {exp.startDate ? `• ${exp.startDate} - ${exp.endDate || "Present"}` : ""}
                           </span>
                         </div>
                       </div>
@@ -857,10 +1145,10 @@ export default function ProfilePage() {
                 </div>
               ) : (
                 <Link
-                  href="/onboarding?edit=true&step=5&section=work"
+                  href="/onboarding?edit=true&step=4"
                   className="flex items-center justify-between p-3 rounded-2xl bg-gray-50/70 border border-gray-100 hover:bg-blue-50/40 hover:border-blue-200 transition-all cursor-pointer group"
                 >
-                  <span className="text-sm text-gray-400 group-hover:text-gray-700 font-medium">No experience added</span>
+                  <span className="text-sm text-gray-400 group-hover:text-gray-700 font-medium">No flight experience added</span>
                   <div className="w-7 h-7 rounded-full bg-white border border-gray-200 text-gray-400 group-hover:border-blue-200 group-hover:bg-[#1d4ed8] group-hover:text-white flex items-center justify-center transition-all">
                     <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
                   </div>
@@ -868,171 +1156,337 @@ export default function ProfilePage() {
               )}
             </div>
 
-            {/* Languages: Interactive navigation shortcut */}
-            <div className="pt-3.5 flex flex-col gap-2">
+            {/* 5. FLIGHT CREW CARD: Languages & Contact */}
+            <div className="bg-white rounded-3xl border border-gray-100 p-5 sm:p-6 shadow-xs flex flex-col gap-4">
               <div className="flex items-center justify-between">
-                <span className="text-xs text-gray-400 font-bold uppercase tracking-wider">
-                  Languages
-                </span>
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-2xl bg-blue-50 text-[#1d4ed8] border border-blue-100 flex items-center justify-center shrink-0">
+                    <Globe className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h2 className="text-base sm:text-lg font-extrabold text-gray-900">
+                      Languages & Contact
+                    </h2>
+                    <span className="text-[11px] text-gray-400 font-medium">Spoken languages and phone</span>
+                  </div>
+                </div>
                 <Link
-                  href="/onboarding?edit=true&step=5&section=languages"
-                  className="inline-flex items-center gap-1 px-3 py-1 rounded-full border border-[#1d4ed8] text-[#1d4ed8] hover:bg-blue-50 text-xs font-bold transition-all cursor-pointer shadow-2xs active:scale-95"
+                  href="/onboarding?edit=true&step=1"
+                  className="text-xs sm:text-sm font-bold text-[#1d4ed8] hover:text-[#1e40af] cursor-pointer"
                 >
-                  <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-                  <span>Add</span>
+                  Edit
                 </Link>
               </div>
-              {languagesList.length > 0 ? (
+
+              <div className="divide-y divide-gray-100 space-y-3.5 pt-1">
+                {/* Languages */}
+                <div className="pt-1 flex flex-col gap-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-gray-400 font-bold uppercase tracking-wider">
+                      Languages
+                    </span>
+                    <Link
+                      href="/onboarding?edit=true&step=5"
+                      className="text-xs text-[#1d4ed8] hover:underline font-semibold"
+                    >
+                      {languagesList.length > 0 ? "Edit" : "Add"}
+                    </Link>
+                  </div>
+                  {languagesList.length > 0 ? (
+                    <div className="flex flex-wrap gap-2 pt-0.5">
+                      {languagesList.map((lang, idx) => (
+                        <span
+                          key={idx}
+                          className="bg-gray-100 border border-gray-200/80 text-gray-800 rounded-full px-3 py-1 text-xs font-semibold shadow-2xs"
+                        >
+                          {lang}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-gray-400 font-medium">No languages added</p>
+                  )}
+                </div>
+
+                {/* Phone */}
+                <div className="pt-3 flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full bg-blue-50 text-[#1d4ed8] flex items-center justify-center shrink-0">
+                    <Phone className="w-4 h-4" />
+                  </div>
+                  <div className="flex flex-col min-w-0">
+                    <span className="text-[11px] text-gray-400 font-bold uppercase">Phone</span>
+                    <span className={cn("text-xs sm:text-sm font-semibold", phoneValue ? "text-[#1d4ed8]" : "text-gray-400 font-normal")}>
+                      {phoneValue || "Not added"}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Email */}
+                <div className="pt-3 flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full bg-blue-50 text-[#1d4ed8] flex items-center justify-center shrink-0">
+                    <Mail className="w-4 h-4" />
+                  </div>
+                  <div className="flex flex-col min-w-0">
+                    <span className="text-[11px] text-gray-400 font-bold uppercase">Contact Email</span>
+                    <span className={cn("text-xs sm:text-sm font-semibold truncate", emailValue ? "text-[#1d4ed8]" : "text-gray-400 font-normal")}>
+                      {emailValue || "Not added"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </>
+        ) : (
+          <>
+            {/* AVIATION PROFESSIONAL CARD: Professional details */}
+            <div className="bg-white rounded-3xl border border-gray-100 p-5 sm:p-6 shadow-xs flex flex-col gap-4">
+              <div className="flex items-center justify-between">
+                <h2 className="text-base sm:text-lg font-extrabold text-gray-900">
+                  Professional details
+                </h2>
                 <Link
-                  href="/onboarding?edit=true&step=5&section=languages"
-                  className="flex flex-wrap gap-2 pt-0.5 p-2 -mx-2 rounded-2xl hover:bg-blue-50/40 transition-all cursor-pointer group"
-                  title="Manage Languages"
+                  href="/onboarding?edit=true&step=5"
+                  className="text-xs sm:text-sm font-bold text-[#1d4ed8] hover:text-[#1e40af] cursor-pointer"
                 >
-                  {languagesList.map((lang, idx) => (
+                  Edit all
+                </Link>
+              </div>
+
+              <div className="divide-y divide-gray-100 space-y-4 pt-1">
+                {/* Location */}
+                <Link
+                  href="/onboarding?edit=true&step=5&section=location"
+                  className="pt-2 flex items-center justify-between group p-2.5 -mx-2.5 rounded-2xl hover:bg-blue-50/40 transition-all cursor-pointer"
+                  title="Edit Location"
+                >
+                  <div className="flex flex-col gap-1 min-w-0">
+                    <span className="text-xs text-gray-400 font-bold uppercase tracking-wider group-hover:text-[#1d4ed8] transition-colors">
+                      Location
+                    </span>
+                    <p className={cn("text-sm font-semibold truncate", locationValue ? "text-gray-900" : "text-gray-400 font-normal")}>
+                      {locationValue || "Add your location"}
+                    </p>
+                  </div>
+                  <div className="w-8 h-8 rounded-full bg-gray-50 border border-gray-100 text-gray-400 group-hover:border-blue-200 group-hover:bg-blue-50 group-hover:text-[#1d4ed8] flex items-center justify-center shrink-0 transition-all">
+                    {locationValue ? <ChevronRight className="w-4 h-4" /> : <Plus className="w-4 h-4 stroke-[2.5]" />}
+                  </div>
+                </Link>
+
+                {/* Work experience */}
+                <div className="pt-3.5 flex flex-col gap-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-gray-400 font-bold uppercase tracking-wider">
+                      Work experience
+                    </span>
+                    <Link
+                      href="/onboarding?edit=true&step=5&section=work"
+                      className="inline-flex items-center gap-1 px-3 py-1 rounded-full border border-[#1d4ed8] text-[#1d4ed8] hover:bg-blue-50 text-xs font-bold transition-all cursor-pointer shadow-2xs active:scale-95"
+                    >
+                      <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+                      <span>Add</span>
+                    </Link>
+                  </div>
+                  {workExperiences.length > 0 ? (
+                    <div className="space-y-1.5">
+                      {workExperiences.map((exp: any, idx: number) => (
+                        <Link
+                          key={exp.id || idx}
+                          href="/onboarding?edit=true&step=5&section=work"
+                          className="flex items-start justify-between p-2.5 -mx-2.5 rounded-2xl hover:bg-blue-50/40 border border-transparent hover:border-blue-100 transition-all cursor-pointer group"
+                          title="Manage Work Experience"
+                        >
+                          <div className="flex items-start gap-2.5 min-w-0">
+                            <Briefcase className="w-4 h-4 text-gray-400 group-hover:text-[#1d4ed8] shrink-0 mt-0.5 transition-colors" />
+                            <div className="flex flex-col min-w-0">
+                              <span className="text-sm font-bold text-gray-900 group-hover:text-[#1d4ed8] transition-colors truncate">
+                                {exp.roleTitle || exp.jobTitle || "Aviation Professional"}
+                              </span>
+                              <span className="text-xs text-gray-500 font-medium truncate">
+                                {exp.companyName || exp.company} {exp.startDate ? `• ${exp.startDate} - ${exp.endDate || "Present"}` : ""}
+                              </span>
+                            </div>
+                          </div>
+                          <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-[#1d4ed8] shrink-0 transition-colors mt-1" />
+                        </Link>
+                      ))}
+                    </div>
+                  ) : (
+                    <Link
+                      href="/onboarding?edit=true&step=5&section=work"
+                      className="flex items-center justify-between p-3 rounded-2xl bg-gray-50/70 border border-gray-100 hover:bg-blue-50/40 hover:border-blue-200 transition-all cursor-pointer group"
+                    >
+                      <span className="text-sm text-gray-400 group-hover:text-gray-700 font-medium">No experience added</span>
+                      <div className="w-7 h-7 rounded-full bg-white border border-gray-200 text-gray-400 group-hover:border-blue-200 group-hover:bg-[#1d4ed8] group-hover:text-white flex items-center justify-center transition-all">
+                        <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+                      </div>
+                    </Link>
+                  )}
+                </div>
+
+                {/* Languages */}
+                <div className="pt-3.5 flex flex-col gap-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-gray-400 font-bold uppercase tracking-wider">
+                      Languages
+                    </span>
+                    <Link
+                      href="/onboarding?edit=true&step=5&section=languages"
+                      className="inline-flex items-center gap-1 px-3 py-1 rounded-full border border-[#1d4ed8] text-[#1d4ed8] hover:bg-blue-50 text-xs font-bold transition-all cursor-pointer shadow-2xs active:scale-95"
+                    >
+                      <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+                      <span>Add</span>
+                    </Link>
+                  </div>
+                  {languagesList.length > 0 ? (
+                    <Link
+                      href="/onboarding?edit=true&step=5&section=languages"
+                      className="flex flex-wrap gap-2 pt-0.5 p-2 -mx-2 rounded-2xl hover:bg-blue-50/40 transition-all cursor-pointer group"
+                      title="Manage Languages"
+                    >
+                      {languagesList.map((lang, idx) => (
+                        <span
+                          key={idx}
+                          className="bg-gray-100 group-hover:bg-blue-50 border border-gray-200/80 group-hover:border-blue-200 text-gray-800 group-hover:text-[#1d4ed8] rounded-full px-3 py-1 text-xs font-semibold shadow-2xs transition-colors"
+                        >
+                          {lang}
+                        </span>
+                      ))}
+                    </Link>
+                  ) : (
+                    <Link
+                      href="/onboarding?edit=true&step=5&section=languages"
+                      className="flex items-center justify-between p-3 rounded-2xl bg-gray-50/70 border border-gray-100 hover:bg-blue-50/40 hover:border-blue-200 transition-all cursor-pointer group"
+                    >
+                      <span className="text-sm text-gray-400 group-hover:text-gray-700 font-medium">No languages added</span>
+                      <div className="w-7 h-7 rounded-full bg-white border border-gray-200 text-gray-400 group-hover:border-blue-200 group-hover:bg-[#1d4ed8] group-hover:text-white flex items-center justify-center transition-all">
+                        <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+                      </div>
+                    </Link>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* AVIATION PROFESSIONAL CARD: Skills */}
+            <div className="bg-white rounded-3xl border border-gray-100 p-5 sm:p-6 shadow-xs flex flex-col gap-4">
+              <div className="flex items-center justify-between">
+                <h2 className="text-base sm:text-lg font-extrabold text-gray-900">
+                  Skills & Expertise
+                </h2>
+                <Link
+                  href="/onboarding?edit=true&step=6"
+                  className="inline-flex items-center gap-1 px-3.5 py-1 rounded-full border border-[#1d4ed8] text-[#1d4ed8] hover:bg-blue-50 text-xs font-bold transition-all cursor-pointer shadow-2xs active:scale-95"
+                >
+                  {skillsList.length > 0 ? (
+                    <>
+                      <Pencil className="w-3 h-3" />
+                      <span>Edit</span>
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+                      <span>Add</span>
+                    </>
+                  )}
+                </Link>
+              </div>
+
+              {skillsList.length > 0 ? (
+                <Link
+                  href="/onboarding?edit=true&step=6"
+                  className="flex flex-wrap gap-2 pt-1 p-2 -mx-2 rounded-2xl hover:bg-blue-50/40 transition-all cursor-pointer group"
+                  title="Manage Skills"
+                >
+                  {skillsList.map((skill, idx) => (
                     <span
                       key={idx}
-                      className="bg-gray-100 group-hover:bg-blue-50 border border-gray-200/80 group-hover:border-blue-200 text-gray-800 group-hover:text-[#1d4ed8] rounded-full px-3 py-1 text-xs font-semibold shadow-2xs transition-colors"
+                      className="bg-gray-100 group-hover:bg-blue-50 border border-gray-200 group-hover:border-blue-200 text-gray-800 group-hover:text-[#1d4ed8] rounded-full px-3.5 py-1.5 text-xs font-semibold shadow-2xs transition-colors"
                     >
-                      {lang}
+                      {skill}
                     </span>
                   ))}
                 </Link>
               ) : (
                 <Link
-                  href="/onboarding?edit=true&step=5&section=languages"
-                  className="flex items-center justify-between p-3 rounded-2xl bg-gray-50/70 border border-gray-100 hover:bg-blue-50/40 hover:border-blue-200 transition-all cursor-pointer group"
+                  href="/onboarding?edit=true&step=6"
+                  className="flex items-center justify-between p-3.5 rounded-2xl bg-gray-50/70 border border-gray-100 hover:bg-blue-50/40 hover:border-blue-200 transition-all cursor-pointer group"
                 >
-                  <span className="text-sm text-gray-400 group-hover:text-gray-700 font-medium">No languages added</span>
-                  <div className="w-7 h-7 rounded-full bg-white border border-gray-200 text-gray-400 group-hover:border-blue-200 group-hover:bg-[#1d4ed8] group-hover:text-white flex items-center justify-center transition-all">
-                    <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+                  <div className="flex flex-col">
+                    <span className="text-sm font-bold text-gray-900 group-hover:text-[#1d4ed8] transition-colors">Select your skills</span>
+                    <span className="text-xs text-gray-400">Add key competencies and aviation specialties</span>
+                  </div>
+                  <div className="w-8 h-8 rounded-full bg-white border border-gray-200 text-gray-400 group-hover:border-blue-200 group-hover:bg-[#1d4ed8] group-hover:text-white flex items-center justify-center transition-all">
+                    <Plus className="w-4 h-4 stroke-[2.5]" />
                   </div>
                 </Link>
               )}
             </div>
 
-          </div>
-        </div>
-
-        {/* CARD: Skills: Interactive navigation shortcut */}
-        <div className="bg-white rounded-3xl border border-gray-100 p-5 sm:p-6 shadow-xs flex flex-col gap-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-base sm:text-lg font-extrabold text-gray-900">
-              Skills & Expertise
-            </h2>
-            <Link
-              href="/onboarding?edit=true&step=6"
-              className="inline-flex items-center gap-1 px-3.5 py-1 rounded-full border border-[#1d4ed8] text-[#1d4ed8] hover:bg-blue-50 text-xs font-bold transition-all cursor-pointer shadow-2xs active:scale-95"
-            >
-              {skillsList.length > 0 ? (
-                <>
-                  <Pencil className="w-3 h-3" />
-                  <span>Edit</span>
-                </>
-              ) : (
-                <>
-                  <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-                  <span>Add</span>
-                </>
-              )}
-            </Link>
-          </div>
-
-          {skillsList.length > 0 ? (
-            <Link
-              href="/onboarding?edit=true&step=6"
-              className="flex flex-wrap gap-2 pt-1 p-2 -mx-2 rounded-2xl hover:bg-blue-50/40 transition-all cursor-pointer group"
-              title="Manage Skills"
-            >
-              {skillsList.map((skill, idx) => (
-                <span
-                  key={idx}
-                  className="bg-gray-100 group-hover:bg-blue-50 border border-gray-200 group-hover:border-blue-200 text-gray-800 group-hover:text-[#1d4ed8] rounded-full px-3.5 py-1.5 text-xs font-semibold shadow-2xs transition-colors"
+            {/* AVIATION PROFESSIONAL CARD: Contact & Credentials */}
+            <div className="bg-white rounded-3xl border border-gray-100 p-5 sm:p-6 shadow-xs flex flex-col gap-4">
+              <div className="flex items-center justify-between">
+                <h2 className="text-base sm:text-lg font-extrabold text-gray-900">
+                  Contact & Credentials
+                </h2>
+                <Link
+                  href="/onboarding?edit=true&step=4"
+                  className="text-xs sm:text-sm font-bold text-[#1d4ed8] hover:text-[#1e40af] cursor-pointer"
                 >
-                  {skill}
-                </span>
-              ))}
-            </Link>
-          ) : (
-            <Link
-              href="/onboarding?edit=true&step=6"
-              className="flex items-center justify-between p-3.5 rounded-2xl bg-gray-50/70 border border-gray-100 hover:bg-blue-50/40 hover:border-blue-200 transition-all cursor-pointer group"
-            >
-              <div className="flex flex-col">
-                <span className="text-sm font-bold text-gray-900 group-hover:text-[#1d4ed8] transition-colors">Select your skills</span>
-                <span className="text-xs text-gray-400">Add key competencies and aviation specialties</span>
+                  Edit
+                </Link>
               </div>
-              <div className="w-8 h-8 rounded-full bg-white border border-gray-200 text-gray-400 group-hover:border-blue-200 group-hover:bg-[#1d4ed8] group-hover:text-white flex items-center justify-center transition-all">
-                <Plus className="w-4 h-4 stroke-[2.5]" />
-              </div>
-            </Link>
-          )}
-        </div>
 
-        {/* CARD: Contact & Credentials */}
-        <div className="bg-white rounded-3xl border border-gray-100 p-5 sm:p-6 shadow-xs flex flex-col gap-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-base sm:text-lg font-extrabold text-gray-900">
-              Contact & Credentials
-            </h2>
-            <Link
-              href="/onboarding?edit=true&step=4"
-              className="text-xs sm:text-sm font-bold text-[#1d4ed8] hover:text-[#1e40af] cursor-pointer"
-            >
-              Edit
-            </Link>
-          </div>
-
-          <div className="divide-y divide-gray-100 space-y-3.5 pt-1">
-            
-            {/* Phone */}
-            <div className="pt-1 flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-blue-50 text-[#1d4ed8] flex items-center justify-center shrink-0">
-                <Phone className="w-4 h-4" />
-              </div>
-              <div className="flex flex-col min-w-0">
-                <span className="text-[11px] text-gray-400 font-bold uppercase">Phone</span>
-                <span className={cn("text-xs sm:text-sm font-semibold", phoneValue ? "text-[#1d4ed8]" : "text-gray-400 font-normal")}>
-                  {phoneValue || "Not added"}
-                </span>
-              </div>
-            </div>
-
-            {/* Email */}
-            <div className="pt-3 flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-blue-50 text-[#1d4ed8] flex items-center justify-center shrink-0">
-                <Mail className="w-4 h-4" />
-              </div>
-              <div className="flex flex-col min-w-0">
-                <span className="text-[11px] text-gray-400 font-bold uppercase">Contact Email</span>
-                <span className={cn("text-xs sm:text-sm font-semibold truncate", emailValue ? "text-[#1d4ed8]" : "text-gray-400 font-normal")}>
-                  {emailValue || "Not added"}
-                </span>
-              </div>
-            </div>
-
-            {/* Licenses / Certifications */}
-            <div className="pt-3.5 flex flex-col gap-2">
-              <span className="text-xs text-gray-400 font-bold uppercase tracking-wider">
-                Licenses / Certifications
-              </span>
-              {licensesList.length > 0 ? (
-                <div className="flex flex-wrap gap-2 pt-0.5">
-                  {licensesList.map((lic, idx) => (
-                    <span
-                      key={idx}
-                      className="bg-gray-100 border border-gray-200/90 text-gray-800 rounded-full px-3.5 py-1 text-xs font-semibold shadow-2xs"
-                    >
-                      {lic}
+              <div className="divide-y divide-gray-100 space-y-3.5 pt-1">
+                {/* Phone */}
+                <div className="pt-1 flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full bg-blue-50 text-[#1d4ed8] flex items-center justify-center shrink-0">
+                    <Phone className="w-4 h-4" />
+                  </div>
+                  <div className="flex flex-col min-w-0">
+                    <span className="text-[11px] text-gray-400 font-bold uppercase">Phone</span>
+                    <span className={cn("text-xs sm:text-sm font-semibold", phoneValue ? "text-[#1d4ed8]" : "text-gray-400 font-normal")}>
+                      {phoneValue || "Not added"}
                     </span>
-                  ))}
+                  </div>
                 </div>
-              ) : (
-                <p className="text-sm text-gray-400 font-normal">Not added</p>
-              )}
-            </div>
 
-          </div>
-        </div>
+                {/* Email */}
+                <div className="pt-3 flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full bg-blue-50 text-[#1d4ed8] flex items-center justify-center shrink-0">
+                    <Mail className="w-4 h-4" />
+                  </div>
+                  <div className="flex flex-col min-w-0">
+                    <span className="text-[11px] text-gray-400 font-bold uppercase">Contact Email</span>
+                    <span className={cn("text-xs sm:text-sm font-semibold truncate", emailValue ? "text-[#1d4ed8]" : "text-gray-400 font-normal")}>
+                      {emailValue || "Not added"}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Licenses / Certifications */}
+                <div className="pt-3.5 flex flex-col gap-2">
+                  <span className="text-xs text-gray-400 font-bold uppercase tracking-wider">
+                    Licenses / Certifications
+                  </span>
+                  {licensesList.length > 0 ? (
+                    <div className="flex flex-wrap gap-2 pt-0.5">
+                      {licensesList.map((lic, idx) => (
+                        <span
+                          key={idx}
+                          className="bg-gray-100 border border-gray-200/90 text-gray-800 rounded-full px-3.5 py-1 text-xs font-semibold shadow-2xs"
+                        >
+                          {lic}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-400 font-normal">Not added</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </>
+        )}
 
         {/* User Posts Section */}
         {userPosts.length > 0 && (

@@ -247,21 +247,31 @@ export function UserProfileProvider({
       const localAccountType =
         localPersonal?.category || localPersonal?.role || localPersonal?.accountType || "";
 
-      let resolvedAccountType = "aviation_professional";
+      const profRole =
+        userData?.professionalRole ||
+        userData?.professional_role ||
+        session.user.user_metadata?.professionalRole ||
+        session.user.user_metadata?.professional_role ||
+        localPersonal?.professionalRole ||
+        localPersonal?.category ||
+        "";
+
+      let resolvedAccountType = "flight_crew";
       if (
         authAccountType === "business" ||
         dbAccountType === "business" ||
-        localAccountType === "business"
+        localAccountType === "business" ||
+        localPersonal?.category === "business"
       ) {
         resolvedAccountType = "business";
       } else if (
-        authAccountType === "flight_crew" ||
-        dbAccountType === "flight_crew" ||
-        localAccountType === "flight_crew"
+        profRole === "aviation_professional" ||
+        localAccountType === "aviation_professional" ||
+        authAccountType === "aviation_professional"
       ) {
-        resolvedAccountType = "flight_crew";
-      } else {
         resolvedAccountType = "aviation_professional";
+      } else {
+        resolvedAccountType = "flight_crew";
       }
 
       const businessFlag = resolvedAccountType === "business";
@@ -348,6 +358,22 @@ export function UserProfileProvider({
           crewData?.personal?.professionalRole ||
           "",
         role: userData?.role || localPersonal?.role || crewData?.personal?.role || "",
+        totalFlightHours:
+          myProfileData?.flight_hours ||
+          myProfileData?.flightHours ||
+          crewData?.personal?.totalFlightHours ||
+          crewData?.personal?.flightHours ||
+          localPersonal?.totalFlightHours ||
+          localPersonal?.flightHours ||
+          "",
+        flightHours:
+          myProfileData?.flight_hours ||
+          myProfileData?.flightHours ||
+          crewData?.personal?.totalFlightHours ||
+          crewData?.personal?.flightHours ||
+          localPersonal?.totalFlightHours ||
+          localPersonal?.flightHours ||
+          "",
         availabilityStatus:
           userProfileData?.workAvailabilityStatus ||
           userData?.availability_status ||
@@ -358,12 +384,12 @@ export function UserProfileProvider({
       setPersonal(mergedPersonal);
 
       // 6. Build final licenses / credentials list
-      let resolvedLicenses =
-        crewData?.licenses && crewData.licenses.length > 0
-          ? crewData.licenses
-          : localLicenses || [];
-
-      if (
+      let resolvedLicenses: any[] = [];
+      if (Array.isArray(crewData?.licenses) && crewData.licenses.length > 0) {
+        resolvedLicenses = crewData.licenses;
+      } else if (Array.isArray(localLicenses) && localLicenses.length > 0) {
+        resolvedLicenses = localLicenses;
+      } else if (
         Array.isArray(userProfileData?.professionalCredentials) &&
         userProfileData.professionalCredentials.length > 0
       ) {
