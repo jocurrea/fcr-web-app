@@ -40,6 +40,7 @@ export default function ProfilePage() {
   const router = useRouter();
   const PlusIcon = Plus;
   const ChevronRightIcon = ChevronRight;
+  const BuildingOfficeIcon = Building2;
   const {
     profileProgress,
     profilePhoto,
@@ -926,85 +927,39 @@ export default function ProfilePage() {
           </>
         )}
 
-        {/* =========================================================================
-            STANDALONE SECTION: Company affiliation
-            Completely decoupled OUTSIDE and BELOW 'Complete your profile' block
-            ========================================================================= */}
-        <div className="flex flex-col gap-3 mb-2">
-          {/* Section title flat on gray background */}
-          <div className="px-1 bg-transparent">
-            <h2 className="text-xl font-bold text-gray-900">Company affiliation</h2>
-          </div>
-
-          {/* Standalone White Card */}
-          <div className="bg-white rounded-3xl border border-gray-100 p-5 sm:p-6 shadow-xs flex flex-col gap-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-2xl bg-blue-50 text-[#1d4ed8] border border-blue-100 flex items-center justify-center shrink-0">
-                  <Building2 className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="text-base sm:text-lg font-extrabold text-gray-900">
-                    Company affiliation
-                  </h3>
-                  <span className="text-[11px] sm:text-xs text-gray-400 font-medium">Employer linking & verification status</span>
-                </div>
-              </div>
-              <Link
-                href="/business/affiliate"
-                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border border-[#1d4ed8] text-[#1d4ed8] hover:bg-blue-50 text-xs font-bold transition-all cursor-pointer shadow-2xs active:scale-95"
-              >
-                {affiliationName ? (
-                  <>
-                    <Pencil className="w-3 h-3" />
-                    <span>Manage</span>
-                  </>
-                ) : (
-                  <>
-                    <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-                    <span>Add</span>
-                  </>
-                )}
-              </Link>
+        {/* COMPANY AFFILIATION SECTION */}
+        <div className="mt-8 mb-4">
+          {/* Small floating section label on the gray background */}
+          <h3 className="text-[15px] font-bold text-gray-900 mb-3 px-1">Company affiliation</h3>
+          
+          {/* Single flat card */}
+          <div
+            onClick={() => router.push("/business/affiliate")}
+            className="bg-white rounded-[20px] p-4 flex items-center gap-4 shadow-sm cursor-pointer border border-gray-100"
+          >
+            {/* Left: Blue Building Icon */}
+            <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center flex-shrink-0">
+              <BuildingOfficeIcon className="w-5 h-5 text-blue-500" /> 
             </div>
-
-            <Link
-              href="/business/affiliate"
-              className="p-4 rounded-2xl bg-gray-50/70 border border-gray-100 hover:border-blue-200 hover:bg-blue-50/40 flex items-center justify-between gap-3 shadow-2xs transition-all cursor-pointer group"
-              title="Link your employer"
-            >
-              <div className="flex items-center gap-3.5 min-w-0">
-                <div className="w-11 h-11 rounded-2xl bg-blue-50 border border-blue-100 text-[#1d4ed8] group-hover:bg-[#1d4ed8] group-hover:text-white flex items-center justify-center shrink-0 transition-colors">
-                  <Building2 className="w-5 h-5" />
-                </div>
-                <div className="flex flex-col min-w-0">
-                  <span className="text-xs sm:text-sm font-bold text-gray-900 group-hover:text-[#1d4ed8] truncate transition-colors">
-                    {affiliationName ? affiliationName : "Link your employer"}
-                  </span>
-                  <span className="text-xs text-gray-500 truncate font-medium mt-0.5">
-                    {affiliationName ? (
-                      isAffiliationPending ? (
-                        <span className="text-amber-600 font-semibold inline-flex items-center gap-1">
-                          <Clock className="w-3 h-3" /> Pending Verification
-                        </span>
-                      ) : isAffiliationVerified ? (
-                        <span className="text-emerald-600 font-semibold inline-flex items-center gap-1">
-                          <CheckCircle2 className="w-3 h-3" /> Verified Company
-                        </span>
-                      ) : (
-                        "Self-declared affiliation"
-                      )
-                    ) : (
-                      "Associate your profile with your company or airline"
-                    )}
-                  </span>
-                </div>
-              </div>
-
-              <div className="p-1 text-gray-400 group-hover:text-[#1d4ed8] transition-colors">
-                <ChevronRight className="w-5 h-5" />
-              </div>
-            </Link>
+            
+            {/* Middle: Text Stack */}
+            <div className="flex-1">
+              <h4 className="text-[15px] font-bold text-gray-900">
+                {affiliationName || "Link your employer"}
+              </h4>
+              <p className="text-[13px] text-gray-500 leading-tight mt-0.5">
+                {affiliationName
+                  ? isAffiliationPending
+                    ? "Pending Verification"
+                    : isAffiliationVerified
+                    ? "Verified Company"
+                    : "Search registered companies and request verification."
+                  : "Search registered companies and request verification."}
+              </p>
+            </div>
+            
+            {/* Right: Chevron */}
+            <ChevronRightIcon className="w-5 h-5 text-gray-400 flex-shrink-0" />
           </div>
         </div>
 
