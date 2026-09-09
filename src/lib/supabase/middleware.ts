@@ -194,7 +194,13 @@ export async function updateSession(request: NextRequest) {
 
   // 2. User IS fully onboarded and has a role
   if (isOnboarded && hasRole) {
-    // If trying to access public auth routes or welcome
+    // If trying to access registration, allow fresh registration without bouncing to /home
+    if (pathname === "/register") {
+      response.cookies.set("flightcrew_onboarded", "false", { path: "/", maxAge: 0 });
+      return response;
+    }
+
+    // If trying to access other public auth routes or welcome
     if (isPublicAuthRoute || isRoot) {
       return makeRedirect("/home");
     }

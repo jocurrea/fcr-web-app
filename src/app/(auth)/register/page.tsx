@@ -6,6 +6,79 @@ import { ChevronLeft, Lock, EyeOff, Eye, AlertCircle, Building2, CheckCircle2, M
 import { useState, useEffect, Suspense } from "react";
 import { supabase } from "@/lib/supabase";
 
+// Helper to thoroughly purge any stale session cache, tokens, and storage
+async function clearStaleSessionCache() {
+  try {
+    await supabase.auth.signOut({ scope: "local" }).catch(() => {});
+  } catch (e) {
+    console.warn("Supabase local sign out warning:", e);
+  }
+
+  if (typeof window !== "undefined") {
+    try {
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key) {
+          if (
+            key.startsWith("sb-") ||
+            key.includes("auth-token") ||
+            key.startsWith("onboarding_") ||
+            key.startsWith("userProfilePhoto") ||
+            key.startsWith("userCoverPhoto") ||
+            key.startsWith("userCoverImage") ||
+            key.startsWith("user_posts") ||
+            key.startsWith("userName") ||
+            key === "current_user_id" ||
+            key === "account_type" ||
+            key === "accountType" ||
+            key === "flightcrew_onboarded" ||
+            key === "pending_role" ||
+            key === "onboarding_step"
+          ) {
+            keysToRemove.push(key);
+          }
+        }
+      }
+      keysToRemove.forEach((k) => localStorage.removeItem(k));
+    } catch (e) {
+      console.warn("localStorage cleanup warning:", e);
+    }
+
+    try {
+      const pendingInvite = sessionStorage.getItem("pending_invite_token");
+      sessionStorage.clear();
+      if (pendingInvite) {
+        sessionStorage.setItem("pending_invite_token", pendingInvite);
+      }
+    } catch (e) {
+      console.warn("sessionStorage cleanup warning:", e);
+    }
+
+    try {
+      document.cookie = "flightcrew_onboarded=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+      document.cookie.split(";").forEach((cookie) => {
+        const name = cookie.split("=")[0]?.trim();
+        if (
+          name &&
+          (name.startsWith("sb-") ||
+            name.includes("auth-token") ||
+            name.startsWith("flightcrew_"))
+        ) {
+          document.cookie = `${name}=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
+        }
+      });
+    } catch (e) {
+      console.warn("cookie cleanup warning:", e);
+    }
+
+    try {
+      window.dispatchEvent(new CustomEvent("profile-updated"));
+      window.dispatchEvent(new CustomEvent("profile-progress-updated", { detail: 0 }));
+    } catch (e) {}
+  }
+}
+
 function RegisterForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -32,6 +105,9 @@ function RegisterForm() {
   const [isCheckingInvite, setIsCheckingInvite] = useState(false);
 
   useEffect(() => {
+    // Purge any stale session or storage on registration mount
+    clearStaleSessionCache();
+
     // Capture invitation token if present in URL
     if (typeof window !== "undefined") {
       const urlParams = new URLSearchParams(window.location.search);
@@ -91,6 +167,9 @@ function RegisterForm() {
     }
 
     try {
+      // 1. Purge any stale session cache prior to signup initiation
+      await clearStaleSessionCache();
+
       const accountType = invitedCompany ? "corporate_member" : "individual";
       const employerName = invitedCompany ? invitedCompany.name : undefined;
 
@@ -98,6 +177,7 @@ function RegisterForm() {
         ? `${window.location.origin}/auth/callback?next=/role-selection`
         : "/auth/callback?next=/role-selection";
 
+      // 2. Perform signup with Supabase
       const { data, error: authError } = await supabase.auth.signUp({
         email: email.trim().toLowerCase(),
         password,
@@ -125,50 +205,6 @@ function RegisterForm() {
         throw authError;
       }
 
-      // Clear any lingering onboarding state or cookies from previous sessions
-      try {
-        document.cookie = "flightcrew_onboarded=false; path=/; max-age=0";
-        localStorage.removeItem("flightcrew_onboarded");
-        sessionStorage.removeItem("flightcrew_onboarded");
-        localStorage.removeItem("onboarding_personal");
-        localStorage.removeItem("onboarding_licenses");
-        localStorage.removeItem("onboarding_ratings");
-        localStorage.removeItem("onboarding_work");
-        localStorage.removeItem("onboarding_resume");
-        localStorage.removeItem("userProfilePhoto");
-        localStorage.removeItem("userCoverPhoto");
-      } catch (storageErr) {
-        console.warn("Storage cleanup error:", storageErr);
-      }
-
-      const userId = data.session?.user?.id || data.user?.id;
-
-      if (userId) {
-        localStorage.setItem("current_user_id", userId);
-
-        // Ensure user record in users table has onboarded strictly set to 0 and no assigned role
-        // Non-blocking best-effort execution so redirection is never halted
-        Promise.allSettled([
-          supabase.from("users").upsert({
-            id: userId,
-            email: email.trim().toLowerCase(),
-            onboarded: 0,
-            accountType: accountType || null,
-            role: null,
-            professionalRole: null,
-          }, { onConflict: "id" }),
-          invitedCompany?.id
-            ? supabase.from("company_members").insert({
-                company_id: invitedCompany.id,
-                user_id: userId,
-                role: "member",
-              })
-            : Promise.resolve(),
-        ]).catch((dbErr) => {
-          console.warn("Background user setup error:", dbErr);
-        });
-      }
-
       // If email confirmation is required (no session returned immediately)
       if (!data.session) {
         setEmailConfirmationSent(true);
@@ -176,8 +212,106 @@ function RegisterForm() {
         return;
       }
 
-      // Successful registration with active session - proceed strictly to role selection
-      router.push("/role-selection");
+      // 3. Force the client to initialize with the exact auth.users session returned by the newly completed signup transaction
+      const session = data.session;
+      const newUserId = session.user.id;
+
+      const { error: setSessionError } = await supabase.auth.setSession({
+        access_token: session.access_token,
+        refresh_token: session.refresh_token,
+      });
+
+      if (setSessionError) {
+        console.warn("[Register] Error forcing client session initialization:", setSessionError);
+      }
+
+      // Bind current_user_id immediately to the new user ID
+      localStorage.setItem("current_user_id", newUserId);
+
+      // 4. Verify that get_onboarding_identity() is strictly evaluated right after signup to bind the correct user ID and account type to the new session, preventing cross-user session leakage
+      let verifiedUserId = newUserId;
+      let verifiedAccountType = accountType;
+
+      try {
+        const { data: identityData, error: identityError } = await supabase.rpc("get_onboarding_identity");
+
+        if (identityError) {
+          console.warn("[Register] get_onboarding_identity evaluation warning:", identityError);
+        } else if (identityData) {
+          console.log("[Register] get_onboarding_identity evaluated successfully:", identityData);
+          const identityObj = Array.isArray(identityData) ? identityData[0] : identityData;
+          const returnedUserId = identityObj?.id || identityObj?.user_id || identityObj?.userId;
+          const returnedAccountType =
+            identityObj?.account_type ||
+            identityObj?.accountType ||
+            identityObj?.role ||
+            identityObj?.professional_role ||
+            identityObj?.professionalRole;
+
+          // Cross-user session leakage guard
+          if (returnedUserId && returnedUserId !== newUserId) {
+            console.error("[Register] CRITICAL: Session leakage detected!", {
+              expectedUserId: newUserId,
+              returnedUserId,
+            });
+            await clearStaleSessionCache();
+            throw new Error("Session security check failed: identity mismatch detected.");
+          }
+
+          if (returnedUserId) {
+            verifiedUserId = returnedUserId;
+          }
+          if (returnedAccountType && returnedAccountType !== "individual" && returnedAccountType !== "corporate_member") {
+            verifiedAccountType = returnedAccountType;
+          }
+        }
+      } catch (rpcErr: any) {
+        if (rpcErr?.message?.includes("Session security check failed")) {
+          throw rpcErr;
+        }
+        console.warn("[Register] RPC get_onboarding_identity execution note:", rpcErr);
+      }
+
+      // Bind the verified identity parameters
+      localStorage.setItem("current_user_id", verifiedUserId);
+      if (verifiedAccountType) {
+        localStorage.setItem("account_type", verifiedAccountType);
+      }
+
+      // Ensure user record in users table has onboarded strictly set to 0 and correct identity
+      await supabase.from("users").upsert({
+        id: verifiedUserId,
+        email: email.trim().toLowerCase(),
+        onboarded: 0,
+        accountType: verifiedAccountType || null,
+        role: null,
+        professionalRole: null,
+      }, { onConflict: "id" });
+
+      if (invitedCompany?.id) {
+        try {
+          await supabase.from("company_members").insert({
+            company_id: invitedCompany.id,
+            user_id: verifiedUserId,
+            role: "member",
+          });
+        } catch (dbErr) {
+          console.warn("[Register] Invited company member setup error:", dbErr);
+        }
+      }
+
+      // Make sure flightcrew_onboarded cookie is strictly false for the new session
+      document.cookie = "flightcrew_onboarded=false; path=/; max-age=0";
+      sessionStorage.removeItem("flightcrew_onboarded");
+      localStorage.removeItem("flightcrew_onboarded");
+
+      // Broadcast profile update to reset providers
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("profile-updated"));
+      }
+
+      // Navigate with full browser replace to guarantee complete session isolation
+      window.location.replace("/role-selection");
     } catch (err: any) {
       setError(err.message || "An error occurred during registration");
     } finally {

@@ -88,12 +88,25 @@ export function ProtectedHeader() {
     try {
       await supabase.auth.signOut();
       
-      // Clear current user id to switch sessions
-      localStorage.removeItem("current_user_id");
-      
-      router.push("/welcome");
+      // Clear all user session tokens, role, and onboarded markers
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("current_user_id");
+        localStorage.removeItem("account_type");
+        localStorage.removeItem("accountType");
+        localStorage.removeItem("flightcrew_onboarded");
+        sessionStorage.clear();
+        document.cookie = "flightcrew_onboarded=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+        window.location.replace("/welcome");
+      } else {
+        router.push("/welcome");
+      }
     } catch (error) {
       console.error("Error signing out:", error);
+      if (typeof window !== "undefined") {
+        window.location.replace("/welcome");
+      } else {
+        router.push("/welcome");
+      }
     }
   };
 

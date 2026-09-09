@@ -94,6 +94,9 @@ export async function signUpWithPassword(formData: FormData) {
         role: null,
         professionalRole: null,
       }, { onConflict: "id" });
+
+      // Verify and evaluate get_onboarding_identity() right after signup
+      await supabase.rpc("get_onboarding_identity");
     } catch {
       // ignore
     }

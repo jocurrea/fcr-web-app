@@ -306,8 +306,22 @@ export default function RoleSelectionPage() {
   };
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
-    router.push("/login");
+    try {
+      await supabase.auth.signOut().catch(() => {});
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("current_user_id");
+        localStorage.removeItem("account_type");
+        localStorage.removeItem("accountType");
+        localStorage.removeItem("flightcrew_onboarded");
+        sessionStorage.clear();
+        document.cookie = "flightcrew_onboarded=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+        window.location.replace("/login");
+      } else {
+        router.push("/login");
+      }
+    } catch {
+      window.location.replace("/login");
+    }
   };
 
   if (isCheckingAccess) {

@@ -175,12 +175,34 @@ export function UserProfileProvider({
       } = await supabase.auth.getSession();
 
       if (!session?.user) {
+        setProfileData(null);
+        setPersonal(null);
+        setLicenses([]);
+        setRatings([]);
+        setWork([]);
+        setLanguages([]);
+        setSkills([]);
+        setResume(null);
+        setCompanyInfo(null);
+        setAffiliationInfo(null);
+        setAccountType(null);
+        setIsBusiness(false);
+        setOnboarded(false);
+        setProfileProgressState(0);
+        setCompletionAreas([]);
+        setCompletedCount(0);
+        setMissingAreas([]);
+        setProfilePhoto(null);
+        setCoverPhoto(null);
         setIsLoading(false);
         fetchingRef.current = false;
         return 0;
       }
 
       const userId = session.user.id;
+      if (typeof window !== "undefined") {
+        localStorage.setItem("current_user_id", userId);
+      }
 
       // 1. Unified parallel fetch for canonical get_my_profile() RPC, users, resumes, user_profiles, companies
       const [myProfileRes, userRes, resumeRes, userProfileRes, companyRes] =
@@ -659,6 +681,39 @@ export function UserProfileProvider({
   useEffect(() => {
     refetchProfile();
 
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "SIGNED_OUT" || !session?.user) {
+        setProfileData(null);
+        setPersonal(null);
+        setLicenses([]);
+        setRatings([]);
+        setWork([]);
+        setLanguages([]);
+        setSkills([]);
+        setResume(null);
+        setCompanyInfo(null);
+        setAffiliationInfo(null);
+        setAccountType(null);
+        setIsBusiness(false);
+        setOnboarded(false);
+        setProfileProgressState(0);
+        setCompletionAreas([]);
+        setCompletedCount(0);
+        setMissingAreas([]);
+        setProfilePhoto(null);
+        setCoverPhoto(null);
+        setIsLoading(false);
+      } else if (
+        event === "SIGNED_IN" ||
+        event === "TOKEN_REFRESHED" ||
+        event === "USER_UPDATED"
+      ) {
+        refetchProfile();
+      }
+    });
+
     function handleProgressUpdate(e: any) {
       if (typeof e.detail === "number") {
         setProfileProgressState(e.detail);
@@ -675,6 +730,7 @@ export function UserProfileProvider({
     window.addEventListener("profile-updated", handleProfileMutation);
 
     return () => {
+      subscription.unsubscribe();
       window.removeEventListener("profile-progress-updated", handleProgressUpdate);
       window.removeEventListener("profile-updated", handleProfileMutation);
     };
