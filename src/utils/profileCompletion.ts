@@ -1,11 +1,18 @@
 import { supabase } from "@/lib/supabase";
 
 /**
- * Standardized fixed percentage snaps.
+ * Standardized fixed percentage snaps matching mobile specification:
+ * 0/6 => 0%
+ * 1/6 => 15%
+ * 2/6 => 30%
+ * 3/6 => 50%
+ * 4/6 => 70%
+ * 5/6 => 85%
+ * 6/6 => 100%
  */
-export const PERCENTAGE_MAP = [0, 17, 33, 50, 67, 83, 100] as const;
+export const PERCENTAGE_MAP = [0, 15, 30, 50, 70, 85, 100] as const;
 
-export type SnapPercentage = (typeof PERCENTAGE_MAP)[number] | number;
+export type SnapPercentage = (typeof PERCENTAGE_MAP)[number];
 
 export interface CompletionArea {
   key: string;
@@ -68,65 +75,125 @@ export function hasValue(val: unknown): boolean {
   return false;
 }
 
-/**
- * Single source of truth for computing profile completion areas and percentage.
- */
-export function computeProfileAreas(data: {
+export interface ProfileAreasInput {
   photo?: string | null;
+  name?: string | null;
   location?: string | null;
-  work?: any[] | null;
-  languages?: any[] | null;
-  skills?: any[] | null;
+  phone?: string | null;
+  email?: string | null;
+  ratings?: any[] | null;
   licenses?: any[] | null;
-}) {
+  qualifications?: any[] | null;
+  flightHours?: string | number | null;
+  summary?: string | null;
+  role?: string | null;
+  work?: any[] | null;
+  skills?: any[] | null;
+  languages?: any[] | null;
+  affiliation?: any | null;
+  companyName?: string | null;
+  [key: string]: any;
+}
+
+/**
+ * Single source of truth for computing the exact 6 core profile areas:
+ * 1. Personal profile
+ * 2. Aircraft ratings
+ * 3. Work and qualifications
+ * 4. Professional profile
+ * 5. Career and skills
+ * 6. Company affiliation / Employer linking
+ */
+export function computeProfileAreas(data: ProfileAreasInput) {
+  // 1. Personal profile (photo or name+location or contact details)
+  const hasPhoto = Boolean(data.photo && typeof data.photo === "string" && data.photo.trim().length > 0);
+  const hasLocation = Boolean(data.location && typeof data.location === "string" && data.location.trim().length > 0);
+  const hasName = Boolean(data.name && typeof data.name === "string" && data.name.trim().length > 0);
+  const isPersonalDone = hasPhoto || (hasLocation && hasName) || Boolean(data.phone || data.email);
+
+  // 2. Aircraft ratings (type ratings / aircraft certificates)
+  const hasRatings = Array.isArray(data.ratings) && data.ratings.length > 0;
+  const isRatingsDone = hasRatings;
+
+  // 3. Work and qualifications (aviation licenses / certifications)
+  const hasLicenses = Array.isArray(data.licenses) && data.licenses.length > 0;
+  const hasQualifications = Array.isArray(data.qualifications) && data.qualifications.length > 0;
+  const isWorkQualificationsDone = hasLicenses || hasQualifications;
+
+  // 4. Professional profile (flight hours, professional summary, or role)
+  const hasFlightHours = Boolean(
+    data.flightHours &&
+    String(data.flightHours).trim().length > 0 &&
+    String(data.flightHours).trim() !== "0"
+  );
+  const hasSummary = Boolean(data.summary && typeof data.summary === "string" && data.summary.trim().length > 0);
+  const hasRole = Boolean(data.role && typeof data.role === "string" && data.role.trim().length > 0);
+  const isProfessionalDone = hasFlightHours || hasSummary || hasRole;
+
+  // 5. Career and skills (work history, skills, languages)
+  const hasWork = Array.isArray(data.work) && data.work.length > 0;
+  const hasSkills = Array.isArray(data.skills) && data.skills.length > 0;
+  const hasLanguages = Array.isArray(data.languages) && data.languages.length > 0;
+  const isCareerSkillsDone = hasWork || hasSkills || hasLanguages;
+
+  // 6. Company affiliation / Employer linking
+  const hasAffiliation = Boolean(
+    data.affiliation?.name ||
+    data.affiliation?.id ||
+    data.companyName ||
+    data.linkedCompany ||
+    (typeof data.affiliation === "string" && data.affiliation.trim().length > 0)
+  );
+  const isAffiliationDone = hasAffiliation;
+
   const areas: CompletionArea[] = [
     {
-      key: "photo",
-      label: "Profile photo",
-      desc: "Upload a professional photo",
-      isDone: Boolean(data.photo && typeof data.photo === "string" && data.photo.trim().length > 0),
+      key: "personal_profile",
+      label: "Personal profile",
+      desc: "Basic details, photo, and contact information",
+      isDone: isPersonalDone,
+      step: 1,
+    },
+    {
+      key: "aircraft_ratings",
+      label: "Aircraft ratings",
+      desc: "Type ratings and aircraft certifications",
+      isDone: isRatingsDone,
+      step: 3,
+    },
+    {
+      key: "work_qualifications",
+      label: "Work and qualifications",
+      desc: "Aviation licenses, credentials, and medicals",
+      isDone: isWorkQualificationsDone,
       step: 2,
     },
     {
-      key: "location",
-      label: "Location",
-      desc: "Add your city and country",
-      isDone: Boolean(data.location && typeof data.location === "string" && data.location.trim().length > 0),
-      step: 5,
+      key: "professional_profile",
+      label: "Professional profile",
+      desc: "Flight hours, role, and professional summary",
+      isDone: isProfessionalDone,
+      step: 1,
     },
     {
-      key: "work",
-      label: "Work experience",
-      desc: "Share your career background",
-      isDone: Boolean(Array.isArray(data.work) && data.work.length > 0),
-      step: 5,
-    },
-    {
-      key: "languages",
-      label: "Languages",
-      desc: "Add the languages you speak",
-      isDone: Boolean(Array.isArray(data.languages) && data.languages.length > 0),
-      step: 5,
-    },
-    {
-      key: "skills",
-      label: "Skills",
-      desc: "Highlight your aviation expertise",
-      isDone: Boolean(Array.isArray(data.skills) && data.skills.length > 0),
-      step: 6,
-    },
-    {
-      key: "licenses",
-      label: "Licenses / Certifications",
-      desc: "Add professional credentials",
-      isDone: Boolean(Array.isArray(data.licenses) && data.licenses.length > 0),
+      key: "career_skills",
+      label: "Career and skills",
+      desc: "Work history, skills, and languages",
+      isDone: isCareerSkillsDone,
       step: 4,
+    },
+    {
+      key: "company_affiliation",
+      label: "Company affiliation",
+      desc: "Associate your profile with your airline or company",
+      isDone: isAffiliationDone,
+      step: 5,
     },
   ];
 
   const completedCount = areas.filter((a) => a.isDone).length;
   const totalCount = areas.length;
-  const percentage = Math.round((completedCount / totalCount) * 100);
+  const percentage = mapSectionsToPercentage(completedCount);
 
   return {
     areas,
@@ -138,10 +205,12 @@ export function computeProfileAreas(data: {
 }
 
 /**
- * Maps the number of completed sections to its corresponding snap percentage.
+ * Maps the number of completed sections to its corresponding snap percentage:
+ * 0 => 0%, 1 => 15%, 2 => 30%, 3 => 50%, 4 => 70%, 5 => 85%, 6 => 100%
  */
 export function mapSectionsToPercentage(sectionsCompleted: number): number {
-  return Math.round((Math.max(0, Math.min(6, sectionsCompleted)) / 6) * 100);
+  const index = Math.max(0, Math.min(6, Math.floor(sectionsCompleted)));
+  return PERCENTAGE_MAP[index];
 }
 
 /**
@@ -153,11 +222,54 @@ export function calculateCompletionPercentage(profileData?: ProfileData | null):
   const personal = profileData.personal || {};
 
   const photo = profileData.profileImage || profileData.avatar || personal.profileImage || personal.avatar || null;
+  const name = profileData.firstName || personal.firstName || [personal.firstName, personal.lastName].filter(Boolean).join(" ") || null;
   const location =
     (typeof profileData.location === "string" ? profileData.location : null) ||
     (typeof personal.location === "string" ? personal.location : null) ||
     profileData.cityCountry ||
     personal.cityCountry ||
+    null;
+
+  const phone = profileData.phone || personal.phone || null;
+  const email = profileData.email || personal.email || null;
+
+  const ratings =
+    (Array.isArray(profileData.ratings) && profileData.ratings) ||
+    (Array.isArray(personal.ratings) && personal.ratings) ||
+    (Array.isArray(profileData.aircraftRatings) && profileData.aircraftRatings) ||
+    [];
+
+  const licenses =
+    (Array.isArray(profileData.licenses) && profileData.licenses) ||
+    (Array.isArray(personal.licenses) && personal.licenses) ||
+    (profileData.licenseCertification ? [profileData.licenseCertification] : []) ||
+    (personal.licenseCertification ? [personal.licenseCertification] : []) ||
+    [];
+
+  const flightHours =
+    profileData.flightHours ||
+    profileData.flight_hours ||
+    profileData.totalFlightHours ||
+    personal.flightHours ||
+    personal.flight_hours ||
+    personal.totalFlightHours ||
+    null;
+
+  const summary =
+    profileData.aboutMe ||
+    profileData.summary ||
+    profileData.description ||
+    personal.aboutMe ||
+    personal.summary ||
+    personal.description ||
+    profileData.resume?.summary ||
+    null;
+
+  const role =
+    profileData.role ||
+    profileData.professionalRole ||
+    personal.role ||
+    personal.professionalRole ||
     null;
 
   const work =
@@ -179,20 +291,31 @@ export function calculateCompletionPercentage(profileData?: ProfileData | null):
     (Array.isArray(profileData.structuredSkills) && profileData.structuredSkills) ||
     [];
 
-  const licenses =
-    (Array.isArray(profileData.licenses) && profileData.licenses) ||
-    (Array.isArray(personal.licenses) && personal.licenses) ||
-    (profileData.licenseCertification ? [profileData.licenseCertification] : []) ||
-    (personal.licenseCertification ? [personal.licenseCertification] : []) ||
-    [];
+  const affiliation =
+    profileData.affiliation ||
+    profileData.company ||
+    profileData.affiliationInfo ||
+    personal.affiliation ||
+    personal.company ||
+    personal.companyName ||
+    personal.linkedCompany ||
+    null;
 
   const result = computeProfileAreas({
     photo,
+    name,
     location,
+    phone,
+    email,
+    ratings,
+    licenses,
+    flightHours,
+    summary,
+    role,
     work,
     languages,
     skills,
-    licenses,
+    affiliation,
   });
 
   return result.percentage;
@@ -367,13 +490,60 @@ export async function fetchProfileProgress(
     (rData?.personal?.licenseCertification ? [rData.personal.licenseCertification] : []) ||
     [];
 
+  const ratings =
+    (Array.isArray(myProfileData?.ratings) && myProfileData.ratings.length > 0 ? myProfileData.ratings : null) ||
+    (Array.isArray(rData?.ratings) && rData.ratings.length > 0 ? rData.ratings : null) ||
+    (Array.isArray(localPersonal?.ratings) && localPersonal.ratings.length > 0 ? localPersonal.ratings : null) ||
+    [];
+
+  const flightHours =
+    myProfileData?.flight_hours ||
+    myProfileData?.flightHours ||
+    rData?.personal?.totalFlightHours ||
+    rData?.personal?.flightHours ||
+    localPersonal?.totalFlightHours ||
+    localPersonal?.flightHours ||
+    null;
+
+  const summary =
+    myProfileData?.about_me ||
+    myProfileData?.summary ||
+    rData?.personal?.description ||
+    rData?.resume?.summary ||
+    localPersonal?.description ||
+    localPersonal?.aboutMe ||
+    localPersonal?.summary ||
+    null;
+
+  const role =
+    userRecord?.professionalRole ||
+    userRecord?.role ||
+    localPersonal?.professionalRole ||
+    localPersonal?.role ||
+    null;
+
+  const affiliation =
+    myProfileData?.affiliation ||
+    myProfileData?.company ||
+    localPersonal?.companyName ||
+    localPersonal?.linkedCompany ||
+    null;
+
   const result = computeProfileAreas({
     photo,
+    name: userRecord?.firstName || localPersonal?.firstName || null,
     location,
+    phone: userProfileRecord?.contactPhone || localPersonal?.phone || null,
+    email: userProfileRecord?.contactEmail || localPersonal?.email || null,
+    ratings,
+    licenses,
+    flightHours,
+    summary,
+    role,
     work,
     languages,
     skills,
-    licenses,
+    affiliation,
   });
 
   return result.percentage;

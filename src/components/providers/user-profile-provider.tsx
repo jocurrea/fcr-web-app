@@ -490,6 +490,7 @@ export function UserProfileProvider({
       setSkills(resolvedSkills);
 
       // 10. Resolve affiliation info (E01-HU11)
+      let resolvedAffiliation: AffiliationInfo | null = null;
       if (myProfileData) {
         const aff =
           myProfileData.affiliation ||
@@ -520,12 +521,13 @@ export function UserProfileProvider({
           (compId ? "pending" : "active");
 
         if (compName) {
-          setAffiliationInfo({
+          resolvedAffiliation = {
             name: compName,
             id: compId,
             status: affStatus,
             logo: aff?.logo_url || aff?.company?.logo_url || null,
-          });
+          };
+          setAffiliationInfo(resolvedAffiliation);
         }
       }
 
@@ -606,11 +608,20 @@ export function UserProfileProvider({
 
         const calculation = computeProfileAreas({
           photo: resolvedPhoto,
+          name: [mergedPersonal?.firstName, mergedPersonal?.lastName].filter(Boolean).join(" ") || null,
           location: mergedPersonal?.location || null,
+          phone: mergedPersonal?.phone || null,
+          email: mergedPersonal?.email || null,
+          ratings: resolvedRatings,
+          licenses: licensesList,
+          flightHours: mergedPersonal?.totalFlightHours || mergedPersonal?.flightHours || null,
+          summary: mergedPersonal?.description || mergedPersonal?.aboutMe || mergedPersonal?.summary || resolvedResume?.summary || null,
+          role: mergedPersonal?.professionalRole || mergedPersonal?.role || null,
           work: resolvedWork,
           languages: resolvedLanguages,
           skills: resolvedSkills,
-          licenses: licensesList,
+          affiliation: resolvedAffiliation,
+          companyName: mergedPersonal?.companyName || mergedPersonal?.linkedCompany || null,
         });
 
         progress = calculation.percentage;
