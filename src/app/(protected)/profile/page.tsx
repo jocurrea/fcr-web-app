@@ -271,6 +271,20 @@ export default function ProfilePage() {
     company_affiliation: "Link your airline or employer.",
   };
 
+  const CANONICAL_AREA_KEYS = [
+    "personal_profile",
+    "aircraft_ratings",
+    "work_qualifications",
+    "professional_profile",
+    "career_skills",
+    "company_affiliation",
+  ] as const;
+
+  const sortedMissingAreas = [
+    ...CANONICAL_AREA_KEYS.map((key) => missingAreas.find((item: any) => item.key === key)).filter(Boolean),
+    ...missingAreas.filter((item: any) => !CANONICAL_AREA_KEYS.includes(item?.key as any)),
+  ];
+
   const workExperiences: any[] = Array.isArray(work) && work.length > 0
     ? work
     : Array.isArray(personal?.workExperiences)
@@ -782,19 +796,21 @@ export default function ProfilePage() {
             </Link>
           )}
 
-          {/* Status Pill Badge directly on page background */}
-          <div className="flex justify-center mt-3">
-            <button
-              type="button"
-              onClick={() => setShowAvailabilityModal(true)}
-              className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-emerald-500 text-emerald-600 bg-transparent text-xs font-bold hover:bg-emerald-50/50 transition-colors cursor-pointer shadow-2xs active:scale-95"
-              title="Change availability status"
-            >
-              <Briefcase className="w-3.5 h-3.5" />
-              <span>{statusDisplayText}</span>
-              <Pencil className="w-3 h-3 text-emerald-500 ml-0.5 opacity-80" />
-            </button>
-          </div>
+          {/* Status Pill Badge: Only for aviation_professional, hidden completely for all flight_crew accounts (Pilot/Crew) */}
+          {isAviationProfessional && (
+            <div className="flex justify-center mt-3">
+              <button
+                type="button"
+                onClick={() => setShowAvailabilityModal(true)}
+                className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-emerald-500 text-emerald-600 bg-transparent text-xs font-bold hover:bg-emerald-50/50 transition-colors cursor-pointer shadow-2xs active:scale-95"
+                title="Change availability status"
+              >
+                <Briefcase className="w-3.5 h-3.5" />
+                <span>{statusDisplayText}</span>
+                <Pencil className="w-3 h-3 text-emerald-500 ml-0.5 opacity-80" />
+              </button>
+            </div>
+          )}
 
           {/* 2. BOTONES DE INTERACCIÓN (Profile Likes & Profile Visitors) */}
           <div className="flex justify-center items-center gap-3.5 mt-4 w-full">
@@ -825,7 +841,7 @@ export default function ProfilePage() {
             TOP PROGRESS SECTION (Profile Completion)
             ========================================================================= */}
         {accountType !== "business" && completionPercentage < 100 && (
-          <div className="w-full flex flex-col">
+          <div className="w-full flex flex-col bg-transparent">
             {/* 1. The Header is NOT a card: Completely flat on main gray background */}
             <div className="w-full flex items-center justify-between bg-transparent px-1 mb-3">
               <div className="flex flex-col">
@@ -843,8 +859,8 @@ export default function ProfilePage() {
               </span>
             </div>
 
-            {/* 2. Individual Cards for Each Item */}
-            {missingAreas.map((item) => (
+            {/* 2. Individual Cards for Each Item (Strictly ordered canonical sequence) */}
+            {sortedMissingAreas.map((item: any) => (
               <div
                 key={item.key}
                 className="bg-white rounded-xl shadow-sm p-4 mb-4 border border-gray-100 hover:border-blue-200 transition-all"
