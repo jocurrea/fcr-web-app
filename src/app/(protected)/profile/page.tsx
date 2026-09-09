@@ -807,20 +807,13 @@ export default function ProfilePage() {
               <span>Profile visitors</span>
             </button>
           </div>
-
-          {/* 3. Resumen Profesional Directo (Centrado, Gris Oscuro, Sin título "About Me") */}
-          {summaryText && (
-            <p className="text-xs sm:text-sm text-gray-700 leading-relaxed font-normal text-center max-w-sm sm:max-w-md mx-auto mt-4 px-1">
-              {summaryText}
-            </p>
-          )}
         </div>
 
         {/* Main Content Cards Container */}
         <div className="w-full flex flex-col gap-4">
 
         {/* =========================================================================
-            3. WIDGET DE COMPLETITUD DE PERFIL (Profile Completion)
+            TOP PROGRESS CARD (Profile Completion)
             ========================================================================= */}
         {accountType !== "business" && completionPercentage < 100 && (
           <div className="bg-white rounded-3xl border border-gray-100 p-5 sm:p-6 shadow-xs flex flex-col gap-4">
@@ -898,85 +891,16 @@ export default function ProfilePage() {
         )}
 
         {/* =========================================================================
-            6-SECTION CORE PROFILE CARDS (Strictly matching mobile specification)
-            1. Company affiliation / Employer linking
-            2. Personal profile
-            3. Aircraft ratings
-            4. Work and qualifications
-            5. Professional profile
-            6. Career and skills
+            6-SECTION CORE PROFILE CARDS (Strict mobile order & structure)
+            1. Personal profile
+            2. Aircraft ratings / Type ratings
+            3. Work and qualifications
+            4. Professional profile
+            5. Career and skills
+            6. Company affiliation / Employer linking
             ========================================================================= */}
 
-        {/* SECTION 1: Company affiliation / Employer linking */}
-        <div className="bg-white rounded-3xl border border-gray-100 p-5 sm:p-6 shadow-xs flex flex-col gap-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-2xl bg-blue-50 text-[#1d4ed8] border border-blue-100 flex items-center justify-center shrink-0">
-                <Building2 className="w-4 h-4" />
-              </div>
-              <div>
-                <h2 className="text-base sm:text-lg font-extrabold text-gray-900">
-                  Company affiliation
-                </h2>
-                <span className="text-[11px] text-gray-400 font-medium">Airline or employer link</span>
-              </div>
-            </div>
-            <Link
-              href="/business/affiliate"
-              className="inline-flex items-center gap-1 px-3.5 py-1 rounded-full border border-[#1d4ed8] text-[#1d4ed8] hover:bg-blue-50 text-xs font-bold transition-all cursor-pointer shadow-2xs active:scale-95"
-            >
-              {affiliationName ? (
-                <>
-                  <Pencil className="w-3 h-3" />
-                  <span>Edit</span>
-                </>
-              ) : (
-                <>
-                  <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-                  <span>+ Add</span>
-                </>
-              )}
-            </Link>
-          </div>
-
-          <Link
-            href="/business/affiliate"
-            className="p-4 rounded-2xl bg-gray-50/70 border border-gray-100 hover:border-blue-200 hover:bg-blue-50/40 flex items-center justify-between gap-3 shadow-2xs transition-all cursor-pointer group"
-            title="Link your employer"
-          >
-            <div className="flex items-center gap-3.5 min-w-0">
-              <div className="w-11 h-11 rounded-2xl bg-blue-50 border border-blue-100 text-[#1d4ed8] group-hover:bg-[#1d4ed8] group-hover:text-white flex items-center justify-center shrink-0 transition-colors">
-                <Building2 className="w-5 h-5" />
-              </div>
-              <div className="flex flex-col min-w-0">
-                <span className="text-xs sm:text-sm font-bold text-gray-900 group-hover:text-[#1d4ed8] truncate transition-colors">
-                  {affiliationName ? affiliationName : "Link your employer"}
-                </span>
-                <span className="text-xs text-gray-500 truncate font-medium">
-                  {affiliationName ? (
-                    isAffiliationPending ? (
-                      <span className="text-amber-600 font-semibold">Pending Verification</span>
-                    ) : isAffiliationVerified ? (
-                      <span className="text-emerald-600 font-semibold flex items-center gap-1">
-                        <CheckCircle2 className="w-3 h-3" /> Verified Company
-                      </span>
-                    ) : (
-                      "Self-declared affiliation"
-                    )
-                  ) : (
-                    "Associate your profile with your company or airline"
-                  )}
-                </span>
-              </div>
-            </div>
-
-            <div className="p-2 text-gray-400 group-hover:text-[#1d4ed8] transition-colors">
-              <ChevronRight className="w-5 h-5" />
-            </div>
-          </Link>
-        </div>
-
-        {/* SECTION 2: Personal profile */}
+        {/* SECTION 1: Personal profile */}
         <div className="bg-white rounded-3xl border border-gray-100 p-5 sm:p-6 shadow-xs flex flex-col gap-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
@@ -987,30 +911,30 @@ export default function ProfilePage() {
                 <h2 className="text-base sm:text-lg font-extrabold text-gray-900">
                   Personal profile
                 </h2>
-                <span className="text-[11px] text-gray-400 font-medium">Basic details & contact information</span>
+                <span className="text-[11px] sm:text-xs text-gray-400 font-medium">Basic details & contact information</span>
               </div>
             </div>
             <Link
               href={isFlightCrew ? "/onboarding?edit=true&step=1" : "/onboarding?edit=true&step=2"}
-              className="inline-flex items-center gap-1 px-3.5 py-1 rounded-full border border-[#1d4ed8] text-[#1d4ed8] hover:bg-blue-50 text-xs font-bold transition-all cursor-pointer shadow-2xs active:scale-95"
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border border-[#1d4ed8] text-[#1d4ed8] hover:bg-blue-50 text-xs font-bold transition-all cursor-pointer shadow-2xs active:scale-95"
             >
               <Pencil className="w-3 h-3" />
               <span>Edit</span>
             </Link>
           </div>
 
-          <div className="divide-y divide-gray-100 space-y-3.5 pt-1">
+          <div className="divide-y divide-gray-100 space-y-2 pt-1">
             {/* Location */}
             <Link
               href={isFlightCrew ? "/onboarding?edit=true&step=1" : "/onboarding?edit=true&step=5&section=location"}
-              className="pt-1 flex items-center justify-between group p-2.5 -mx-2.5 rounded-2xl hover:bg-blue-50/40 transition-all cursor-pointer"
+              className="flex items-center justify-between p-2.5 -mx-2.5 rounded-2xl hover:bg-blue-50/40 transition-all cursor-pointer group"
             >
               <div className="flex items-center gap-3 min-w-0">
                 <div className="w-8 h-8 rounded-full bg-blue-50 text-[#1d4ed8] flex items-center justify-center shrink-0">
                   <MapPin className="w-4 h-4" />
                 </div>
                 <div className="flex flex-col min-w-0">
-                  <span className="text-[11px] text-gray-400 font-bold uppercase">Location</span>
+                  <span className="text-[11px] text-gray-400 font-bold uppercase tracking-wider">Location</span>
                   <span className={cn("text-xs sm:text-sm font-semibold truncate", locationValue ? "text-gray-900" : "text-gray-400 font-normal")}>
                     {locationValue || "Add your location"}
                   </span>
@@ -1020,34 +944,46 @@ export default function ProfilePage() {
             </Link>
 
             {/* Phone */}
-            <div className="pt-3 flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-blue-50 text-[#1d4ed8] flex items-center justify-center shrink-0">
-                <Phone className="w-4 h-4" />
+            <Link
+              href={isFlightCrew ? "/onboarding?edit=true&step=1" : "/onboarding?edit=true&step=2"}
+              className="pt-2 flex items-center justify-between p-2.5 -mx-2.5 rounded-2xl hover:bg-blue-50/40 transition-all cursor-pointer group"
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-8 h-8 rounded-full bg-blue-50 text-[#1d4ed8] flex items-center justify-center shrink-0">
+                  <Phone className="w-4 h-4" />
+                </div>
+                <div className="flex flex-col min-w-0">
+                  <span className="text-[11px] text-gray-400 font-bold uppercase tracking-wider">Phone</span>
+                  <span className={cn("text-xs sm:text-sm font-semibold truncate", phoneValue ? "text-[#1d4ed8]" : "text-gray-400 font-normal")}>
+                    {phoneValue || "Not added"}
+                  </span>
+                </div>
               </div>
-              <div className="flex flex-col min-w-0">
-                <span className="text-[11px] text-gray-400 font-bold uppercase">Phone</span>
-                <span className={cn("text-xs sm:text-sm font-semibold", phoneValue ? "text-[#1d4ed8]" : "text-gray-400 font-normal")}>
-                  {phoneValue || "Not added"}
-                </span>
-              </div>
-            </div>
+              <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-[#1d4ed8] transition-colors shrink-0" />
+            </Link>
 
-            {/* Email */}
-            <div className="pt-3 flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-blue-50 text-[#1d4ed8] flex items-center justify-center shrink-0">
-                <Mail className="w-4 h-4" />
+            {/* Contact Email */}
+            <Link
+              href={isFlightCrew ? "/onboarding?edit=true&step=1" : "/onboarding?edit=true&step=2"}
+              className="pt-2 flex items-center justify-between p-2.5 -mx-2.5 rounded-2xl hover:bg-blue-50/40 transition-all cursor-pointer group"
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-8 h-8 rounded-full bg-blue-50 text-[#1d4ed8] flex items-center justify-center shrink-0">
+                  <Mail className="w-4 h-4" />
+                </div>
+                <div className="flex flex-col min-w-0">
+                  <span className="text-[11px] text-gray-400 font-bold uppercase tracking-wider">Contact Email</span>
+                  <span className={cn("text-xs sm:text-sm font-semibold truncate", emailValue ? "text-[#1d4ed8]" : "text-gray-400 font-normal")}>
+                    {emailValue || "Not added"}
+                  </span>
+                </div>
               </div>
-              <div className="flex flex-col min-w-0">
-                <span className="text-[11px] text-gray-400 font-bold uppercase">Contact Email</span>
-                <span className={cn("text-xs sm:text-sm font-semibold truncate", emailValue ? "text-[#1d4ed8]" : "text-gray-400 font-normal")}>
-                  {emailValue || "Not added"}
-                </span>
-              </div>
-            </div>
+              <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-[#1d4ed8] transition-colors shrink-0" />
+            </Link>
           </div>
         </div>
 
-        {/* SECTION 3: Aircraft ratings */}
+        {/* SECTION 2: Aircraft ratings / Type ratings */}
         <div className="bg-white rounded-3xl border border-gray-100 p-5 sm:p-6 shadow-xs flex flex-col gap-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
@@ -1058,12 +994,12 @@ export default function ProfilePage() {
                 <h2 className="text-base sm:text-lg font-extrabold text-gray-900">
                   Aircraft ratings
                 </h2>
-                <span className="text-[11px] text-gray-400 font-medium">Type ratings & aircraft certifications</span>
+                <span className="text-[11px] sm:text-xs text-gray-400 font-medium">Certified aircraft models</span>
               </div>
             </div>
             <Link
               href="/onboarding?edit=true&step=3"
-              className="inline-flex items-center gap-1 px-3.5 py-1 rounded-full border border-[#1d4ed8] text-[#1d4ed8] hover:bg-blue-50 text-xs font-bold transition-all cursor-pointer shadow-2xs active:scale-95"
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border border-[#1d4ed8] text-[#1d4ed8] hover:bg-blue-50 text-xs font-bold transition-all cursor-pointer shadow-2xs active:scale-95"
             >
               {ratingsList.length > 0 ? (
                 <>
@@ -1082,36 +1018,42 @@ export default function ProfilePage() {
           {ratingsList.length > 0 ? (
             <Link
               href="/onboarding?edit=true&step=3"
-              className="flex flex-wrap gap-2 pt-1 p-2 -mx-2 rounded-2xl hover:bg-blue-50/40 transition-all cursor-pointer group"
+              className="flex items-center justify-between p-2.5 -mx-2.5 rounded-2xl hover:bg-blue-50/40 transition-all cursor-pointer group"
               title="Manage Type Ratings"
             >
-              {ratingsList.map((rating, idx) => (
-                <div
-                  key={idx}
-                  className="inline-flex items-center gap-2 bg-blue-50/70 border border-blue-200/80 text-[#1d4ed8] group-hover:bg-blue-100/70 rounded-2xl px-4 py-2 text-xs font-bold shadow-2xs transition-colors"
-                >
-                  <Plane className="w-3.5 h-3.5 text-[#1d4ed8] shrink-0" />
-                  <span>{rating}</span>
-                </div>
-              ))}
+              <div className="flex flex-wrap gap-2 min-w-0">
+                {ratingsList.map((rating, idx) => (
+                  <div
+                    key={idx}
+                    className="inline-flex items-center gap-2 bg-blue-50/70 border border-blue-200/80 text-[#1d4ed8] group-hover:bg-blue-100/70 rounded-2xl px-4 py-2 text-xs font-bold shadow-2xs transition-colors"
+                  >
+                    <Plane className="w-3.5 h-3.5 text-[#1d4ed8] shrink-0" />
+                    <span>{rating}</span>
+                  </div>
+                ))}
+              </div>
+              <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-[#1d4ed8] transition-colors shrink-0 ml-2" />
             </Link>
           ) : (
             <Link
               href="/onboarding?edit=true&step=3"
               className="flex items-center justify-between p-3.5 rounded-2xl bg-gray-50/70 border border-gray-100 hover:bg-blue-50/40 hover:border-blue-200 transition-all cursor-pointer group"
             >
-              <div className="flex flex-col">
-                <span className="text-sm font-bold text-gray-900 group-hover:text-[#1d4ed8] transition-colors">Add aircraft ratings</span>
+              <div className="flex flex-col min-w-0">
+                <span className="text-xs sm:text-sm font-bold text-gray-900 group-hover:text-[#1d4ed8] transition-colors">Add aircraft ratings</span>
                 <span className="text-xs text-gray-400">Certified aircraft models (e.g. A320, B737, Embraer)</span>
               </div>
-              <div className="w-8 h-8 rounded-full bg-white border border-gray-200 text-gray-400 group-hover:border-blue-200 group-hover:bg-[#1d4ed8] group-hover:text-white flex items-center justify-center transition-all">
-                <Plus className="w-4 h-4 stroke-[2.5]" />
+              <div className="flex items-center gap-2 shrink-0">
+                <div className="w-8 h-8 rounded-full bg-white border border-gray-200 text-gray-400 group-hover:border-blue-200 group-hover:bg-[#1d4ed8] group-hover:text-white flex items-center justify-center transition-all">
+                  <Plus className="w-4 h-4 stroke-[2.5]" />
+                </div>
+                <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-[#1d4ed8] transition-colors" />
               </div>
             </Link>
           )}
         </div>
 
-        {/* SECTION 4: Work and qualifications */}
+        {/* SECTION 3: Work and qualifications */}
         <div className="bg-white rounded-3xl border border-gray-100 p-5 sm:p-6 shadow-xs flex flex-col gap-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
@@ -1122,12 +1064,12 @@ export default function ProfilePage() {
                 <h2 className="text-base sm:text-lg font-extrabold text-gray-900">
                   Work and qualifications
                 </h2>
-                <span className="text-[11px] text-gray-400 font-medium">Aviation licenses & credentials</span>
+                <span className="text-[11px] sm:text-xs text-gray-400 font-medium">Licenses & credentials with validity tags</span>
               </div>
             </div>
             <Link
               href={isFlightCrew ? "/onboarding?edit=true&step=2" : "/onboarding?edit=true&step=4"}
-              className="inline-flex items-center gap-1 px-3.5 py-1 rounded-full border border-[#1d4ed8] text-[#1d4ed8] hover:bg-blue-50 text-xs font-bold transition-all cursor-pointer shadow-2xs active:scale-95"
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border border-[#1d4ed8] text-[#1d4ed8] hover:bg-blue-50 text-xs font-bold transition-all cursor-pointer shadow-2xs active:scale-95"
             >
               {richLicenses.length > 0 ? (
                 <>
@@ -1195,18 +1137,21 @@ export default function ProfilePage() {
               href={isFlightCrew ? "/onboarding?edit=true&step=2" : "/onboarding?edit=true&step=4"}
               className="flex items-center justify-between p-3.5 rounded-2xl bg-gray-50/70 border border-gray-100 hover:bg-blue-50/40 hover:border-blue-200 transition-all cursor-pointer group"
             >
-              <div className="flex flex-col">
-                <span className="text-sm font-bold text-gray-900 group-hover:text-[#1d4ed8] transition-colors">Add aviation license</span>
-                <span className="text-xs text-gray-400">Add ATPL, CPL, Cabin Crew Attestation, or Medical</span>
+              <div className="flex flex-col min-w-0">
+                <span className="text-xs sm:text-sm font-bold text-gray-900 group-hover:text-[#1d4ed8] transition-colors">Add aviation license</span>
+                <span className="text-xs text-gray-400">ATPL, CPL, Cabin Crew Attestation, or Medical</span>
               </div>
-              <div className="w-8 h-8 rounded-full bg-white border border-gray-200 text-gray-400 group-hover:border-blue-200 group-hover:bg-[#1d4ed8] group-hover:text-white flex items-center justify-center transition-all">
-                <Plus className="w-4 h-4 stroke-[2.5]" />
+              <div className="flex items-center gap-2 shrink-0">
+                <div className="w-8 h-8 rounded-full bg-white border border-gray-200 text-gray-400 group-hover:border-blue-200 group-hover:bg-[#1d4ed8] group-hover:text-white flex items-center justify-center transition-all">
+                  <Plus className="w-4 h-4 stroke-[2.5]" />
+                </div>
+                <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-[#1d4ed8] transition-colors" />
               </div>
             </Link>
           )}
         </div>
 
-        {/* SECTION 5: Professional profile */}
+        {/* SECTION 4: Professional profile */}
         <div className="bg-white rounded-3xl border border-gray-100 p-5 sm:p-6 shadow-xs flex flex-col gap-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
@@ -1217,12 +1162,12 @@ export default function ProfilePage() {
                 <h2 className="text-base sm:text-lg font-extrabold text-gray-900">
                   Professional profile
                 </h2>
-                <span className="text-[11px] text-gray-400 font-medium">Flight hours & career summary</span>
+                <span className="text-[11px] sm:text-xs text-gray-400 font-medium">Total flight hours & career summary/bio</span>
               </div>
             </div>
             <Link
               href={isFlightCrew ? "/onboarding?edit=true&step=1" : "/onboarding?edit=true&step=3"}
-              className="inline-flex items-center gap-1 px-3.5 py-1 rounded-full border border-[#1d4ed8] text-[#1d4ed8] hover:bg-blue-50 text-xs font-bold transition-all cursor-pointer shadow-2xs active:scale-95"
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border border-[#1d4ed8] text-[#1d4ed8] hover:bg-blue-50 text-xs font-bold transition-all cursor-pointer shadow-2xs active:scale-95"
             >
               <Pencil className="w-3 h-3" />
               <span>Edit</span>
@@ -1244,20 +1189,31 @@ export default function ProfilePage() {
             </div>
           </div>
 
-          {/* Professional summary text */}
-          {summaryText && (
-            <div className="pt-2">
-              <span className="text-xs text-gray-400 font-bold uppercase tracking-wider block mb-1">
-                Summary
+          {/* Professional summary & bio */}
+          <Link
+            href={isFlightCrew ? "/onboarding?edit=true&step=1" : "/onboarding?edit=true&step=3"}
+            className="pt-1 p-2.5 -mx-2.5 rounded-2xl hover:bg-blue-50/40 transition-all cursor-pointer group block"
+            title="Edit Summary"
+          >
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-xs text-gray-400 font-bold uppercase tracking-wider">
+                Career Summary & Bio
               </span>
-              <p className="text-sm text-gray-700 leading-relaxed font-normal">
+              <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-[#1d4ed8] transition-colors shrink-0" />
+            </div>
+            {summaryText ? (
+              <p className="text-xs sm:text-sm text-gray-700 leading-relaxed font-normal group-hover:text-gray-900 transition-colors">
                 {summaryText}
               </p>
-            </div>
-          )}
+            ) : (
+              <p className="text-xs text-gray-400 font-medium italic">
+                No career summary added yet. Click to add your bio.
+              </p>
+            )}
+          </Link>
         </div>
 
-        {/* SECTION 6: Career and skills */}
+        {/* SECTION 5: Career and skills */}
         <div className="bg-white rounded-3xl border border-gray-100 p-5 sm:p-6 shadow-xs flex flex-col gap-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
@@ -1268,12 +1224,12 @@ export default function ProfilePage() {
                 <h2 className="text-base sm:text-lg font-extrabold text-gray-900">
                   Career and skills
                 </h2>
-                <span className="text-[11px] text-gray-400 font-medium">Work history, skills & languages</span>
+                <span className="text-[11px] sm:text-xs text-gray-400 font-medium">Work history, languages & skills</span>
               </div>
             </div>
             <Link
               href={isFlightCrew ? "/onboarding?edit=true&step=4" : "/onboarding?edit=true&step=5"}
-              className="inline-flex items-center gap-1 px-3.5 py-1 rounded-full border border-[#1d4ed8] text-[#1d4ed8] hover:bg-blue-50 text-xs font-bold transition-all cursor-pointer shadow-2xs active:scale-95"
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border border-[#1d4ed8] text-[#1d4ed8] hover:bg-blue-50 text-xs font-bold transition-all cursor-pointer shadow-2xs active:scale-95"
             >
               {workExperiences.length > 0 || skillsList.length > 0 ? (
                 <>
@@ -1400,6 +1356,77 @@ export default function ProfilePage() {
               )}
             </div>
           </div>
+        </div>
+
+        {/* SECTION 6: Company affiliation / Employer linking */}
+        <div className="bg-white rounded-3xl border border-gray-100 p-5 sm:p-6 shadow-xs flex flex-col gap-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-2xl bg-blue-50 text-[#1d4ed8] border border-blue-100 flex items-center justify-center shrink-0">
+                <Building2 className="w-4 h-4" />
+              </div>
+              <div>
+                <h2 className="text-base sm:text-lg font-extrabold text-gray-900">
+                  Company affiliation
+                </h2>
+                <span className="text-[11px] sm:text-xs text-gray-400 font-medium">Employer linking & verification status</span>
+              </div>
+            </div>
+            <Link
+              href="/business/affiliate"
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border border-[#1d4ed8] text-[#1d4ed8] hover:bg-blue-50 text-xs font-bold transition-all cursor-pointer shadow-2xs active:scale-95"
+            >
+              {affiliationName ? (
+                <>
+                  <Pencil className="w-3 h-3" />
+                  <span>Edit</span>
+                </>
+              ) : (
+                <>
+                  <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+                  <span>+ Add</span>
+                </>
+              )}
+            </Link>
+          </div>
+
+          <Link
+            href="/business/affiliate"
+            className="p-4 rounded-2xl bg-gray-50/70 border border-gray-100 hover:border-blue-200 hover:bg-blue-50/40 flex items-center justify-between gap-3 shadow-2xs transition-all cursor-pointer group"
+            title="Link your employer"
+          >
+            <div className="flex items-center gap-3.5 min-w-0">
+              <div className="w-11 h-11 rounded-2xl bg-blue-50 border border-blue-100 text-[#1d4ed8] group-hover:bg-[#1d4ed8] group-hover:text-white flex items-center justify-center shrink-0 transition-colors">
+                <Building2 className="w-5 h-5" />
+              </div>
+              <div className="flex flex-col min-w-0">
+                <span className="text-xs sm:text-sm font-bold text-gray-900 group-hover:text-[#1d4ed8] truncate transition-colors">
+                  {affiliationName ? affiliationName : "Link your employer"}
+                </span>
+                <span className="text-xs text-gray-500 truncate font-medium mt-0.5">
+                  {affiliationName ? (
+                    isAffiliationPending ? (
+                      <span className="text-amber-600 font-semibold inline-flex items-center gap-1">
+                        <Clock className="w-3 h-3" /> Pending Verification
+                      </span>
+                    ) : isAffiliationVerified ? (
+                      <span className="text-emerald-600 font-semibold inline-flex items-center gap-1">
+                        <CheckCircle2 className="w-3 h-3" /> Verified Company
+                      </span>
+                    ) : (
+                      "Self-declared affiliation"
+                    )
+                  ) : (
+                    "Associate your profile with your company or airline"
+                  )}
+                </span>
+              </div>
+            </div>
+
+            <div className="p-1 text-gray-400 group-hover:text-[#1d4ed8] transition-colors">
+              <ChevronRight className="w-5 h-5" />
+            </div>
+          </Link>
         </div>
 
         {/* User Posts Section */}
