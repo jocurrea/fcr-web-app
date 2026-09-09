@@ -942,6 +942,69 @@ export default function ProfilePage() {
               </div>
 
             </div>
+
+            {/* --- INICIO SECCIONES INFERIORES --- */}
+
+            {/* 1. COMPANY AFFILIATION */}
+            <div className="mt-8 mb-6">
+              <h3 className="text-[15px] font-bold text-gray-900 mb-3 px-1">Company affiliation</h3>
+              <div className="bg-white rounded-[20px] p-4 flex items-center gap-4 shadow-sm border border-gray-100 cursor-pointer">
+                <div className="w-10 h-10 rounded-full bg-[#F0F4FF] flex items-center justify-center flex-shrink-0">
+                  <BuildingOfficeIcon className="w-5 h-5 text-blue-500" />
+                </div>
+                <div className="flex-1">
+                  <h4 className="text-[15px] font-bold text-gray-900">Link your employer</h4>
+                  <p className="text-[13px] text-gray-500 leading-tight mt-0.5">Search registered companies and request verification.</p>
+                </div>
+                <ChevronRightIcon className="w-5 h-5 text-gray-400 flex-shrink-0" />
+              </div>
+            </div>
+
+            {/* 2. PILOT BADGE / WINGS CARD */}
+            <div className="bg-white rounded-[20px] p-5 shadow-sm border border-gray-100 mb-4 relative">
+              <button className="absolute top-4 right-4 text-blue-600 font-semibold text-sm">Edit</button>
+              
+              <div className="flex flex-col items-center justify-center mb-6 mt-4">
+                 {/* Aquí va el componente o imagen de las alas */}
+                 <div className="w-48 h-20 bg-gray-200 rounded flex items-center justify-center mb-3">
+                    <span className="text-gray-400 text-xs">Wings Image Placeholder</span>
+                 </div>
+                 <h3 className="text-lg font-bold text-gray-900">Titanium</h3>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-gray-500">Flight hours</p>
+                  <p className="text-base font-medium text-gray-900">946464</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Nationality</p>
+                  <p className="text-base font-medium text-gray-900">United States</p>
+                </div>
+              </div>
+            </div>
+
+            {/* 3. LICENSES CARD */}
+            <div className="bg-white rounded-[20px] p-5 shadow-sm border border-gray-100 mb-6">
+              <div className="flex justify-between items-start mb-6">
+                <h3 className="text-lg font-bold text-gray-900">Licenses</h3>
+                <button className="text-blue-600 font-semibold text-sm">Manage</button>
+              </div>
+              
+              <div className="flex justify-between items-center">
+                 <div>
+                   <p className="text-base font-bold text-gray-900 leading-snug">
+                     ABPL - Aerostatic<br/>Balloon Pilot<br/>License
+                   </p>
+                 </div>
+                 <div className="text-right">
+                   <p className="text-sm text-gray-900">sep. de 2026</p>
+                   <p className="text-xs text-gray-500 mt-1">Medical certificate expires in 16 days</p>
+                 </div>
+              </div>
+            </div>
+
+            {/* --- FIN SECCIONES INFERIORES --- */}
           </>
         ) : (
           <div className="w-full flex flex-col gap-4">
