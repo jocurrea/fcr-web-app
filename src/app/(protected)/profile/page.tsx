@@ -41,6 +41,8 @@ export default function ProfilePage() {
   const PlusIcon = Plus;
   const ChevronRightIcon = ChevronRight;
   const BuildingOfficeIcon = Building2;
+  const HeartIcon = Heart;
+  const EyeIcon = Eye;
   const {
     profileProgress,
     profilePhoto,
@@ -843,101 +845,138 @@ export default function ProfilePage() {
             </div>
           )}
 
-          {/* 2. BOTONES DE INTERACCIÓN (Profile Likes & Profile Visitors) */}
-          <div className="flex justify-center items-center gap-3.5 mt-4 w-full">
-            <button
-              type="button"
-              onClick={handleOpenLikersModal}
-              className="flex-1 max-w-[160px] py-2.5 px-4 rounded-full border border-[#1d4ed8] text-[#1d4ed8] bg-transparent hover:bg-blue-50/60 transition-all font-bold text-xs flex items-center justify-center gap-2 cursor-pointer shadow-2xs active:scale-95"
-            >
-              <Heart className="w-4 h-4 text-[#1d4ed8] shrink-0" />
-              <span>Profile likes</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={handleOpenVisitorsModal}
-              className="flex-1 max-w-[160px] py-2.5 px-4 rounded-full border border-[#1d4ed8] text-[#1d4ed8] bg-transparent hover:bg-blue-50/60 transition-all font-bold text-xs flex items-center justify-center gap-2 cursor-pointer shadow-2xs active:scale-95"
-            >
-              <Eye className="w-4 h-4 text-[#1d4ed8] shrink-0" />
-              <span>Profile visitors</span>
-            </button>
-          </div>
         </div>
 
-        {/* Main Content Cards Container */}
-        <div className="w-full flex flex-col gap-4">
-
-        {/* =========================================================================
-            PILOT / FLIGHT HOURS & EXPIRING LICENSES SUMMARY BADGES
-            ========================================================================= */}
-        {flightHoursValue && Number(flightHoursValue) > 0 && (
-          <div className="p-4 rounded-2xl bg-gradient-to-br from-blue-50/60 to-slate-50 border border-blue-100/80 flex items-center justify-between shadow-2xs">
-            <div className="flex flex-col">
-              <span className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">
-                {Number(flightHoursValue).toLocaleString()} hrs
-              </span>
-              <span className="text-xs text-gray-500 font-medium mt-0.5">
-                Total cumulative flight hours
-              </span>
-            </div>
-            <div className="w-12 h-12 rounded-2xl bg-white border border-blue-100 shadow-2xs flex items-center justify-center text-[#1d4ed8]">
-              <Plane className="w-6 h-6" />
-            </div>
-          </div>
-        )}
-
-        {richLicenses.filter((lic) => lic.isExpired || lic.isExpiringSoon).length > 0 && (
-          <div className="flex flex-col gap-2">
-            {richLicenses
-              .filter((lic) => lic.isExpired || lic.isExpiringSoon)
-              .map((lic, idx) => (
-                <div
-                  key={lic.id || idx}
-                  className={cn(
-                    "p-3.5 rounded-2xl border flex items-center justify-between gap-3 text-xs",
-                    lic.isExpired
-                      ? "bg-rose-50/80 border-rose-200 text-rose-800"
-                      : "bg-amber-50/80 border-amber-200 text-amber-800"
-                  )}
-                >
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <AlertTriangle
-                      className={cn(
-                        "w-4 h-4 shrink-0",
-                        lic.isExpired ? "text-rose-600" : "text-amber-600"
-                      )}
-                    />
-                    <span className="font-bold truncate">{lic.name}</span>
-                  </div>
-                  <span className="font-semibold shrink-0">
-                    {lic.isExpired
-                      ? `Expired (${lic.expiryDate})`
-                      : `Expires soon (${lic.expiryDate})`}
-                  </span>
-                </div>
-              ))}
-          </div>
-        )}
-
-        {/* =========================================================================
-            TOP PROGRESS SECTION (Profile Completion)
-            ========================================================================= */}
-        {accountType !== "business" && (
+        {isFlightCrew ? (
           <>
-            {/* 1. HEADER: Flat on the gray background */}
+            {/* 1. BOTONES DE LIKES Y VISITANTES */}
+            <div className="flex justify-center gap-4 mt-4 mb-8">
+              <button
+                type="button"
+                onClick={handleOpenLikersModal}
+                className="flex items-center gap-2 border border-blue-600 text-blue-600 px-5 py-2 rounded-full font-semibold text-sm"
+              >
+                <HeartIcon className="w-4 h-4" /> Profile likes
+              </button>
+              <button
+                type="button"
+                onClick={handleOpenVisitorsModal}
+                className="flex items-center gap-2 border border-blue-600 text-blue-600 px-5 py-2 rounded-full font-semibold text-sm"
+              >
+                <EyeIcon className="w-4 h-4" /> Profile visitors
+              </button>
+            </div>
+
+            {/* 2. ENCABEZADO "COMPLETE YOUR PROFILE" (FONDO TRANSPARENTE) */}
+            <div className="flex justify-between items-start mb-4 px-1 bg-transparent">
+              <div>
+                <h2 className="text-[20px] font-bold text-gray-900 leading-tight">Complete your profile</h2>
+                <p className="text-[14px] text-gray-500 mt-0.5">1 of 6 profile areas complete</p>
+              </div>
+              <div className="bg-[#E6F4EA] text-[#137333] px-3 py-1 rounded-[8px] text-sm font-bold">
+                15%
+              </div>
+            </div>
+
+            {/* 3. LAS 5 TARJETAS DE PROGRESO (LISTA VERTICAL) */}
+            <div className="flex flex-col gap-3">
+              
+              {/* Tarjeta 1: Personal profile */}
+              <div className="bg-white rounded-[20px] p-4 flex items-center gap-4 shadow-sm border border-gray-100">
+                <div className="w-10 h-10 rounded-full bg-[#F0F4FF] flex items-center justify-center flex-shrink-0">
+                  <PlusIcon className="w-5 h-5 text-blue-500" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-[15px] font-bold text-gray-900">Personal profile</h3>
+                  <p className="text-[13px] text-gray-500 leading-snug mt-0.5">Complete your identity, profile photo, nationality, date of birth, marital status, and children.</p>
+                </div>
+                <ChevronRightIcon className="w-5 h-5 text-gray-400 flex-shrink-0" />
+              </div>
+
+              {/* Tarjeta 2: Aircraft ratings */}
+              <div className="bg-white rounded-[20px] p-4 flex items-center gap-4 shadow-sm border border-gray-100">
+                <div className="w-10 h-10 rounded-full bg-[#F0F4FF] flex items-center justify-center flex-shrink-0">
+                  <PlusIcon className="w-5 h-5 text-blue-500" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-[15px] font-bold text-gray-900">Aircraft ratings</h3>
+                  <p className="text-[13px] text-gray-500 leading-snug mt-0.5">Add at least one aircraft type rating.</p>
+                </div>
+                <ChevronRightIcon className="w-5 h-5 text-gray-400 flex-shrink-0" />
+              </div>
+
+              {/* Tarjeta 3: Work and qualifications */}
+              <div className="bg-white rounded-[20px] p-4 flex items-center gap-4 shadow-sm border border-gray-100">
+                <div className="w-10 h-10 rounded-full bg-[#F0F4FF] flex items-center justify-center flex-shrink-0">
+                  <PlusIcon className="w-5 h-5 text-blue-500" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-[15px] font-bold text-gray-900">Work and qualifications</h3>
+                  <p className="text-[13px] text-gray-500 leading-snug mt-0.5">Complete your work location, experience, and role details.</p>
+                </div>
+                <ChevronRightIcon className="w-5 h-5 text-gray-400 flex-shrink-0" />
+              </div>
+
+              {/* Tarjeta 4: Professional profile */}
+              <div className="bg-white rounded-[20px] p-4 flex items-center gap-4 shadow-sm border border-gray-100">
+                <div className="w-10 h-10 rounded-full bg-[#F0F4FF] flex items-center justify-center flex-shrink-0">
+                  <PlusIcon className="w-5 h-5 text-blue-500" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-[15px] font-bold text-gray-900">Professional profile</h3>
+                  <p className="text-[13px] text-gray-500 leading-snug mt-0.5">Complete your contact details, summary, and English proficiency.</p>
+                </div>
+                <ChevronRightIcon className="w-5 h-5 text-gray-400 flex-shrink-0" />
+              </div>
+
+              {/* Tarjeta 5: Career and skills */}
+              <div className="bg-white rounded-[20px] p-4 flex items-center gap-4 shadow-sm border border-gray-100">
+                <div className="w-10 h-10 rounded-full bg-[#F0F4FF] flex items-center justify-center flex-shrink-0">
+                  <PlusIcon className="w-5 h-5 text-blue-500" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-[15px] font-bold text-gray-900">Career and skills</h3>
+                  <p className="text-[13px] text-gray-500 leading-snug mt-0.5">Add experience, training, languages, and at least one skill.</p>
+                </div>
+                <ChevronRightIcon className="w-5 h-5 text-gray-400 flex-shrink-0" />
+              </div>
+
+            </div>
+          </>
+        ) : (
+          <div className="w-full flex flex-col gap-4">
+            {/* 2. BOTONES DE INTERACCIÓN (Profile Likes & Profile Visitors) */}
+            <div className="flex justify-center items-center gap-3.5 mt-4 w-full">
+              <button
+                type="button"
+                onClick={handleOpenLikersModal}
+                className="flex-1 max-w-[160px] py-2.5 px-4 rounded-full border border-[#1d4ed8] text-[#1d4ed8] bg-transparent hover:bg-blue-50/60 transition-all font-bold text-xs flex items-center justify-center gap-2 cursor-pointer shadow-2xs active:scale-95"
+              >
+                <Heart className="w-4 h-4 text-[#1d4ed8] shrink-0" />
+                <span>Profile likes</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleOpenVisitorsModal}
+                className="flex-1 max-w-[160px] py-2.5 px-4 rounded-full border border-[#1d4ed8] text-[#1d4ed8] bg-transparent hover:bg-blue-50/60 transition-all font-bold text-xs flex items-center justify-center gap-2 cursor-pointer shadow-2xs active:scale-95"
+              >
+                <Eye className="w-4 h-4 text-[#1d4ed8] shrink-0" />
+                <span>Profile visitors</span>
+              </button>
+            </div>
+
+            {/* TOP PROGRESS SECTION (Profile Completion) */}
             <div className="flex justify-between items-center mb-4 px-1 bg-transparent">
               <div>
                 <h2 className="text-xl font-bold text-gray-900">Complete your profile</h2>
                 <p className="text-sm text-gray-500 mt-0.5">{completedCount} of 5 profile areas complete</p>
               </div>
-              {/* PERCENTAGE PILL: Light green background, NO borders, NO rings */}
               <div className="bg-[#E6F4EA] text-[#137333] px-3 py-1 rounded-lg text-sm font-bold">
                 {profileProgress}%
               </div>
             </div>
 
-            {/* 2. PENDING CARDS LIST */}
             <div className="flex flex-col gap-3 mb-6">
               {pendingAreas.map((area) => (
                 <div
@@ -945,24 +984,17 @@ export default function ProfilePage() {
                   onClick={() => router.push(area.href)}
                   className="bg-white rounded-[20px] p-4 flex items-center gap-4 border border-gray-100 shadow-sm cursor-pointer"
                 >
-                  
-                  {/* EXACT ICON STYLING: Pale blue background, NO border */}
                   <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center flex-shrink-0">
                     <PlusIcon className="w-5 h-5 text-blue-500" />
                   </div>
-                  
-                  {/* TEXT STACK */}
                   <div className="flex-1">
                     <h3 className="text-[15px] font-bold text-gray-900">{area.title}</h3>
                     <p className="text-[13px] text-gray-500 leading-tight mt-0.5">{area.description}</p>
                   </div>
-                  
                   <ChevronRightIcon className="w-5 h-5 text-gray-400 flex-shrink-0" />
                 </div>
               ))}
             </div>
-          </>
-        )}
 
         {/* COMPANY AFFILIATION SECTION */}
         <div className="mt-8 mb-4">
@@ -1465,6 +1497,8 @@ export default function ProfilePage() {
         </div>
           </>
         )}
+          </div>
+        )}
 
         {/* User Posts Section */}
         {userPosts.length > 0 && (
@@ -1493,7 +1527,6 @@ export default function ProfilePage() {
           </div>
         )}
 
-        </div>
       </div>
 
       {/* =========================================================================
