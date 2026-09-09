@@ -7,6 +7,14 @@ export async function updateSession(request: NextRequest) {
   const url = request.nextUrl.clone();
   const pathname = url.pathname;
 
+  // 0. Bypass service workers and static scripts (must never be redirected)
+  if (
+    pathname === "/OneSignalSDKWorker.js" ||
+    pathname.startsWith("/OneSignalSDKWorker")
+  ) {
+    return NextResponse.next();
+  }
+
   // 1. Clean residual parameters on /login
   if (pathname === "/login" && (url.searchParams.has("edit") || url.searchParams.has("from"))) {
     url.searchParams.delete("edit");
@@ -53,7 +61,8 @@ export async function updateSession(request: NextRequest) {
     pathname === "/register" ||
     pathname === "/welcome" ||
     pathname === "/forgotPassword" ||
-    pathname === "/reset";
+    pathname === "/reset" ||
+    pathname.startsWith("/invitations");
 
   const isPublicStaticRoute =
     pathname === "/privacyPolicy" ||

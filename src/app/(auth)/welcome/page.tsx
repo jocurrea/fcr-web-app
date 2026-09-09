@@ -7,7 +7,7 @@ export default function WelcomePage() {
   const router = useRouter();
 
   return (
-    <div className="flex flex-col min-h-screen bg-white items-center justify-center p-6">
+    <div className="flex flex-col min-h-screen bg-white items-center justify-center p-6" suppressHydrationWarning>
       
       {/* Central Content Block */}
       <div className="w-full flex flex-col items-center mt-[-20px]">

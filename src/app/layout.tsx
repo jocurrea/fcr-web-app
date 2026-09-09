@@ -19,7 +19,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={cn("h-full antialiased", "font-sans", inter.variable)}>
+    <html lang="en" className={cn("h-full antialiased", "font-sans", inter.variable)} suppressHydrationWarning>
       <body className="min-h-full flex flex-col" suppressHydrationWarning>
         <OneSignalProvider>
           <StorageProvider />

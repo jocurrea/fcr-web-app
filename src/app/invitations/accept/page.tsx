@@ -207,30 +207,40 @@ function AcceptInvitationContent() {
       setResolveError(null);
 
       try {
-        // Primary RPC call
+        // Primary RPC call per architecture specifications (raw_token)
         let res = await supabase.rpc("resolve_company_affiliation_invitation", {
-          token: token,
+          raw_token: token,
         });
 
         if (res.error) {
           // Fallback parameter signatures
           const res2 = await supabase.rpc("resolve_company_affiliation_invitation", {
-            invitation_token: token,
+            token: token,
           });
           if (!res2.error && res2.data) {
             res = res2;
           } else {
             const res3 = await supabase.rpc("resolve_company_affiliation_invitation", {
-              p_token: token,
+              invitation_token: token,
             });
             if (!res3.error && res3.data) {
               res = res3;
+            } else {
+              const res4 = await supabase.rpc("resolve_company_affiliation_invitation", {
+                p_token: token,
+              });
+              if (!res4.error && res4.data) {
+                res = res4;
+              }
             }
           }
         }
 
         if (res.error) {
-          console.error("Error resolving invitation:", res.error);
+          console.warn(
+            "Notice resolving invitation:",
+            res.error.message || res.error.details || res.error
+          );
           setResolveError(
             res.error.message || "Invalid, expired, or previously processed invitation."
           );
@@ -278,21 +288,28 @@ function AcceptInvitationContent() {
 
     try {
       let res = await supabase.rpc("accept_company_affiliation_invitation", {
-        token: token,
+        raw_token: token,
       });
 
       if (res.error) {
         const res2 = await supabase.rpc("accept_company_affiliation_invitation", {
-          invitation_token: token,
+          token: token,
         });
         if (!res2.error) {
           res = res2;
         } else {
           const res3 = await supabase.rpc("accept_company_affiliation_invitation", {
-            p_token: token,
+            invitation_token: token,
           });
           if (!res3.error) {
             res = res3;
+          } else {
+            const res4 = await supabase.rpc("accept_company_affiliation_invitation", {
+              p_token: token,
+            });
+            if (!res4.error) {
+              res = res4;
+            }
           }
         }
       }
@@ -306,7 +323,7 @@ function AcceptInvitationContent() {
       // Clean up sessionStorage after successful acceptance
       try { sessionStorage.removeItem(SESSION_STORAGE_KEY); } catch { /* ignore */ }
     } catch (err: any) {
-      console.error("Error accepting invitation:", err);
+      console.error("Error accepting invitation:", err?.message || err);
       setActionError(
         err?.message || "Failed to accept the invitation. Please try again."
       );
@@ -326,21 +343,28 @@ function AcceptInvitationContent() {
 
     try {
       let res = await supabase.rpc("decline_company_affiliation_invitation", {
-        token: token,
+        raw_token: token,
       });
 
       if (res.error) {
         const res2 = await supabase.rpc("decline_company_affiliation_invitation", {
-          invitation_token: token,
+          token: token,
         });
         if (!res2.error) {
           res = res2;
         } else {
           const res3 = await supabase.rpc("decline_company_affiliation_invitation", {
-            p_token: token,
+            invitation_token: token,
           });
           if (!res3.error) {
             res = res3;
+          } else {
+            const res4 = await supabase.rpc("decline_company_affiliation_invitation", {
+              p_token: token,
+            });
+            if (!res4.error) {
+              res = res4;
+            }
           }
         }
       }
@@ -354,7 +378,7 @@ function AcceptInvitationContent() {
       // Clean up sessionStorage after successful decline
       try { sessionStorage.removeItem(SESSION_STORAGE_KEY); } catch { /* ignore */ }
     } catch (err: any) {
-      console.error("Error declining invitation:", err);
+      console.error("Error declining invitation:", err?.message || err);
       setActionError(
         err?.message || "Failed to decline the invitation. Please try again."
       );
@@ -389,8 +413,8 @@ function AcceptInvitationContent() {
   // ==========================================
   if (isResolving || isCheckingAuth) {
     return (
-      <div className="min-h-screen bg-[#f8f9fa] flex flex-col items-center justify-center px-4 py-12">
-        <div className="bg-white rounded-3xl p-8 max-w-md w-full border border-gray-100 shadow-sm text-center flex flex-col items-center gap-4">
+      <div className="min-h-screen bg-[#f8f9fa] flex flex-col items-center justify-center px-4 py-12" suppressHydrationWarning>
+        <div className="bg-white rounded-3xl p-8 max-w-md w-full border border-gray-100 shadow-sm text-center flex flex-col items-center gap-4" suppressHydrationWarning>
           <div className="w-16 h-16 rounded-2xl bg-blue-50 flex items-center justify-center text-blue-600">
             <Loader2 className="w-8 h-8 animate-spin" />
           </div>
@@ -410,7 +434,7 @@ function AcceptInvitationContent() {
   // ==========================================
   if (resolveError || !invitation) {
     return (
-      <div className="min-h-screen bg-[#f8f9fa] flex flex-col items-center justify-center px-4 py-12">
+      <div className="min-h-screen bg-[#f8f9fa] flex flex-col items-center justify-center px-4 py-12" suppressHydrationWarning>
         {/* Top Logo */}
         <div className="mb-8">
           <img
@@ -460,7 +484,7 @@ function AcceptInvitationContent() {
   // ==========================================
   if (actionState === "accepted" || actionState === "already_accepted") {
     return (
-      <div className="min-h-screen bg-[#f8f9fa] flex flex-col items-center justify-center px-4 py-12">
+      <div className="min-h-screen bg-[#f8f9fa] flex flex-col items-center justify-center px-4 py-12" suppressHydrationWarning>
         <div className="mb-8">
           <img
             src="/img/FCRlogo2.png"
@@ -469,7 +493,7 @@ function AcceptInvitationContent() {
           />
         </div>
 
-        <div className="bg-white rounded-3xl p-8 max-w-md w-full border border-gray-100 shadow-sm text-center flex flex-col items-center gap-6">
+        <div className="bg-white rounded-3xl p-8 max-w-md w-full border border-gray-100 shadow-sm text-center flex flex-col items-center gap-6" suppressHydrationWarning>
           <div className="w-20 h-20 rounded-full bg-emerald-50 border-2 border-emerald-100 flex items-center justify-center text-emerald-600 shadow-xs">
             <CheckCircle2 className="w-10 h-10" />
           </div>
@@ -514,7 +538,7 @@ function AcceptInvitationContent() {
   // ==========================================
   if (actionState === "declined" || actionState === "already_declined") {
     return (
-      <div className="min-h-screen bg-[#f8f9fa] flex flex-col items-center justify-center px-4 py-12">
+      <div className="min-h-screen bg-[#f8f9fa] flex flex-col items-center justify-center px-4 py-12" suppressHydrationWarning>
         <div className="mb-8">
           <img
             src="/img/FCRlogo2.png"
@@ -523,7 +547,7 @@ function AcceptInvitationContent() {
           />
         </div>
 
-        <div className="bg-white rounded-3xl p-8 max-w-md w-full border border-gray-100 shadow-sm text-center flex flex-col items-center gap-5">
+        <div className="bg-white rounded-3xl p-8 max-w-md w-full border border-gray-100 shadow-sm text-center flex flex-col items-center gap-5" suppressHydrationWarning>
           <div className="w-16 h-16 rounded-2xl bg-gray-100 border border-gray-200 flex items-center justify-center text-gray-500">
             <XCircle className="w-8 h-8" />
           </div>
@@ -557,7 +581,7 @@ function AcceptInvitationContent() {
   // ==========================================
   if (actionState === "expired" || actionState === "cancelled") {
     return (
-      <div className="min-h-screen bg-[#f8f9fa] flex flex-col items-center justify-center px-4 py-12">
+      <div className="min-h-screen bg-[#f8f9fa] flex flex-col items-center justify-center px-4 py-12" suppressHydrationWarning>
         <div className="mb-8">
           <img
             src="/img/FCRlogo2.png"
@@ -566,7 +590,7 @@ function AcceptInvitationContent() {
           />
         </div>
 
-        <div className="bg-white rounded-3xl p-8 max-w-md w-full border border-gray-100 shadow-sm text-center flex flex-col items-center gap-5">
+        <div className="bg-white rounded-3xl p-8 max-w-md w-full border border-gray-100 shadow-sm text-center flex flex-col items-center gap-5" suppressHydrationWarning>
           <div className="w-16 h-16 rounded-2xl bg-amber-50 border border-amber-200/80 flex items-center justify-center text-amber-600">
             <Clock className="w-8 h-8" />
           </div>
@@ -603,7 +627,7 @@ function AcceptInvitationContent() {
   // ==========================================
   if (!sessionUser) {
     return (
-      <div className="min-h-screen bg-[#f8f9fa] flex flex-col items-center justify-center px-4 py-12">
+      <div className="min-h-screen bg-[#f8f9fa] flex flex-col items-center justify-center px-4 py-12" suppressHydrationWarning>
         <div className="mb-8">
           <img
             src="/img/FCRlogo2.png"
@@ -612,7 +636,7 @@ function AcceptInvitationContent() {
           />
         </div>
 
-        <div className="bg-white rounded-3xl p-8 max-w-md w-full border border-gray-100 shadow-sm flex flex-col items-center text-center gap-6">
+        <div className="bg-white rounded-3xl p-8 max-w-md w-full border border-gray-100 shadow-sm flex flex-col items-center text-center gap-6" suppressHydrationWarning>
           {/* Company Logo / Building Icon */}
           <div className="relative">
             <div className="w-20 h-20 rounded-2xl overflow-hidden bg-blue-50 border border-blue-100 flex items-center justify-center shadow-xs">
@@ -696,7 +720,7 @@ function AcceptInvitationContent() {
     targetEmail.toLowerCase() !== sessionUser.email.toLowerCase();
 
   return (
-    <div className="min-h-screen bg-[#f8f9fa] flex flex-col items-center justify-center px-4 py-12">
+    <div className="min-h-screen bg-[#f8f9fa] flex flex-col items-center justify-center px-4 py-12" suppressHydrationWarning>
       {/* Top Logo */}
       <div className="mb-8">
         <img
@@ -706,7 +730,7 @@ function AcceptInvitationContent() {
         />
       </div>
 
-      <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full border border-gray-100 shadow-sm flex flex-col items-center text-center gap-6">
+      <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full border border-gray-100 shadow-sm flex flex-col items-center text-center gap-6" suppressHydrationWarning>
         {/* Company Logo */}
         <div className="relative">
           <div className="w-20 h-20 rounded-2xl overflow-hidden bg-blue-50 border border-blue-100 flex items-center justify-center shadow-xs">
@@ -839,12 +863,28 @@ function AcceptInvitationContent() {
 }
 
 export default function AcceptInvitationPage() {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) {
+    return (
+      <div
+        className="min-h-screen bg-[#f8f9fa] flex items-center justify-center"
+        suppressHydrationWarning
+      />
+    );
+  }
+
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen bg-[#f8f9fa] flex items-center justify-center">
-          <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
-        </div>
+        <div
+          className="min-h-screen bg-[#f8f9fa] flex items-center justify-center"
+          suppressHydrationWarning
+        />
       }
     >
       <AcceptInvitationContent />
