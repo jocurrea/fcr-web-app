@@ -27,6 +27,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
@@ -966,9 +967,7 @@ export default function ProfilePage() {
               
               <div className="flex flex-col items-center justify-center mb-6 mt-4">
                  {/* Aquí va el componente o imagen de las alas */}
-                 <div className="w-48 h-20 bg-gray-200 rounded flex items-center justify-center mb-3">
-                    <span className="text-gray-400 text-xs">Wings Image Placeholder</span>
-                 </div>
+                 <Image alt="Titanium Badge" className="object-contain mb-3" height={80} src="/silver.png" width={192}/>
                  <h3 className="text-lg font-bold text-gray-900">Titanium</h3>
               </div>
               
