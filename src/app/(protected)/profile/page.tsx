@@ -842,40 +842,40 @@ export default function ProfilePage() {
             ========================================================================= */}
         {accountType !== "business" && completionPercentage < 100 && (
           <>
-            {/* 1. HEADER: Must sit completely flat on the page's gray background. NO bg-white wrapper here. */}
-            <div className="flex justify-between items-center mb-4 px-1 bg-transparent">
+            {/* 1. HEADER SECTION (No bg-white, sits directly on the page background) */}
+            <div className="flex justify-between items-start mb-4 px-1 bg-transparent">
               <div>
                 <h2 className="text-xl font-bold text-gray-900">Complete your profile</h2>
-                <p className="text-sm text-gray-500">{completedAreasCount} of {totalAreasCount} profile areas complete</p>
+                <p className="text-sm text-gray-500 mt-0.5">{completedAreasCount} of {totalAreasCount} profile areas complete</p>
               </div>
-              {/* 2. PERCENTAGE PILL: Light green background, dark green text, rounded-full. NO rings. */}
-              <div className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-sm font-bold">
+              {/* 2. THE PERCENTAGE PILL (Light green bg, bright green text, slightly rounded) */}
+              <div className="bg-green-100/50 text-green-500 px-3 py-1 rounded-lg text-sm font-bold">
                 {completionPercentage}%
               </div>
             </div>
 
-            {/* 3. PENDING CARDS LIST: A flex column with a gap between individual white cards */}
-            <div className="flex flex-col gap-3">
+            {/* 3. INDIVIDUAL PENDING CARDS */}
+            <div className="flex flex-col gap-3 mb-6">
               {/* Map through the strictly ordered pending areas here */}
               {sortedMissingAreas.map((area: any) => (
                 <Link
                   key={area.key}
                   href={getMissingAreaLink(area)}
-                  className="bg-white rounded-2xl p-4 flex items-center gap-4 shadow-sm hover:shadow-md transition-all cursor-pointer group"
+                  className="bg-white rounded-2xl p-4 flex items-center gap-4 border border-gray-100 shadow-sm cursor-pointer hover:border-blue-200 transition-all group"
                 >
-                  {/* Left: Light blue circular + button */}
-                  <span className="bg-blue-50 text-blue-600 rounded-full w-10 h-10 flex items-center justify-center flex-shrink-0 group-hover:bg-blue-600 group-hover:text-white transition-colors">
-                    <Plus className="w-5 h-5" />
-                  </span>
+                  {/* Left: + Icon (White circle, light blue border, blue icon) */}
+                  <div className="w-10 h-10 rounded-full border-2 border-blue-100 flex items-center justify-center flex-shrink-0 bg-white">
+                    <Plus className="w-5 h-5 text-blue-500" />
+                  </div>
                   
                   {/* Middle: Text Stack */}
                   <div className="flex-1 min-w-0">
-                    <h3 className="text-base font-semibold text-gray-900">{area.label}</h3>
-                    <p className="text-sm text-gray-500 leading-snug">{PENDING_AREA_SUBTITLES[area.key] || area.desc}</p>
+                    <h3 className="text-base font-bold text-gray-900">{area.label}</h3>
+                    <p className="text-sm text-gray-500 leading-snug mt-0.5">{PENDING_AREA_SUBTITLES[area.key] || area.desc}</p>
                   </div>
                   
                   {/* Right: Chevron */}
-                  <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-gray-600 transition-colors flex-shrink-0" />
+                  <ChevronRight className="w-5 h-5 text-gray-400 flex-shrink-0" />
                 </Link>
               ))}
             </div>
