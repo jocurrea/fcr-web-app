@@ -869,6 +869,58 @@ export default function ProfilePage() {
         <div className="w-full flex flex-col gap-4">
 
         {/* =========================================================================
+            PILOT / FLIGHT HOURS & EXPIRING LICENSES SUMMARY BADGES
+            ========================================================================= */}
+        {flightHoursValue && Number(flightHoursValue) > 0 && (
+          <div className="p-4 rounded-2xl bg-gradient-to-br from-blue-50/60 to-slate-50 border border-blue-100/80 flex items-center justify-between shadow-2xs">
+            <div className="flex flex-col">
+              <span className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">
+                {Number(flightHoursValue).toLocaleString()} hrs
+              </span>
+              <span className="text-xs text-gray-500 font-medium mt-0.5">
+                Total cumulative flight hours
+              </span>
+            </div>
+            <div className="w-12 h-12 rounded-2xl bg-white border border-blue-100 shadow-2xs flex items-center justify-center text-[#1d4ed8]">
+              <Plane className="w-6 h-6" />
+            </div>
+          </div>
+        )}
+
+        {richLicenses.filter((lic) => lic.isExpired || lic.isExpiringSoon).length > 0 && (
+          <div className="flex flex-col gap-2">
+            {richLicenses
+              .filter((lic) => lic.isExpired || lic.isExpiringSoon)
+              .map((lic, idx) => (
+                <div
+                  key={lic.id || idx}
+                  className={cn(
+                    "p-3.5 rounded-2xl border flex items-center justify-between gap-3 text-xs",
+                    lic.isExpired
+                      ? "bg-rose-50/80 border-rose-200 text-rose-800"
+                      : "bg-amber-50/80 border-amber-200 text-amber-800"
+                  )}
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <AlertTriangle
+                      className={cn(
+                        "w-4 h-4 shrink-0",
+                        lic.isExpired ? "text-rose-600" : "text-amber-600"
+                      )}
+                    />
+                    <span className="font-bold truncate">{lic.name}</span>
+                  </div>
+                  <span className="font-semibold shrink-0">
+                    {lic.isExpired
+                      ? `Expired (${lic.expiryDate})`
+                      : `Expires soon (${lic.expiryDate})`}
+                  </span>
+                </div>
+              ))}
+          </div>
+        )}
+
+        {/* =========================================================================
             TOP PROGRESS SECTION (Profile Completion)
             ========================================================================= */}
         {accountType !== "business" && (
@@ -949,16 +1001,13 @@ export default function ProfilePage() {
         </div>
 
         {/* =========================================================================
-            CORE PROFILE CARDS
-            1. Personal profile
-            2. Aircraft ratings / Type ratings
-            3. Work and qualifications
-            4. Professional profile
-            5. Career and skills
+            CORE PROFILE CARDS (Aviation Professional Detailed Profile)
+            Hidden completely for Flight Crew accounts to match clean mobile interface
             ========================================================================= */}
-
-        {/* SECTION 1: Personal profile */}
-        <div className="bg-white rounded-3xl border border-gray-100 p-5 sm:p-6 shadow-xs flex flex-col gap-4">
+        {isAviationProfessional && (
+          <>
+            {/* SECTION 1: Personal profile */}
+            <div className="bg-white rounded-3xl border border-gray-100 p-5 sm:p-6 shadow-xs flex flex-col gap-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
               <div className="w-9 h-9 rounded-2xl bg-blue-50 text-[#1d4ed8] border border-blue-100 flex items-center justify-center shrink-0">
@@ -1414,6 +1463,8 @@ export default function ProfilePage() {
             </div>
           </div>
         </div>
+          </>
+        )}
 
         {/* User Posts Section */}
         {userPosts.length > 0 && (
