@@ -260,19 +260,16 @@ export default function ProfilePage() {
   };
 
   const getMissingAreaLink = (item: any) => {
-    if (item.key === "company_affiliation") {
-      return "/business/affiliate";
-    }
     return `/onboarding?edit=true&step=${getOnboardingStep(item.key)}`;
   };
 
   const PENDING_AREA_SUBTITLES: Record<string, string> = {
     personal_profile: "Complete your identity, profile photo, nationality, date of birth, marital status, and children.",
+    licenses: "Add at least one license or certification.",
     aircraft_ratings: "Add at least one aircraft type rating.",
     work_qualifications: "Complete your work location, experience, and role details.",
     professional_profile: "Complete your contact details, summary, and English proficiency.",
     career_skills: "Add experience, training, languages, and at least one skill.",
-    company_affiliation: "Search registered companies and request verification.",
   };
 
   const ALL_CANONICAL_AREAS = [
@@ -280,6 +277,11 @@ export default function ProfilePage() {
       key: "personal_profile",
       label: "Personal profile",
       desc: "Complete your identity, profile photo, nationality, date of birth, marital status, and children.",
+    },
+    {
+      key: "licenses",
+      label: "Licenses",
+      desc: "Add at least one license or certification.",
     },
     {
       key: "aircraft_ratings",
@@ -301,26 +303,30 @@ export default function ProfilePage() {
       label: "Career and skills",
       desc: "Add experience, training, languages, and at least one skill.",
     },
-    {
-      key: "company_affiliation",
-      label: "Company affiliation",
-      desc: "Search registered companies and request verification.",
-    },
   ];
 
-  // Visual QA & debugging override: Force-render all 6 profile areas without filtering out completed ones
-  const pendingAreas = ALL_CANONICAL_AREAS.map((canon) => {
-    const fromContext =
-      (completionAreas || []).find((a: any) => a.key === canon.key) ||
-      (missingAreas || []).find((a: any) => a.key === canon.key);
-    return {
-      id: canon.key,
-      key: canon.key,
-      title: fromContext?.label || canon.label,
-      description: PENDING_AREA_SUBTITLES[canon.key] || fromContext?.desc || canon.desc,
-      href: getMissingAreaLink(canon),
-    };
-  });
+  // Restored filter: only genuinely uncompleted areas out of the corrected 6-item list
+  const pendingAreas = ALL_CANONICAL_AREAS
+    .filter((canon) => {
+      const match = (completionAreas || []).find((a: any) => a.key === canon.key);
+      if (match) {
+        return !match.isDone;
+      }
+      if (missingAreas && missingAreas.length > 0) {
+        return missingAreas.some((m: any) => m.key === canon.key);
+      }
+      return true;
+    })
+    .map((canon) => {
+      const fromContext = (completionAreas || []).find((a: any) => a.key === canon.key);
+      return {
+        id: canon.key,
+        key: canon.key,
+        title: fromContext?.label || canon.label,
+        description: PENDING_AREA_SUBTITLES[canon.key] || fromContext?.desc || canon.desc,
+        href: getMissingAreaLink(canon),
+      };
+    });
 
   const completedCount = completedAreasCount;
 
@@ -879,7 +885,7 @@ export default function ProfilePage() {
         {/* =========================================================================
             TOP PROGRESS SECTION (Profile Completion)
             ========================================================================= */}
-        {accountType !== "business" && (
+        {accountType !== "business" && completionPercentage < 100 && pendingAreas.length > 0 && (
           <>
             {/* 1. HEADER: Flat on the gray background */}
             <div className="flex justify-between items-center mb-4 px-1 bg-transparent">
@@ -921,13 +927,94 @@ export default function ProfilePage() {
         )}
 
         {/* =========================================================================
-            6-SECTION CORE PROFILE CARDS (Strict mobile order & structure)
+            STANDALONE SECTION: Company affiliation
+            Completely decoupled OUTSIDE and BELOW 'Complete your profile' block
+            ========================================================================= */}
+        <div className="flex flex-col gap-3 mb-2">
+          {/* Section title flat on gray background */}
+          <div className="px-1 bg-transparent">
+            <h2 className="text-xl font-bold text-gray-900">Company affiliation</h2>
+          </div>
+
+          {/* Standalone White Card */}
+          <div className="bg-white rounded-3xl border border-gray-100 p-5 sm:p-6 shadow-xs flex flex-col gap-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-2xl bg-blue-50 text-[#1d4ed8] border border-blue-100 flex items-center justify-center shrink-0">
+                  <Building2 className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-base sm:text-lg font-extrabold text-gray-900">
+                    Company affiliation
+                  </h3>
+                  <span className="text-[11px] sm:text-xs text-gray-400 font-medium">Employer linking & verification status</span>
+                </div>
+              </div>
+              <Link
+                href="/business/affiliate"
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border border-[#1d4ed8] text-[#1d4ed8] hover:bg-blue-50 text-xs font-bold transition-all cursor-pointer shadow-2xs active:scale-95"
+              >
+                {affiliationName ? (
+                  <>
+                    <Pencil className="w-3 h-3" />
+                    <span>Manage</span>
+                  </>
+                ) : (
+                  <>
+                    <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+                    <span>Add</span>
+                  </>
+                )}
+              </Link>
+            </div>
+
+            <Link
+              href="/business/affiliate"
+              className="p-4 rounded-2xl bg-gray-50/70 border border-gray-100 hover:border-blue-200 hover:bg-blue-50/40 flex items-center justify-between gap-3 shadow-2xs transition-all cursor-pointer group"
+              title="Link your employer"
+            >
+              <div className="flex items-center gap-3.5 min-w-0">
+                <div className="w-11 h-11 rounded-2xl bg-blue-50 border border-blue-100 text-[#1d4ed8] group-hover:bg-[#1d4ed8] group-hover:text-white flex items-center justify-center shrink-0 transition-colors">
+                  <Building2 className="w-5 h-5" />
+                </div>
+                <div className="flex flex-col min-w-0">
+                  <span className="text-xs sm:text-sm font-bold text-gray-900 group-hover:text-[#1d4ed8] truncate transition-colors">
+                    {affiliationName ? affiliationName : "Link your employer"}
+                  </span>
+                  <span className="text-xs text-gray-500 truncate font-medium mt-0.5">
+                    {affiliationName ? (
+                      isAffiliationPending ? (
+                        <span className="text-amber-600 font-semibold inline-flex items-center gap-1">
+                          <Clock className="w-3 h-3" /> Pending Verification
+                        </span>
+                      ) : isAffiliationVerified ? (
+                        <span className="text-emerald-600 font-semibold inline-flex items-center gap-1">
+                          <CheckCircle2 className="w-3 h-3" /> Verified Company
+                        </span>
+                      ) : (
+                        "Self-declared affiliation"
+                      )
+                    ) : (
+                      "Associate your profile with your company or airline"
+                    )}
+                  </span>
+                </div>
+              </div>
+
+              <div className="p-1 text-gray-400 group-hover:text-[#1d4ed8] transition-colors">
+                <ChevronRight className="w-5 h-5" />
+              </div>
+            </Link>
+          </div>
+        </div>
+
+        {/* =========================================================================
+            CORE PROFILE CARDS
             1. Personal profile
             2. Aircraft ratings / Type ratings
             3. Work and qualifications
             4. Professional profile
             5. Career and skills
-            6. Company affiliation / Employer linking
             ========================================================================= */}
 
         {/* SECTION 1: Personal profile */}
@@ -1386,77 +1473,6 @@ export default function ProfilePage() {
               )}
             </div>
           </div>
-        </div>
-
-        {/* SECTION 6: Company affiliation / Employer linking */}
-        <div className="bg-white rounded-3xl border border-gray-100 p-5 sm:p-6 shadow-xs flex flex-col gap-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-2xl bg-blue-50 text-[#1d4ed8] border border-blue-100 flex items-center justify-center shrink-0">
-                <Building2 className="w-4 h-4" />
-              </div>
-              <div>
-                <h2 className="text-base sm:text-lg font-extrabold text-gray-900">
-                  Company affiliation
-                </h2>
-                <span className="text-[11px] sm:text-xs text-gray-400 font-medium">Employer linking & verification status</span>
-              </div>
-            </div>
-            <Link
-              href="/business/affiliate"
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border border-[#1d4ed8] text-[#1d4ed8] hover:bg-blue-50 text-xs font-bold transition-all cursor-pointer shadow-2xs active:scale-95"
-            >
-              {affiliationName ? (
-                <>
-                  <Pencil className="w-3 h-3" />
-                  <span>Manage</span>
-                </>
-              ) : (
-                <>
-                  <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-                  <span>Add</span>
-                </>
-              )}
-            </Link>
-          </div>
-
-          <Link
-            href="/business/affiliate"
-            className="p-4 rounded-2xl bg-gray-50/70 border border-gray-100 hover:border-blue-200 hover:bg-blue-50/40 flex items-center justify-between gap-3 shadow-2xs transition-all cursor-pointer group"
-            title="Link your employer"
-          >
-            <div className="flex items-center gap-3.5 min-w-0">
-              <div className="w-11 h-11 rounded-2xl bg-blue-50 border border-blue-100 text-[#1d4ed8] group-hover:bg-[#1d4ed8] group-hover:text-white flex items-center justify-center shrink-0 transition-colors">
-                <Building2 className="w-5 h-5" />
-              </div>
-              <div className="flex flex-col min-w-0">
-                <span className="text-xs sm:text-sm font-bold text-gray-900 group-hover:text-[#1d4ed8] truncate transition-colors">
-                  {affiliationName ? affiliationName : "Link your employer"}
-                </span>
-                <span className="text-xs text-gray-500 truncate font-medium mt-0.5">
-                  {affiliationName ? (
-                    isAffiliationPending ? (
-                      <span className="text-amber-600 font-semibold inline-flex items-center gap-1">
-                        <Clock className="w-3 h-3" /> Pending Verification
-                      </span>
-                    ) : isAffiliationVerified ? (
-                      <span className="text-emerald-600 font-semibold inline-flex items-center gap-1">
-                        <CheckCircle2 className="w-3 h-3" /> Verified Company
-                      </span>
-                    ) : (
-                      "Self-declared affiliation"
-                    )
-                  ) : (
-                    "Associate your profile with your company or airline"
-                  )}
-                </span>
-              </div>
-            </div>
-
-            <div className="p-1 text-gray-400 group-hover:text-[#1d4ed8] transition-colors">
-              <ChevronRight className="w-5 h-5" />
-            </div>
-          </Link>
         </div>
 
         {/* User Posts Section */}

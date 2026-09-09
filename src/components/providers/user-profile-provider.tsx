@@ -636,6 +636,7 @@ export function UserProfileProvider({
           email: mergedPersonal?.email || null,
           ratings: resolvedRatings,
           licenses: licensesList,
+          qualifications: (Array.isArray(mergedPersonal?.qualifications) && mergedPersonal.qualifications) || null,
           flightHours: mergedPersonal?.totalFlightHours || mergedPersonal?.flightHours || null,
           summary: mergedPersonal?.description || mergedPersonal?.aboutMe || mergedPersonal?.summary || resolvedResume?.summary || null,
           role: mergedPersonal?.professionalRole || mergedPersonal?.role || null,
