@@ -841,53 +841,45 @@ export default function ProfilePage() {
             TOP PROGRESS SECTION (Profile Completion)
             ========================================================================= */}
         {accountType !== "business" && completionPercentage < 100 && (
-          <div className="w-full flex flex-col bg-transparent">
-            {/* 1. The Header is NOT a card: Completely flat on main gray background */}
-            <div className="w-full flex items-center justify-between bg-transparent px-1 mb-3">
-              <div className="flex flex-col">
-                <h3 className="text-base sm:text-lg font-extrabold text-gray-900">
-                  Complete your profile
-                </h3>
-                <span className="text-xs text-gray-500 font-medium mt-0.5">
-                  {completedAreasCount} of {totalAreasCount} profile areas complete
-                </span>
+          <>
+            {/* 1. HEADER: Must sit completely flat on the page's gray background. NO bg-white wrapper here. */}
+            <div className="flex justify-between items-center mb-4 px-1 bg-transparent">
+              <div>
+                <h2 className="text-xl font-bold text-gray-900">Complete your profile</h2>
+                <p className="text-sm text-gray-500">{completedAreasCount} of {totalAreasCount} profile areas complete</p>
               </div>
-
-              {/* 50% Pill: Simple, small light-green rounded pill with dark-green text */}
-              <span className="inline-flex items-center justify-center px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs sm:text-sm font-extrabold shrink-0 shadow-2xs">
+              {/* 2. PERCENTAGE PILL: Light green background, dark green text, rounded-full. NO rings. */}
+              <div className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-sm font-bold">
                 {completionPercentage}%
-              </span>
+              </div>
             </div>
 
-            {/* 2. Individual Cards for Each Item (Strictly ordered canonical sequence) */}
-            {sortedMissingAreas.map((item: any) => (
-              <div
-                key={item.key}
-                className="bg-white rounded-xl shadow-sm p-4 mb-4 border border-gray-100 hover:border-blue-200 transition-all"
-              >
+            {/* 3. PENDING CARDS LIST: A flex column with a gap between individual white cards */}
+            <div className="flex flex-col gap-3">
+              {/* Map through the strictly ordered pending areas here */}
+              {sortedMissingAreas.map((area: any) => (
                 <Link
-                  href={getMissingAreaLink(item)}
-                  className="flex items-center justify-between gap-3.5 cursor-pointer group"
+                  key={area.key}
+                  href={getMissingAreaLink(area)}
+                  className="bg-white rounded-2xl p-4 flex items-center gap-4 shadow-sm hover:shadow-md transition-all cursor-pointer group"
                 >
-                  <div className="flex items-center gap-3.5 min-w-0">
-                    <div className="w-8 h-8 rounded-full bg-blue-50 text-[#1d4ed8] border border-blue-100 flex items-center justify-center shrink-0 group-hover:bg-[#1d4ed8] group-hover:text-white transition-colors">
-                      <Plus className="w-4 h-4 stroke-[2.5]" />
-                    </div>
-                    <div className="flex flex-col min-w-0">
-                      <span className="text-sm font-bold text-gray-900 group-hover:text-[#1d4ed8] transition-colors truncate">
-                        {item.label}
-                      </span>
-                      <span className="text-xs text-gray-500 font-medium truncate mt-0.5">
-                        {PENDING_AREA_SUBTITLES[item.key] || item.desc}
-                      </span>
-                    </div>
+                  {/* Left: Light blue circular + button */}
+                  <span className="bg-blue-50 text-blue-600 rounded-full w-10 h-10 flex items-center justify-center flex-shrink-0 group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                    <Plus className="w-5 h-5" />
+                  </span>
+                  
+                  {/* Middle: Text Stack */}
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-base font-semibold text-gray-900">{area.label}</h3>
+                    <p className="text-sm text-gray-500 leading-snug">{PENDING_AREA_SUBTITLES[area.key] || area.desc}</p>
                   </div>
-
-                  <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-[#1d4ed8] transition-colors shrink-0" />
+                  
+                  {/* Right: Chevron */}
+                  <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-gray-600 transition-colors flex-shrink-0" />
                 </Link>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          </>
         )}
 
         {/* =========================================================================
