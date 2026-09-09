@@ -860,32 +860,26 @@ export default function ProfilePage() {
               </div>
             </div>
 
-            {/* Action Items for Missing Fields */}
-            <div className="flex flex-col gap-2.5 pt-1">
-              {missingAreas.map((item) => (
-                <Link
-                  key={item.key}
-                  href={getMissingAreaLink(item)}
-                  className="w-full text-left p-3.5 rounded-2xl bg-gray-50/80 hover:bg-blue-50/40 border border-gray-100 hover:border-blue-200 transition-all flex items-center justify-between gap-3 shadow-2xs group cursor-pointer"
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-8 h-8 rounded-full bg-blue-50 text-[#1d4ed8] border border-blue-100 flex items-center justify-center shrink-0 group-hover:bg-[#1d4ed8] group-hover:text-white transition-colors">
-                      <Plus className="w-4 h-4 stroke-[2.5]" />
-                    </div>
-                    <div className="flex flex-col min-w-0">
-                      <span className="text-xs sm:text-sm font-bold text-gray-900 truncate">
-                        {item.label}
-                      </span>
-                      <span className="text-[11px] text-gray-400 truncate font-medium">
-                        {item.desc}
-                      </span>
-                    </div>
-                  </div>
-
-                  <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-[#1d4ed8] transition-colors shrink-0" />
-                </Link>
-              ))}
-            </div>
+            {/* Compact remaining areas — full details are in the section cards below */}
+            {missingAreas.length > 0 && (
+              <div className="flex flex-col gap-2 pt-1">
+                <span className="text-[11px] text-gray-400 font-bold uppercase tracking-wider">
+                  Remaining
+                </span>
+                <div className="flex flex-wrap gap-2">
+                  {missingAreas.map((item) => (
+                    <Link
+                      key={item.key}
+                      href={getMissingAreaLink(item)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gray-50 border border-gray-200/80 text-xs font-semibold text-gray-600 hover:bg-blue-50 hover:text-[#1d4ed8] hover:border-blue-200 transition-all cursor-pointer"
+                    >
+                      <Plus className="w-3 h-3 stroke-[2.5]" />
+                      <span>{item.label}</span>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
 
           </div>
         )}
