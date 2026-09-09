@@ -1,10 +1,25 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 export default function WelcomePage() {
   const router = useRouter();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) {
+    return (
+      <div
+        className="flex flex-col min-h-screen bg-white items-center justify-center p-6"
+        suppressHydrationWarning
+      />
+    );
+  }
 
   return (
     <div className="flex flex-col min-h-screen bg-white items-center justify-center p-6" suppressHydrationWarning>
