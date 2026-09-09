@@ -275,27 +275,52 @@ export default function ProfilePage() {
     company_affiliation: "Link your airline or employer.",
   };
 
-  const CANONICAL_AREA_KEYS = [
-    "personal_profile",
-    "aircraft_ratings",
-    "work_qualifications",
-    "professional_profile",
-    "career_skills",
-    "company_affiliation",
-  ] as const;
-
-  const sortedMissingAreas = [
-    ...CANONICAL_AREA_KEYS.map((key) => missingAreas.find((item: any) => item.key === key)).filter(Boolean),
-    ...missingAreas.filter((item: any) => !CANONICAL_AREA_KEYS.includes(item?.key as any)),
+  const ALL_CANONICAL_AREAS = [
+    {
+      key: "personal_profile",
+      label: "Personal profile",
+      desc: "Basic details, photo, and contact information",
+    },
+    {
+      key: "aircraft_ratings",
+      label: "Aircraft ratings",
+      desc: "Type ratings and aircraft certifications",
+    },
+    {
+      key: "work_qualifications",
+      label: "Work and qualifications",
+      desc: "Aviation licenses, credentials, and medicals",
+    },
+    {
+      key: "professional_profile",
+      label: "Professional profile",
+      desc: "Flight hours, role, and professional summary",
+    },
+    {
+      key: "career_skills",
+      label: "Career and skills",
+      desc: "Work history, skills, and languages",
+    },
+    {
+      key: "company_affiliation",
+      label: "Company affiliation",
+      desc: "Associate your profile with your airline or company",
+    },
   ];
 
-  const pendingAreas = sortedMissingAreas.map((item: any) => ({
-    id: item.key,
-    key: item.key,
-    title: item.label,
-    description: PENDING_AREA_SUBTITLES[item.key] || item.desc,
-    href: getMissingAreaLink(item),
-  }));
+  // Visual QA & debugging override: Force-render all 6 profile areas without filtering out completed ones
+  const pendingAreas = ALL_CANONICAL_AREAS.map((canon) => {
+    const fromContext =
+      (completionAreas || []).find((a: any) => a.key === canon.key) ||
+      (missingAreas || []).find((a: any) => a.key === canon.key);
+    return {
+      id: canon.key,
+      key: canon.key,
+      title: fromContext?.label || canon.label,
+      description: PENDING_AREA_SUBTITLES[canon.key] || fromContext?.desc || canon.desc,
+      href: getMissingAreaLink(canon),
+    };
+  });
 
   const completedCount = completedAreasCount;
 
@@ -854,7 +879,7 @@ export default function ProfilePage() {
         {/* =========================================================================
             TOP PROGRESS SECTION (Profile Completion)
             ========================================================================= */}
-        {accountType !== "business" && completionPercentage < 100 && (
+        {accountType !== "business" && (
           <>
             {/* 1. HEADER: Flat on the gray background */}
             <div className="flex justify-between items-center mb-4 px-1 bg-transparent">
