@@ -1009,7 +1009,7 @@ export default function ProfilePage() {
               ) : (
                 <>
                   <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-                  <span>+ Add</span>
+                  <span>Add</span>
                 </>
               )}
             </Link>
@@ -1079,7 +1079,7 @@ export default function ProfilePage() {
               ) : (
                 <>
                   <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-                  <span>+ Add</span>
+                  <span>Add</span>
                 </>
               )}
             </Link>
@@ -1234,12 +1234,12 @@ export default function ProfilePage() {
               {workExperiences.length > 0 || skillsList.length > 0 ? (
                 <>
                   <Pencil className="w-3 h-3" />
-                  <span>Edit</span>
+                  <span>Manage</span>
                 </>
               ) : (
                 <>
                   <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-                  <span>+ Add</span>
+                  <span>Add</span>
                 </>
               )}
             </Link>
@@ -1256,7 +1256,7 @@ export default function ProfilePage() {
                   href={isFlightCrew ? "/onboarding?edit=true&step=4" : "/onboarding?edit=true&step=5&section=work"}
                   className="text-xs text-[#1d4ed8] hover:underline font-semibold"
                 >
-                  {workExperiences.length > 0 ? "Manage" : "+ Add"}
+                  {workExperiences.length > 0 ? "Manage" : "Add"}
                 </Link>
               </div>
 
@@ -1306,7 +1306,7 @@ export default function ProfilePage() {
                   href={isFlightCrew ? "/onboarding?edit=true&step=5" : "/onboarding?edit=true&step=5&section=languages"}
                   className="text-xs text-[#1d4ed8] hover:underline font-semibold"
                 >
-                  {languagesList.length > 0 ? "Edit" : "+ Add"}
+                  {languagesList.length > 0 ? "Edit" : "Add"}
                 </Link>
               </div>
 
@@ -1336,7 +1336,7 @@ export default function ProfilePage() {
                   href={isFlightCrew ? "/onboarding?edit=true&step=5" : "/onboarding?edit=true&step=6"}
                   className="text-xs text-[#1d4ed8] hover:underline font-semibold"
                 >
-                  {skillsList.length > 0 ? "Edit" : "+ Add"}
+                  {skillsList.length > 0 ? "Edit" : "Add"}
                 </Link>
               </div>
 
@@ -1379,12 +1379,12 @@ export default function ProfilePage() {
               {affiliationName ? (
                 <>
                   <Pencil className="w-3 h-3" />
-                  <span>Edit</span>
+                  <span>Manage</span>
                 </>
               ) : (
                 <>
                   <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-                  <span>+ Add</span>
+                  <span>Add</span>
                 </>
               )}
             </Link>
