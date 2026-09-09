@@ -262,6 +262,15 @@ export default function ProfilePage() {
     return `/onboarding?edit=true&step=${getOnboardingStep(item.key)}`;
   };
 
+  const PENDING_AREA_SUBTITLES: Record<string, string> = {
+    personal_profile: "Add your basic details and contact info.",
+    aircraft_ratings: "Add at least one aircraft type rating.",
+    work_qualifications: "Add your aviation licenses or credentials.",
+    professional_profile: "Add your flight hours and career summary.",
+    career_skills: "Add your work history, skills, or languages.",
+    company_affiliation: "Link your airline or employer.",
+  };
+
   const workExperiences: any[] = Array.isArray(work) && work.length > 0
     ? work
     : Array.isArray(personal?.workExperiences)
@@ -860,24 +869,32 @@ export default function ProfilePage() {
               </div>
             </div>
 
-            {/* Compact remaining areas — full details are in the section cards below */}
+            {/* Vertical List of Pending Areas (Mobile Layout) */}
             {missingAreas.length > 0 && (
-              <div className="flex flex-col gap-2 pt-1">
-                <span className="text-[11px] text-gray-400 font-bold uppercase tracking-wider">
-                  Remaining
-                </span>
-                <div className="flex flex-wrap gap-2">
-                  {missingAreas.map((item) => (
-                    <Link
-                      key={item.key}
-                      href={getMissingAreaLink(item)}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gray-50 border border-gray-200/80 text-xs font-semibold text-gray-600 hover:bg-blue-50 hover:text-[#1d4ed8] hover:border-blue-200 transition-all cursor-pointer"
-                    >
-                      <Plus className="w-3 h-3 stroke-[2.5]" />
-                      <span>{item.label}</span>
-                    </Link>
-                  ))}
-                </div>
+              <div className="flex flex-col divide-y divide-gray-100 border-t border-gray-100/80 pt-1">
+                {missingAreas.map((item) => (
+                  <Link
+                    key={item.key}
+                    href={getMissingAreaLink(item)}
+                    className="flex items-center justify-between gap-3 py-3 px-1 hover:bg-blue-50/40 rounded-xl transition-colors cursor-pointer group"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-8 h-8 rounded-full bg-blue-50 text-[#1d4ed8] border border-blue-100 flex items-center justify-center shrink-0 group-hover:bg-[#1d4ed8] group-hover:text-white transition-colors">
+                        <Plus className="w-4 h-4 stroke-[2.5]" />
+                      </div>
+                      <div className="flex flex-col min-w-0">
+                        <span className="text-xs sm:text-sm font-bold text-gray-900 group-hover:text-[#1d4ed8] transition-colors truncate">
+                          {item.label}
+                        </span>
+                        <span className="text-[11px] sm:text-xs text-gray-500 font-medium truncate mt-0.5">
+                          {PENDING_AREA_SUBTITLES[item.key] || item.desc}
+                        </span>
+                      </div>
+                    </div>
+
+                    <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-[#1d4ed8] transition-colors shrink-0" />
+                  </Link>
+                ))}
               </div>
             )}
 
