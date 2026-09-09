@@ -822,13 +822,13 @@ export default function ProfilePage() {
         <div className="w-full flex flex-col gap-4">
 
         {/* =========================================================================
-            TOP PROGRESS CARD (Profile Completion)
+            TOP PROGRESS SECTION (Profile Completion)
             ========================================================================= */}
         {accountType !== "business" && completionPercentage < 100 && (
-          <div className="bg-white rounded-3xl border border-gray-100 p-5 sm:p-6 shadow-xs flex flex-col gap-4">
+          <div className="flex flex-col gap-3">
             
-            {/* Header with Title, Subtitle, and Synchronized Circular Percentage Ring */}
-            <div className="flex items-center justify-between gap-3">
+            {/* 1. Unboxed Header directly on the main gray background */}
+            <div className="flex items-center justify-between gap-3 px-1">
               <div className="flex flex-col">
                 <h3 className="text-base sm:text-lg font-extrabold text-gray-900">
                   Complete your profile
@@ -838,48 +838,23 @@ export default function ProfilePage() {
                 </span>
               </div>
 
-              {/* Synchronized Circular Green Progress Ring */}
-              <div className="relative w-14 h-14 flex items-center justify-center shrink-0">
-                <svg className="w-14 h-14 -rotate-90 pointer-events-none" viewBox="0 0 44 44">
-                  <circle
-                    cx="22"
-                    cy="22"
-                    r="19"
-                    className="text-emerald-100"
-                    strokeWidth="3"
-                    stroke="currentColor"
-                    fill="none"
-                  />
-                  <circle
-                    cx="22"
-                    cy="22"
-                    r="19"
-                    className="text-emerald-500 transition-all duration-500 ease-out"
-                    strokeWidth="3"
-                    strokeDasharray={2 * Math.PI * 19}
-                    strokeDashoffset={2 * Math.PI * 19 - (2 * Math.PI * 19 * Math.min(100, Math.max(0, completionPercentage))) / 100}
-                    strokeLinecap="round"
-                    stroke="currentColor"
-                    fill="none"
-                  />
-                </svg>
-                <span className="absolute inset-0 flex items-center justify-center text-xs font-extrabold text-emerald-600">
-                  {completionPercentage}%
-                </span>
-              </div>
+              {/* 2. Percentage Pill: Small light-green rounded pill with dark-green text */}
+              <span className="inline-flex items-center justify-center px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs sm:text-sm font-extrabold shrink-0 shadow-2xs">
+                {completionPercentage}%
+              </span>
             </div>
 
-            {/* Vertical List of Pending Areas (Mobile Layout) */}
+            {/* 3. Individual White Cards for Pending Items */}
             {missingAreas.length > 0 && (
-              <div className="flex flex-col divide-y divide-gray-100 border-t border-gray-100/80 pt-1">
+              <div className="flex flex-col gap-2.5">
                 {missingAreas.map((item) => (
                   <Link
                     key={item.key}
                     href={getMissingAreaLink(item)}
-                    className="flex items-center justify-between gap-3 py-3 px-1 hover:bg-blue-50/40 rounded-xl transition-colors cursor-pointer group"
+                    className="bg-white rounded-2xl sm:rounded-3xl border border-gray-100 p-4 sm:p-5 shadow-xs hover:border-blue-200 hover:shadow-sm transition-all flex items-center justify-between gap-3.5 cursor-pointer group"
                   >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-8 h-8 rounded-full bg-blue-50 text-[#1d4ed8] border border-blue-100 flex items-center justify-center shrink-0 group-hover:bg-[#1d4ed8] group-hover:text-white transition-colors">
+                    <div className="flex items-center gap-3.5 min-w-0">
+                      <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-blue-50 text-[#1d4ed8] border border-blue-100 flex items-center justify-center shrink-0 group-hover:bg-[#1d4ed8] group-hover:text-white transition-colors">
                         <Plus className="w-4 h-4 stroke-[2.5]" />
                       </div>
                       <div className="flex flex-col min-w-0">
