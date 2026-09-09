@@ -266,7 +266,6 @@ export default function ProfilePage() {
 
   const PENDING_AREA_SUBTITLES: Record<string, string> = {
     personal_profile: "Complete your identity, profile photo, nationality, date of birth, marital status, and children.",
-    licenses: "Add at least one license or certification.",
     aircraft_ratings: "Add at least one aircraft type rating.",
     work_qualifications: "Complete your work location, experience, and role details.",
     professional_profile: "Complete your contact details, summary, and English proficiency.",
@@ -278,11 +277,6 @@ export default function ProfilePage() {
       key: "personal_profile",
       label: "Personal profile",
       desc: "Complete your identity, profile photo, nationality, date of birth, marital status, and children.",
-    },
-    {
-      key: "licenses",
-      label: "Licenses",
-      desc: "Add at least one license or certification.",
     },
     {
       key: "aircraft_ratings",
@@ -306,28 +300,19 @@ export default function ProfilePage() {
     },
   ];
 
-  // Restored filter: only genuinely uncompleted areas out of the corrected 6-item list
-  const pendingAreas = ALL_CANONICAL_AREAS
-    .filter((canon) => {
-      const match = (completionAreas || []).find((a: any) => a.key === canon.key);
-      if (match) {
-        return !match.isDone;
-      }
-      if (missingAreas && missingAreas.length > 0) {
-        return missingAreas.some((m: any) => m.key === canon.key);
-      }
-      return true;
-    })
-    .map((canon) => {
-      const fromContext = (completionAreas || []).find((a: any) => a.key === canon.key);
-      return {
-        id: canon.key,
-        key: canon.key,
-        title: fromContext?.label || canon.label,
-        description: PENDING_AREA_SUBTITLES[canon.key] || fromContext?.desc || canon.desc,
-        href: getMissingAreaLink(canon),
-      };
-    });
+  // Visual QA & debugging override: Always render all 5 profile areas without filtering out completed ones
+  const pendingAreas = ALL_CANONICAL_AREAS.map((canon) => {
+    const fromContext =
+      (completionAreas || []).find((a: any) => a.key === canon.key) ||
+      (missingAreas || []).find((a: any) => a.key === canon.key);
+    return {
+      id: canon.key,
+      key: canon.key,
+      title: fromContext?.label || canon.label,
+      description: PENDING_AREA_SUBTITLES[canon.key] || fromContext?.desc || canon.desc,
+      href: getMissingAreaLink(canon),
+    };
+  });
 
   const completedCount = completedAreasCount;
 
@@ -886,13 +871,13 @@ export default function ProfilePage() {
         {/* =========================================================================
             TOP PROGRESS SECTION (Profile Completion)
             ========================================================================= */}
-        {accountType !== "business" && completionPercentage < 100 && pendingAreas.length > 0 && (
+        {accountType !== "business" && (
           <>
             {/* 1. HEADER: Flat on the gray background */}
             <div className="flex justify-between items-center mb-4 px-1 bg-transparent">
               <div>
                 <h2 className="text-xl font-bold text-gray-900">Complete your profile</h2>
-                <p className="text-sm text-gray-500 mt-0.5">{completedCount} of 6 profile areas complete</p>
+                <p className="text-sm text-gray-500 mt-0.5">{completedCount} of 5 profile areas complete</p>
               </div>
               {/* PERCENTAGE PILL: Light green background, NO borders, NO rings */}
               <div className="bg-[#E6F4EA] text-[#137333] px-3 py-1 rounded-lg text-sm font-bold">
