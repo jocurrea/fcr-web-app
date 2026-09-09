@@ -825,10 +825,9 @@ export default function ProfilePage() {
             TOP PROGRESS SECTION (Profile Completion)
             ========================================================================= */}
         {accountType !== "business" && completionPercentage < 100 && (
-          <div className="flex flex-col gap-3">
-            
-            {/* 1. Unboxed Header directly on the main gray background */}
-            <div className="flex items-center justify-between gap-3 px-1">
+          <div className="w-full flex flex-col">
+            {/* 1. The Header is NOT a card: Completely flat on main gray background */}
+            <div className="w-full flex items-center justify-between bg-transparent px-1 mb-3">
               <div className="flex flex-col">
                 <h3 className="text-base sm:text-lg font-extrabold text-gray-900">
                   Complete your profile
@@ -838,41 +837,40 @@ export default function ProfilePage() {
                 </span>
               </div>
 
-              {/* 2. Percentage Pill: Small light-green rounded pill with dark-green text */}
+              {/* 50% Pill: Simple, small light-green rounded pill with dark-green text */}
               <span className="inline-flex items-center justify-center px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs sm:text-sm font-extrabold shrink-0 shadow-2xs">
                 {completionPercentage}%
               </span>
             </div>
 
-            {/* 3. Individual White Cards for Pending Items */}
-            {missingAreas.length > 0 && (
-              <div className="flex flex-col gap-2.5">
-                {missingAreas.map((item) => (
-                  <Link
-                    key={item.key}
-                    href={getMissingAreaLink(item)}
-                    className="bg-white rounded-2xl sm:rounded-3xl border border-gray-100 p-4 sm:p-5 shadow-xs hover:border-blue-200 hover:shadow-sm transition-all flex items-center justify-between gap-3.5 cursor-pointer group"
-                  >
-                    <div className="flex items-center gap-3.5 min-w-0">
-                      <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-blue-50 text-[#1d4ed8] border border-blue-100 flex items-center justify-center shrink-0 group-hover:bg-[#1d4ed8] group-hover:text-white transition-colors">
-                        <Plus className="w-4 h-4 stroke-[2.5]" />
-                      </div>
-                      <div className="flex flex-col min-w-0">
-                        <span className="text-xs sm:text-sm font-bold text-gray-900 group-hover:text-[#1d4ed8] transition-colors truncate">
-                          {item.label}
-                        </span>
-                        <span className="text-[11px] sm:text-xs text-gray-500 font-medium truncate mt-0.5">
-                          {PENDING_AREA_SUBTITLES[item.key] || item.desc}
-                        </span>
-                      </div>
+            {/* 2. Individual Cards for Each Item */}
+            {missingAreas.map((item) => (
+              <div
+                key={item.key}
+                className="bg-white rounded-xl shadow-sm p-4 mb-4 border border-gray-100 hover:border-blue-200 transition-all"
+              >
+                <Link
+                  href={getMissingAreaLink(item)}
+                  className="flex items-center justify-between gap-3.5 cursor-pointer group"
+                >
+                  <div className="flex items-center gap-3.5 min-w-0">
+                    <div className="w-8 h-8 rounded-full bg-blue-50 text-[#1d4ed8] border border-blue-100 flex items-center justify-center shrink-0 group-hover:bg-[#1d4ed8] group-hover:text-white transition-colors">
+                      <Plus className="w-4 h-4 stroke-[2.5]" />
                     </div>
+                    <div className="flex flex-col min-w-0">
+                      <span className="text-sm font-bold text-gray-900 group-hover:text-[#1d4ed8] transition-colors truncate">
+                        {item.label}
+                      </span>
+                      <span className="text-xs text-gray-500 font-medium truncate mt-0.5">
+                        {PENDING_AREA_SUBTITLES[item.key] || item.desc}
+                      </span>
+                    </div>
+                  </div>
 
-                    <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-[#1d4ed8] transition-colors shrink-0" />
-                  </Link>
-                ))}
+                  <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-[#1d4ed8] transition-colors shrink-0" />
+                </Link>
               </div>
-            )}
-
+            ))}
           </div>
         )}
 
