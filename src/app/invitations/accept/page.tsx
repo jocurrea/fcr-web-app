@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, Suspense } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   Building2,
@@ -24,6 +24,100 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
+
+/* ─────────────────────────────────────────────
+ * Constants
+ * ───────────────────────────────────────────── */
+
+/** Invitation tokens must be 40-128 characters of URL-safe base64. */
+const TOKEN_REGEX = /^[A-Za-z0-9_-]{40,128}$/;
+
+/** sessionStorage key used to persist the token across auth redirects. */
+const SESSION_STORAGE_KEY = "fcr_invitation_token";
+
+/* ─────────────────────────────────────────────
+ * Hash-based token extraction hook
+ *
+ * Architecture rule: the invitation token is delivered
+ * **strictly** via the URL hash fragment (#token=<value>).
+ * It must never be read from search params / query string.
+ *
+ * Flow:
+ *   1. Read window.location.hash on mount.
+ *   2. Parse the "token" param from the hash fragment.
+ *   3. Validate format with TOKEN_REGEX.
+ *   4. Persist to sessionStorage immediately.
+ *   5. Strip the hash from the visible URL via history.replaceState.
+ *   6. If the hash is missing/empty, fall back to sessionStorage
+ *      (handles the post-auth-redirect case).
+ * ───────────────────────────────────────────── */
+function useHashToken(): { token: string; tokenError: string | null } {
+  const [token, setToken] = useState("");
+  const [tokenError, setTokenError] = useState<string | null>(null);
+
+  useEffect(() => {
+    // --- Step 1: Read raw hash ---
+    const rawHash = typeof window !== "undefined" ? window.location.hash : "";
+
+    let extracted = "";
+
+    if (rawHash && rawHash.length > 1) {
+      // Parse hash fragment as URLSearchParams (strip leading '#')
+      try {
+        const hashParams = new URLSearchParams(rawHash.substring(1));
+        extracted = (hashParams.get("token") || "").trim();
+      } catch {
+        // Malformed hash – fall through to sessionStorage
+      }
+    }
+
+    // --- Step 2: Fall back to sessionStorage (post-redirect) ---
+    if (!extracted) {
+      try {
+        extracted = (sessionStorage.getItem(SESSION_STORAGE_KEY) || "").trim();
+      } catch {
+        // sessionStorage unavailable (incognito edge-case) – ignore
+      }
+    }
+
+    // --- Step 3: Validate ---
+    if (!extracted) {
+      setTokenError("No invitation token provided. Please use the link from your invitation email.");
+      return;
+    }
+
+    if (!TOKEN_REGEX.test(extracted)) {
+      setTokenError("The invitation token format is invalid. Please use the original link from your email.");
+      return;
+    }
+
+    // --- Step 4: Persist to sessionStorage ---
+    try {
+      sessionStorage.setItem(SESSION_STORAGE_KEY, extracted);
+    } catch {
+      // Best-effort; if storage is full/blocked we still proceed
+    }
+
+    // --- Step 5: Strip hash from URL ---
+    if (rawHash && typeof window !== "undefined") {
+      try {
+        const cleanUrl =
+          window.location.pathname + window.location.search;
+        window.history.replaceState(null, "", cleanUrl);
+      } catch {
+        // history API unavailable – non-critical
+      }
+    }
+
+    setToken(extracted);
+  }, []); // Run once on mount
+
+  return { token, tokenError };
+}
+
+/* ─────────────────────────────────────────────
+ * Types
+ * ───────────────────────────────────────────── */
 
 interface InvitationData {
   company_id?: string;
@@ -51,10 +145,13 @@ type ActionState =
   | "expired"
   | "cancelled";
 
+/* ─────────────────────────────────────────────
+ * Main Component
+ * ───────────────────────────────────────────── */
+
 function AcceptInvitationContent() {
-  const searchParams = useSearchParams();
   const router = useRouter();
-  const token = searchParams.get("token") || "";
+  const { token, tokenError } = useHashToken();
 
   const [sessionUser, setSessionUser] = useState<any>(null);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
@@ -93,9 +190,15 @@ function AcceptInvitationContent() {
 
   // 2. Token Resolution via RPC
   useEffect(() => {
-    if (!token) {
+    // Wait until the hash hook has settled — if tokenError is set, surface it
+    if (tokenError) {
       setIsResolving(false);
-      setResolveError("No invitation token provided in the URL.");
+      setResolveError(tokenError);
+      return;
+    }
+
+    if (!token) {
+      // Hook hasn't resolved yet (still in its useEffect); stay in loading state
       return;
     }
 
@@ -163,7 +266,7 @@ function AcceptInvitationContent() {
     }
 
     resolveInvitation();
-  }, [token]);
+  }, [token, tokenError]);
 
   // 3. Action Handlers: Accept
   const handleAccept = async () => {
@@ -199,6 +302,9 @@ function AcceptInvitationContent() {
       }
 
       setActionState("accepted");
+
+      // Clean up sessionStorage after successful acceptance
+      try { sessionStorage.removeItem(SESSION_STORAGE_KEY); } catch { /* ignore */ }
     } catch (err: any) {
       console.error("Error accepting invitation:", err);
       setActionError(
@@ -244,6 +350,9 @@ function AcceptInvitationContent() {
       }
 
       setActionState("declined");
+
+      // Clean up sessionStorage after successful decline
+      try { sessionStorage.removeItem(SESSION_STORAGE_KEY); } catch { /* ignore */ }
     } catch (err: any) {
       console.error("Error declining invitation:", err);
       setActionError(
@@ -271,7 +380,9 @@ function AcceptInvitationContent() {
   const roleName = invitation?.role || invitation?.position || "Aviation Professional";
   const targetEmail = invitation?.email || invitation?.invited_email || null;
 
-  const currentRedirectUrl = `/invitations/accept?token=${encodeURIComponent(token)}`;
+  // Redirect URL preserves token in the hash fragment (never query string)
+  // After auth redirect, the token is recovered from sessionStorage by useHashToken
+  const currentRedirectUrl = `/invitations/accept`;
 
   // ==========================================
   // RENDER: Loading State
