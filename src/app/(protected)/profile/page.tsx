@@ -102,44 +102,56 @@ export default function ProfilePage() {
         return;
       }
 
-      // 1. Fetch current resume data
+      // 1. Clean resumes table data
       const { data: currentResume } = await supabase
         .from("resumes")
         .select("data")
         .eq("userId", userId)
         .maybeSingle();
 
-      const resumeData = (currentResume?.data as any) || {};
+      const currentData = (currentResume?.data as any) || {};
       const updatedPersonal = {
-        ...(resumeData.personal || {}),
+        ...(currentData.personal || {}),
         flightHours: null,
         totalFlightHours: null,
         flight_hours: null,
         summary: null,
         aboutMe: null,
         description: null,
+        bio: null,
         licenses: [],
         ratings: [],
         qualifications: null,
+        work: [],
+        workExperiences: [],
+        skills: [],
+        structuredSkills: [],
+        languages: [],
       };
 
       const updatedResumeObj = {
-        ...(resumeData.resume || {}),
+        ...(currentData.resume || {}),
         summary: null,
+        skills: [],
+        languages: [],
       };
 
       const cleanResumeData = {
-        ...resumeData,
+        ...currentData,
         licenses: [],
         ratings: [],
         qualifications: null,
         flightHours: null,
+        totalFlightHours: null,
+        flight_hours: null,
         summary: null,
+        work: [],
+        skills: [],
+        languages: [],
         personal: updatedPersonal,
         resume: updatedResumeObj,
       };
 
-      // 2. Update resumes table in Supabase
       await supabase.from("resumes").upsert(
         {
           userId: userId,
@@ -148,40 +160,66 @@ export default function ProfilePage() {
         { onConflict: "userId" }
       );
 
-      // 3. Clear user_profiles if row exists
+      // 2. Clean user_profiles table
       try {
         await supabase
           .from("user_profiles")
           .update({
-            professionalCredentials: [],
-            professional_credentials: [],
             flightHours: null,
-            flight_hours: null,
-            summary: null,
+            flight_hours: null as any,
+            bio: null,
+            professionalCredentials: [],
+            spokenLanguages: [],
+            professionalWorkExperiences: [],
           })
-          .or(`userId.eq.${userId},user_id.eq.${userId}`);
-      } catch (e) {
-        console.warn("user_profiles update notice:", e);
-      }
+          .eq("userId", userId);
+      } catch (e) {}
 
-      // 4. Clear users table if columns exist
+      try {
+        await supabase
+          .from("user_profiles")
+          .update({
+            flightHours: null,
+            bio: null,
+            professionalCredentials: [],
+            spokenLanguages: [],
+            professionalWorkExperiences: [],
+          })
+          .eq("user_id", userId as any);
+      } catch (e) {}
+
+      // 3. Clean flight_crew_profiles table
+      try {
+        await supabase
+          .from("flight_crew_profiles")
+          .update({
+            flightHours: null,
+            englishProficiency: null,
+          })
+          .eq("userId", userId);
+      } catch (e) {}
+
+      // 4. Clean users table
       try {
         await supabase
           .from("users")
           .update({
-            flight_hours: null,
-            summary: null,
+            flightHours: null,
+            flight_hours: null as any,
+            bio: null,
           })
           .eq("id", userId);
-      } catch (e) {
-        console.warn("users update notice:", e);
-      }
+      } catch (e) {}
 
-      // 5. Clear localStorage cached data
+      // 5. Clean localStorage
       try {
         localStorage.removeItem("onboarding_licenses");
         localStorage.removeItem("onboarding_ratings");
         localStorage.removeItem("onboarding_resume");
+        localStorage.removeItem("onboarding_work");
+        localStorage.removeItem("onboarding_skills");
+        localStorage.removeItem("onboarding_languages");
+
         const localPersonalStr = localStorage.getItem("onboarding_personal");
         if (localPersonalStr) {
           const parsed = JSON.parse(localPersonalStr);
@@ -191,26 +229,33 @@ export default function ProfilePage() {
           parsed.summary = null;
           parsed.aboutMe = null;
           parsed.description = null;
+          parsed.bio = null;
           parsed.licenses = [];
           parsed.ratings = [];
           parsed.qualifications = null;
+          parsed.work = [];
+          parsed.workExperiences = [];
+          parsed.skills = [];
+          parsed.structuredSkills = [];
+          parsed.languages = [];
           localStorage.setItem("onboarding_personal", JSON.stringify(parsed));
         }
-      } catch (e) {
-        console.warn("localStorage clean notice:", e);
-      }
+      } catch (e) {}
 
-      // 6. Refresh provider and Next.js router
+      // 6. Refresh profile data and trigger UI updates
       try {
         await supabase.rpc("get_my_profile");
       } catch (e) {}
 
       await revalidateProfileLayout();
       await refetchProfile();
+
       if (typeof window !== "undefined") {
         window.dispatchEvent(new CustomEvent("profile-updated"));
       }
+
       router.refresh();
+      alert("Test data reset successfully! Profile progress is now at base (15%).");
     } catch (err: any) {
       console.error("Error resetting test data:", err);
       alert("Error resetting test data: " + (err?.message || err));
