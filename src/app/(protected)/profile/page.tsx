@@ -872,10 +872,10 @@ export default function ProfilePage() {
             <div className="flex justify-between items-start mb-4 px-1 bg-transparent">
               <div>
                 <h2 className="text-[20px] font-bold text-gray-900 leading-tight">Complete your profile</h2>
-                <p className="text-[14px] text-gray-500 mt-0.5">1 of 6 profile areas complete</p>
+                <p className="text-[14px] text-gray-500 mt-0.5">{completedAreasCount} of 6 profile areas complete</p>
               </div>
               <div className="bg-[#E6F4EA] text-[#137333] px-3 py-1 rounded-[8px] text-sm font-bold">
-                15%
+                {profileProgress}%
               </div>
             </div>
 
