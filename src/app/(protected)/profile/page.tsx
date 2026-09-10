@@ -44,6 +44,8 @@ export default function ProfilePage() {
   const BuildingOfficeIcon = Building2;
   const HeartIcon = Heart;
   const EyeIcon = Eye;
+  const PhoneIcon = Phone;
+  const EnvelopeIcon = Mail;
   const {
     profileProgress,
     profilePhoto,
@@ -1064,6 +1066,74 @@ export default function ProfilePage() {
             <ChevronRightIcon className="w-5 h-5 text-gray-400 flex-shrink-0" />
           </div>
         </div>
+
+        {professionalRole === 'aviation_professional' && (
+          <div className="flex flex-col gap-4 mt-6 mb-8">
+            
+            {/* 1. PROFESSIONAL DETAILS */}
+            <div className="bg-white rounded-[20px] p-5 shadow-sm border border-gray-100">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-[16px] font-bold text-gray-900">Professional details</h3>
+                <button className="text-blue-600 font-semibold text-[14px]">Add</button>
+              </div>
+              
+              <div className="flex flex-col gap-4">
+                <div>
+                  <p className="text-[14px] text-gray-600 mb-1">Location</p>
+                  <p className="text-[14px] text-gray-400">Not added</p>
+                </div>
+                <div className="h-[1px] w-full bg-gray-100"></div>
+                <div>
+                  <p className="text-[14px] text-gray-600 mb-1">Work experience</p>
+                  <p className="text-[14px] text-gray-400">Not added</p>
+                </div>
+                <div className="h-[1px] w-full bg-gray-100"></div>
+                <div>
+                  <p className="text-[14px] text-gray-600 mb-1">Languages</p>
+                  <p className="text-[14px] text-gray-400">Not added</p>
+                </div>
+              </div>
+            </div>
+
+            {/* 2. SKILLS */}
+            <div className="bg-white rounded-[20px] p-5 shadow-sm border border-gray-100">
+              <div className="flex justify-between items-center mb-2">
+                <h3 className="text-[16px] font-bold text-gray-900">Skills</h3>
+                <button className="text-blue-600 font-semibold text-[14px]">Add</button>
+              </div>
+              <p className="text-[14px] text-gray-500">Add the skills that best describe your work.</p>
+            </div>
+
+            {/* 3. CONTACT & CREDENTIALS */}
+            <div className="bg-white rounded-[20px] p-5 shadow-sm border border-gray-100">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-[16px] font-bold text-gray-900">Contact & Credentials</h3>
+                <button className="text-blue-600 font-semibold text-[14px]">Edit</button>
+              </div>
+              
+              <div className="flex flex-col gap-3">
+                <div className="flex items-center gap-3">
+                  <PhoneIcon className="w-5 h-5 text-gray-400" />
+                  {/* Remplazar con variable real cuando se conecte */}
+                  <span className="text-[14px] text-blue-600">693589632</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <EnvelopeIcon className="w-5 h-5 text-gray-400" />
+                  {/* Remplazar con variable real cuando se conecte */}
+                  <span className="text-[14px] text-blue-600">celular@gmail.com</span>
+                </div>
+                
+                <div className="mt-2">
+                  <p className="text-[14px] text-gray-900 mb-2 font-medium">Licenses & Certifications</p>
+                  <div className="inline-block px-4 py-1.5 bg-gray-50 border border-gray-100 rounded-[10px] text-[13px] text-gray-700">
+                    Fgh
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        )}
 
         {/* 4. SECCIONES ESPECÍFICAS DE ROL */}
         {isFlightCrew && (
