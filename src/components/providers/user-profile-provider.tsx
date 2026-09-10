@@ -628,7 +628,7 @@ export function UserProfileProvider({
           .map((l: any) => l?.name || l?.licenseName || l)
           .filter(Boolean);
 
-        const calculation = computeProfileAreas({
+        const areasInput = {
           photo: resolvedPhoto,
           name: [mergedPersonal?.firstName, mergedPersonal?.lastName].filter(Boolean).join(" ") || null,
           location: mergedPersonal?.location || null,
@@ -645,6 +645,16 @@ export function UserProfileProvider({
           skills: resolvedSkills,
           affiliation: resolvedAffiliation,
           companyName: mergedPersonal?.companyName || mergedPersonal?.linkedCompany || null,
+        };
+
+        console.log("[DEBUG-PROFILE-PROGRESS] Input to computeProfileAreas:", JSON.stringify(areasInput, null, 2));
+
+        const calculation = computeProfileAreas(areasInput);
+
+        console.log("[DEBUG-PROFILE-PROGRESS] Result:", {
+          percentage: calculation.percentage,
+          completedCount: calculation.completedCount,
+          areas: calculation.areas.map((a: any) => ({ key: a.key, isDone: a.isDone })),
         });
 
         progress = calculation.percentage;
