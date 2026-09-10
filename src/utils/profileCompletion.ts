@@ -106,34 +106,22 @@ export interface ProfileAreasInput {
  */
 export function computeProfileAreas(data: ProfileAreasInput) {
   // 1. Personal profile (nombre, fecha de nacimiento, nacionalidad etc.)
-  const hasName = Boolean(data.name && typeof data.name === "string" && data.name.trim().length > 0);
-  const hasLocation = Boolean(data.location && typeof data.location === "string" && data.location.trim().length > 0);
-  const isPersonalDone = hasName || hasLocation;
+  const isPersonalDone = !!data?.name && typeof data.name === "string" && data.name.trim().length > 0;
 
   // 2. Licenses
-  const isLicensesDone = Array.isArray(data.licenses) && data.licenses.length > 0;
+  const isLicensesDone = Array.isArray(data?.licenses) && data.licenses.length > 0;
 
   // 3. Aircraft ratings
-  const isRatingsDone = Array.isArray(data.ratings) && data.ratings.length > 0;
+  const isRatingsDone = Array.isArray(data?.ratings) && data.ratings.length > 0;
 
   // 4. Work and qualifications
-  const hasWork = Array.isArray(data.work) && data.work.length > 0;
-  const hasQualifications = Array.isArray(data.qualifications) && data.qualifications.length > 0;
-  const isWorkQualificationsDone = hasWork || hasQualifications;
+  const isWorkQualificationsDone = (Array.isArray(data?.work) && data.work.length > 0) || (Array.isArray(data?.qualifications) && data.qualifications.length > 0);
 
   // 5. Professional profile
-  const hasFlightHours = Boolean(
-    data.flightHours &&
-    String(data.flightHours).trim().length > 0 &&
-    String(data.flightHours).trim() !== "0"
-  );
-  const hasSummary = Boolean(data.summary && typeof data.summary === "string" && data.summary.trim().length > 0);
-  const isProfessionalDone = hasFlightHours || hasSummary;
+  const isProfessionalDone = (!!data?.flightHours && Number(data.flightHours) > 0) || (typeof data?.summary === "string" && data.summary.trim().length > 0);
 
   // 6. Career and skills
-  const hasSkills = Array.isArray(data.skills) && data.skills.length > 0;
-  const hasLanguages = Array.isArray(data.languages) && data.languages.length > 0;
-  const isCareerSkillsDone = hasSkills || hasLanguages;
+  const isCareerSkillsDone = (Array.isArray(data?.skills) && data.skills.length > 0) || (Array.isArray(data?.languages) && data.languages.length > 0);
 
   const areas: CompletionArea[] = [
     {
