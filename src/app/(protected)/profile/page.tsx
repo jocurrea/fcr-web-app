@@ -883,7 +883,10 @@ export default function ProfilePage() {
             <div className="flex flex-col gap-3">
               
               {/* Tarjeta 1: Personal profile */}
-              <div className="bg-white rounded-[20px] p-4 flex items-center gap-4 shadow-sm border border-gray-100">
+              <div 
+                onClick={() => router.push(getMissingAreaLink({ key: "personal_profile" }))}
+                className="bg-white rounded-[20px] p-4 flex items-center gap-4 shadow-sm border border-gray-100"
+              >
                 <div className="w-10 h-10 rounded-full bg-[#F0F4FF] flex items-center justify-center flex-shrink-0">
                   <PlusIcon className="w-5 h-5 text-blue-500" />
                 </div>
@@ -895,7 +898,10 @@ export default function ProfilePage() {
               </div>
 
               {/* Tarjeta 2: Aircraft ratings */}
-              <div className="bg-white rounded-[20px] p-4 flex items-center gap-4 shadow-sm border border-gray-100">
+              <div 
+                onClick={() => router.push(getMissingAreaLink({ key: "aircraft_ratings" }))}
+                className="bg-white rounded-[20px] p-4 flex items-center gap-4 shadow-sm border border-gray-100"
+              >
                 <div className="w-10 h-10 rounded-full bg-[#F0F4FF] flex items-center justify-center flex-shrink-0">
                   <PlusIcon className="w-5 h-5 text-blue-500" />
                 </div>
@@ -907,7 +913,10 @@ export default function ProfilePage() {
               </div>
 
               {/* Tarjeta 3: Work and qualifications */}
-              <div className="bg-white rounded-[20px] p-4 flex items-center gap-4 shadow-sm border border-gray-100">
+              <div 
+                onClick={() => router.push(getMissingAreaLink({ key: "work_qualifications" }))}
+                className="bg-white rounded-[20px] p-4 flex items-center gap-4 shadow-sm border border-gray-100"
+              >
                 <div className="w-10 h-10 rounded-full bg-[#F0F4FF] flex items-center justify-center flex-shrink-0">
                   <PlusIcon className="w-5 h-5 text-blue-500" />
                 </div>
@@ -919,7 +928,10 @@ export default function ProfilePage() {
               </div>
 
               {/* Tarjeta 4: Professional profile */}
-              <div className="bg-white rounded-[20px] p-4 flex items-center gap-4 shadow-sm border border-gray-100">
+              <div 
+                onClick={() => router.push(getMissingAreaLink({ key: "professional_profile" }))}
+                className="bg-white rounded-[20px] p-4 flex items-center gap-4 shadow-sm border border-gray-100"
+              >
                 <div className="w-10 h-10 rounded-full bg-[#F0F4FF] flex items-center justify-center flex-shrink-0">
                   <PlusIcon className="w-5 h-5 text-blue-500" />
                 </div>
@@ -931,7 +943,10 @@ export default function ProfilePage() {
               </div>
 
               {/* Tarjeta 5: Career and skills */}
-              <div className="bg-white rounded-[20px] p-4 flex items-center gap-4 shadow-sm border border-gray-100">
+              <div 
+                onClick={() => router.push(getMissingAreaLink({ key: "career_skills" }))}
+                className="bg-white rounded-[20px] p-4 flex items-center gap-4 shadow-sm border border-gray-100"
+              >
                 <div className="w-10 h-10 rounded-full bg-[#F0F4FF] flex items-center justify-center flex-shrink-0">
                   <PlusIcon className="w-5 h-5 text-blue-500" />
                 </div>
@@ -949,7 +964,10 @@ export default function ProfilePage() {
             {/* 1. COMPANY AFFILIATION */}
             <div className="mt-8 mb-6">
               <h3 className="text-[15px] font-bold text-gray-900 mb-3 px-1">Company affiliation</h3>
-              <div className="bg-white rounded-[20px] p-4 flex items-center gap-4 shadow-sm border border-gray-100 cursor-pointer">
+              <div 
+                onClick={() => router.push("/business/affiliate")}
+                className="bg-white rounded-[20px] p-4 flex items-center gap-4 shadow-sm border border-gray-100 cursor-pointer"
+              >
                 <div className="w-10 h-10 rounded-full bg-[#F0F4FF] flex items-center justify-center flex-shrink-0">
                   <BuildingOfficeIcon className="w-5 h-5 text-blue-500" />
                 </div>
@@ -963,7 +981,12 @@ export default function ProfilePage() {
 
             {/* 2. PILOT BADGE / WINGS CARD */}
             <div className="bg-white rounded-[20px] p-5 shadow-sm border border-gray-100 mb-4 relative">
-              <button className="absolute top-4 right-4 text-blue-600 font-semibold text-sm">Edit</button>
+              <button 
+                onClick={() => router.push("/onboarding?edit=true&step=1")}
+                className="absolute top-4 right-4 text-blue-600 font-semibold text-sm"
+              >
+                Edit
+              </button>
               
               <div className="flex flex-col items-center justify-center mb-6 mt-4">
                  {/* Aquí va el componente o imagen de las alas */}
@@ -987,7 +1010,12 @@ export default function ProfilePage() {
             <div className="bg-white rounded-[20px] p-5 shadow-sm border border-gray-100 mb-6">
               <div className="flex justify-between items-start mb-6">
                 <h3 className="text-lg font-bold text-gray-900">Licenses</h3>
-                <button className="text-blue-600 font-semibold text-sm">Manage</button>
+                <button 
+                  onClick={() => router.push("/onboarding?edit=true&step=2")}
+                  className="text-blue-600 font-semibold text-sm"
+                >
+                  Manage
+                </button>
               </div>
               
               <div className="flex justify-between items-center">
