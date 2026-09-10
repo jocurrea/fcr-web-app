@@ -1084,7 +1084,12 @@ export default function ProfilePage() {
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-[16px] font-bold text-gray-900">Professional details</h3>
                 <button 
-                  onClick={() => router.push("/onboarding?edit=true&step=5")}
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    router.push("/onboarding?edit=true&step=5");
+                  }}
                   className="text-blue-600 font-semibold text-[14px] cursor-pointer"
                 >
                   Add
@@ -1093,7 +1098,11 @@ export default function ProfilePage() {
               
               <div className="flex flex-col gap-4">
                 <div 
-                  onClick={() => router.push("/onboarding?edit=true&step=5&section=location")}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    router.push("/onboarding?edit=true&step=5&section=location");
+                  }}
                   className="cursor-pointer"
                 >
                   <p className="text-[14px] text-gray-600 mb-1">Location</p>
@@ -1105,7 +1114,11 @@ export default function ProfilePage() {
                 </div>
                 <div className="h-[1px] w-full bg-gray-100"></div>
                 <div 
-                  onClick={() => router.push("/onboarding?edit=true&step=5&section=work")}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    router.push("/onboarding?edit=true&step=5&section=work");
+                  }}
                   className="cursor-pointer"
                 >
                   <p className="text-[14px] text-gray-600 mb-1">Work experience</p>
@@ -1119,7 +1132,11 @@ export default function ProfilePage() {
                 </div>
                 <div className="h-[1px] w-full bg-gray-100"></div>
                 <div 
-                  onClick={() => router.push("/onboarding?edit=true&step=5&section=languages")}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    router.push("/onboarding?edit=true&step=5&section=languages");
+                  }}
                   className="cursor-pointer"
                 >
                   <p className="text-[14px] text-gray-600 mb-1">Languages</p>
@@ -1135,7 +1152,12 @@ export default function ProfilePage() {
               <div className="flex justify-between items-center mb-2">
                 <h3 className="text-[16px] font-bold text-gray-900">Skills</h3>
                 <button 
-                  onClick={() => router.push("/onboarding?edit=true&step=6")}
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    router.push("/onboarding?edit=true&step=6");
+                  }}
                   className="text-blue-600 font-semibold text-[14px] cursor-pointer"
                 >
                   Add
@@ -1153,7 +1175,12 @@ export default function ProfilePage() {
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-[16px] font-bold text-gray-900">Contact & Credentials</h3>
                 <button 
-                  onClick={() => router.push("/onboarding?edit=true&step=4")}
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    router.push("/onboarding?edit=true&step=4");
+                  }}
                   className="text-blue-600 font-semibold text-[14px] cursor-pointer"
                 >
                   Edit
