@@ -885,7 +885,7 @@ export default function ProfilePage() {
               {/* Tarjeta 1: Personal profile */}
               <div 
                 onClick={() => router.push(getMissingAreaLink({ key: "personal_profile" }))}
-                className="bg-white rounded-[20px] p-4 flex items-center gap-4 shadow-sm border border-gray-100"
+                className="bg-white rounded-[20px] p-4 flex items-center gap-4 shadow-sm border border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors"
               >
                 <div className="w-10 h-10 rounded-full bg-[#F0F4FF] flex items-center justify-center flex-shrink-0">
                   <PlusIcon className="w-5 h-5 text-blue-500" />
@@ -900,7 +900,7 @@ export default function ProfilePage() {
               {/* Tarjeta 2: Aircraft ratings */}
               <div 
                 onClick={() => router.push(getMissingAreaLink({ key: "aircraft_ratings" }))}
-                className="bg-white rounded-[20px] p-4 flex items-center gap-4 shadow-sm border border-gray-100"
+                className="bg-white rounded-[20px] p-4 flex items-center gap-4 shadow-sm border border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors"
               >
                 <div className="w-10 h-10 rounded-full bg-[#F0F4FF] flex items-center justify-center flex-shrink-0">
                   <PlusIcon className="w-5 h-5 text-blue-500" />
@@ -915,7 +915,7 @@ export default function ProfilePage() {
               {/* Tarjeta 3: Work and qualifications */}
               <div 
                 onClick={() => router.push(getMissingAreaLink({ key: "work_qualifications" }))}
-                className="bg-white rounded-[20px] p-4 flex items-center gap-4 shadow-sm border border-gray-100"
+                className="bg-white rounded-[20px] p-4 flex items-center gap-4 shadow-sm border border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors"
               >
                 <div className="w-10 h-10 rounded-full bg-[#F0F4FF] flex items-center justify-center flex-shrink-0">
                   <PlusIcon className="w-5 h-5 text-blue-500" />
@@ -930,7 +930,7 @@ export default function ProfilePage() {
               {/* Tarjeta 4: Professional profile */}
               <div 
                 onClick={() => router.push(getMissingAreaLink({ key: "professional_profile" }))}
-                className="bg-white rounded-[20px] p-4 flex items-center gap-4 shadow-sm border border-gray-100"
+                className="bg-white rounded-[20px] p-4 flex items-center gap-4 shadow-sm border border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors"
               >
                 <div className="w-10 h-10 rounded-full bg-[#F0F4FF] flex items-center justify-center flex-shrink-0">
                   <PlusIcon className="w-5 h-5 text-blue-500" />
@@ -945,7 +945,7 @@ export default function ProfilePage() {
               {/* Tarjeta 5: Career and skills */}
               <div 
                 onClick={() => router.push(getMissingAreaLink({ key: "career_skills" }))}
-                className="bg-white rounded-[20px] p-4 flex items-center gap-4 shadow-sm border border-gray-100"
+                className="bg-white rounded-[20px] p-4 flex items-center gap-4 shadow-sm border border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors"
               >
                 <div className="w-10 h-10 rounded-full bg-[#F0F4FF] flex items-center justify-center flex-shrink-0">
                   <PlusIcon className="w-5 h-5 text-blue-500" />
@@ -966,7 +966,7 @@ export default function ProfilePage() {
               <h3 className="text-[15px] font-bold text-gray-900 mb-3 px-1">Company affiliation</h3>
               <div 
                 onClick={() => router.push("/business/affiliate")}
-                className="bg-white rounded-[20px] p-4 flex items-center gap-4 shadow-sm border border-gray-100 cursor-pointer"
+                className="bg-white rounded-[20px] p-4 flex items-center gap-4 shadow-sm border border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors"
               >
                 <div className="w-10 h-10 rounded-full bg-[#F0F4FF] flex items-center justify-center flex-shrink-0">
                   <BuildingOfficeIcon className="w-5 h-5 text-blue-500" />
