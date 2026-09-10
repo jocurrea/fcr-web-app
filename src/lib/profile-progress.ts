@@ -1,5 +1,5 @@
 export {
-  PERCENTAGE_MAP,
+  PROGRESS_STEPS as PERCENTAGE_MAP,
   calculateCompletionPercentage,
   fetchProfileProgress,
   mapSectionsToPercentage,

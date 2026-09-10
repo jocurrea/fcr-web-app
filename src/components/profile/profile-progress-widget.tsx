@@ -3,12 +3,12 @@
 import React, { useMemo } from "react";
 import {
   calculateCompletionPercentage,
-  PERCENTAGE_MAP,
+  PROGRESS_STEPS,
   ProfileData,
   SnapPercentage,
 } from "@/utils/profileCompletion";
 
-export { calculateCompletionPercentage, PERCENTAGE_MAP };
+export { calculateCompletionPercentage, PROGRESS_STEPS as PERCENTAGE_MAP };
 export type { ProfileData, SnapPercentage };
 
 const DEFAULT_SECTION_LABELS = [

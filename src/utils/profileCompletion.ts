@@ -10,9 +10,9 @@ import { supabase } from "@/lib/supabase";
  * 5/6 => 85%
  * 6/6 => 100%
  */
-export const PERCENTAGE_MAP = [0, 15, 30, 50, 70, 85, 100] as const;
+export const PROGRESS_STEPS = [0, 15, 30, 50, 70, 85, 100] as const;
 
-export type SnapPercentage = (typeof PERCENTAGE_MAP)[number];
+export type SnapPercentage = (typeof PROGRESS_STEPS)[number];
 
 export interface CompletionArea {
   key: string;
@@ -105,42 +105,35 @@ export interface ProfileAreasInput {
  * 6. Career and skills
  */
 export function computeProfileAreas(data: ProfileAreasInput) {
-  // 1. Personal profile (photo or name+location or contact details)
-  const hasPhoto = Boolean(data.photo && typeof data.photo === "string" && data.photo.trim().length > 0);
-  const hasLocation = Boolean(data.location && typeof data.location === "string" && data.location.trim().length > 0);
+  // 1. Personal profile (nombre, fecha de nacimiento, nacionalidad etc.)
   const hasName = Boolean(data.name && typeof data.name === "string" && data.name.trim().length > 0);
-  const isPersonalDone = hasPhoto || (hasLocation && hasName) || Boolean(data.phone || data.email);
+  const hasLocation = Boolean(data.location && typeof data.location === "string" && data.location.trim().length > 0);
+  const isPersonalDone = hasName || hasLocation;
 
-  // 2. Licenses (pilot/crew aviation licenses or credentials)
-  const hasLicenses = Array.isArray(data.licenses) && data.licenses.length > 0;
-  const isLicensesDone = hasLicenses;
+  // 2. Licenses
+  const isLicensesDone = Array.isArray(data.licenses) && data.licenses.length > 0;
 
-  // 3. Aircraft ratings (type ratings / aircraft certificates)
-  const hasRatings = Array.isArray(data.ratings) && data.ratings.length > 0;
-  const isRatingsDone = hasRatings;
+  // 3. Aircraft ratings
+  const isRatingsDone = Array.isArray(data.ratings) && data.ratings.length > 0;
 
-  // 4. Work and qualifications (experience, qualifications, or role details)
+  // 4. Work and qualifications
+  const hasWork = Array.isArray(data.work) && data.work.length > 0;
   const hasQualifications = Array.isArray(data.qualifications) && data.qualifications.length > 0;
-  const isWorkQualificationsDone =
-    hasQualifications ||
-    (Array.isArray(data.work) && data.work.length > 0) ||
-    Boolean(data.location && data.role);
+  const isWorkQualificationsDone = hasWork || hasQualifications;
 
-  // 5. Professional profile (flight hours, professional summary, or role)
+  // 5. Professional profile
   const hasFlightHours = Boolean(
     data.flightHours &&
     String(data.flightHours).trim().length > 0 &&
     String(data.flightHours).trim() !== "0"
   );
   const hasSummary = Boolean(data.summary && typeof data.summary === "string" && data.summary.trim().length > 0);
-  const hasRole = Boolean(data.role && typeof data.role === "string" && data.role.trim().length > 0);
-  const isProfessionalDone = hasFlightHours || hasSummary || hasRole;
+  const isProfessionalDone = hasFlightHours || hasSummary;
 
-  // 6. Career and skills (work history, skills, languages)
-  const hasWork = Array.isArray(data.work) && data.work.length > 0;
+  // 6. Career and skills
   const hasSkills = Array.isArray(data.skills) && data.skills.length > 0;
   const hasLanguages = Array.isArray(data.languages) && data.languages.length > 0;
-  const isCareerSkillsDone = hasWork || hasSkills || hasLanguages;
+  const isCareerSkillsDone = hasSkills || hasLanguages;
 
   const areas: CompletionArea[] = [
     {
@@ -206,7 +199,7 @@ export function computeProfileAreas(data: ProfileAreasInput) {
  */
 export function mapSectionsToPercentage(sectionsCompleted: number): number {
   const index = Math.max(0, Math.min(6, Math.floor(sectionsCompleted)));
-  return PERCENTAGE_MAP[index];
+  return PROGRESS_STEPS[index];
 }
 
 /**
