@@ -15,7 +15,6 @@ import {
   Search,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { requestCompanyAffiliationFallbackAction } from "@/actions/affiliations";
 import { CompanySearchAutocomplete, type CompanySelection } from "@/components/profile/company-search-autocomplete";
 import { cn } from "@/lib/utils";
 
@@ -143,72 +142,52 @@ export default function BusinessAffiliatePage() {
       }
 
       if (selectedCompany.id) {
-        // 1. Registered Business Account -> strictly call request_company_affiliation(uuid) RPC
-        let rpcRes = await supabase.rpc("request_company_affiliation", {
+        // 1. Registered Business Account -> strictly call request_company_affiliation RPC
+        const res = await supabase.rpc("request_company_affiliation", {
           target_company_id: selectedCompany.id,
         });
 
-        if (rpcRes.error) {
-          // Try alternative parameter signatures if the PostgreSQL parameter name differs
-          const rpcRes2 = await supabase.rpc("request_company_affiliation", {
-            company_id: selectedCompany.id,
-          });
-          if (!rpcRes2.error) {
-            rpcRes = rpcRes2;
-          } else {
-            const rpcRes3 = await supabase.rpc("request_company_affiliation", {
-              p_company_id: selectedCompany.id,
-            });
-            if (!rpcRes3.error) {
-              rpcRes = rpcRes3;
-            }
-          }
+        // Strict verification: check for RPC error or non-200/204 status
+        if (res.error || (res.status && res.status !== 200 && res.status !== 204)) {
+          console.error("Supabase RPC request_company_affiliation error:", res.error, "Status:", res.status);
+          const errorMsg =
+            res.error?.message ||
+            (res.status === 403
+              ? "Access denied (403): You do not have permission to request affiliation with this company."
+              : "Failed to submit affiliation request. Please try again.");
+
+          setErrorMessage(errorMsg);
+          setIsSubmitting(false);
+          return;
         }
 
-        // If the RPC fails due to RLS, permissions, or missing grants, securely fallback to Server Action with service role key
-        if (rpcRes.error) {
-          console.warn("Client RPC request_company_affiliation notice:", rpcRes.error.message, "— Invoking secure fallback Server Action...");
-          const fallbackRes = await requestCompanyAffiliationFallbackAction({
-            companyId: selectedCompany.id,
-            companyName: selectedCompany.name,
-          });
-
-          if (!fallbackRes.success) {
-            console.error("Fallback Server Action failed:", fallbackRes.error);
-            setErrorMessage(fallbackRes.error || "Failed to submit affiliation request. Please try again.");
-            setIsSubmitting(false);
-            return;
-          }
-        }
-
-        setSuccessMessage(`Affiliation request sent to ${selectedCompany.name}! Awaiting review by company administrator.`);
+        // Database confirmed operation successfully
+        setSuccessMessage(
+          `Affiliation request sent to ${selectedCompany.name}! Awaiting review by company administrator.`
+        );
       } else {
-        // 2. Unregistered / Free-text Company -> E01-HU12: create unregistered affiliation
-        const res1 = await supabase.rpc("create_unregistered_company_affiliation", {
+        // 2. Unregistered Company -> call create_unregistered_company_affiliation RPC
+        const res = await supabase.rpc("create_unregistered_company_affiliation", {
           company_name: selectedCompany.name.trim(),
         });
 
-        if (res1.error) {
-          const res2 = await supabase.rpc("create_unregistered_company_affiliation", {
-            text: selectedCompany.name.trim(),
-          });
-          if (res2.error) {
-            const res3 = await supabase.rpc("create_unregistered_company_affiliation", {
-              name: selectedCompany.name.trim(),
-            });
-            if (res3.error) {
-              console.error("Error calling create_unregistered_company_affiliation:", res1.error);
-              setErrorMessage(res1.error.message || "Failed to save company affiliation.");
-              setIsSubmitting(false);
-              return;
-            }
-          }
+        if (res.error || (res.status && res.status !== 200 && res.status !== 204)) {
+          console.error("Supabase RPC create_unregistered_company_affiliation error:", res.error, "Status:", res.status);
+          const errorMsg =
+            res.error?.message ||
+            (res.status === 403
+              ? "Access denied (403): You do not have permission to add this company affiliation."
+              : "Failed to save company affiliation. Please try again.");
+
+          setErrorMessage(errorMsg);
+          setIsSubmitting(false);
+          return;
         }
 
         setSuccessMessage(`Company affiliation saved as "${selectedCompany.name}".`);
       }
 
-      // Update local storage cache
+      // Update local storage cache only on confirmed success
       try {
         const savedPersonal = localStorage.getItem("onboarding_personal");
         const parsed = savedPersonal ? JSON.parse(savedPersonal) : {};
@@ -220,12 +199,12 @@ export default function BusinessAffiliatePage() {
         console.warn("Local storage cache update error:", e);
       }
 
-      // Smooth redirection back to profile
+      // Smooth redirection back to profile only after success
       setTimeout(() => {
         router.push("/profile");
       }, 1200);
     } catch (err: any) {
-      console.error("Affiliation submission error:", err);
+      console.error("Affiliation submission exception:", err);
       setErrorMessage(err?.message || "An unexpected error occurred. Please try again.");
     } finally {
       setIsSubmitting(false);
