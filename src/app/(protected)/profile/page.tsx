@@ -88,6 +88,136 @@ export default function ProfilePage() {
   const [showAvailabilityModal, setShowAvailabilityModal] = useState(false);
   const [loadingVisitors, setLoadingVisitors] = useState(false);
   const [loadingLikers, setLoadingLikers] = useState(false);
+  const [isResettingTestData, setIsResettingTestData] = useState(false);
+
+  const handleResetTestData = async () => {
+    try {
+      setIsResettingTestData(true);
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      const userId = session?.user?.id || currentUserId;
+      if (!userId) {
+        alert("No active user session found.");
+        return;
+      }
+
+      // 1. Fetch current resume data
+      const { data: currentResume } = await supabase
+        .from("resumes")
+        .select("data")
+        .eq("userId", userId)
+        .maybeSingle();
+
+      const resumeData = (currentResume?.data as any) || {};
+      const updatedPersonal = {
+        ...(resumeData.personal || {}),
+        flightHours: null,
+        totalFlightHours: null,
+        flight_hours: null,
+        summary: null,
+        aboutMe: null,
+        description: null,
+        licenses: [],
+        ratings: [],
+        qualifications: null,
+      };
+
+      const updatedResumeObj = {
+        ...(resumeData.resume || {}),
+        summary: null,
+      };
+
+      const cleanResumeData = {
+        ...resumeData,
+        licenses: [],
+        ratings: [],
+        qualifications: null,
+        flightHours: null,
+        summary: null,
+        personal: updatedPersonal,
+        resume: updatedResumeObj,
+      };
+
+      // 2. Update resumes table in Supabase
+      await supabase.from("resumes").upsert(
+        {
+          userId: userId,
+          data: cleanResumeData,
+        },
+        { onConflict: "userId" }
+      );
+
+      // 3. Clear user_profiles if row exists
+      try {
+        await supabase
+          .from("user_profiles")
+          .update({
+            professionalCredentials: [],
+            professional_credentials: [],
+            flightHours: null,
+            flight_hours: null,
+            summary: null,
+          })
+          .or(`userId.eq.${userId},user_id.eq.${userId}`);
+      } catch (e) {
+        console.warn("user_profiles update notice:", e);
+      }
+
+      // 4. Clear users table if columns exist
+      try {
+        await supabase
+          .from("users")
+          .update({
+            flight_hours: null,
+            summary: null,
+          })
+          .eq("id", userId);
+      } catch (e) {
+        console.warn("users update notice:", e);
+      }
+
+      // 5. Clear localStorage cached data
+      try {
+        localStorage.removeItem("onboarding_licenses");
+        localStorage.removeItem("onboarding_ratings");
+        localStorage.removeItem("onboarding_resume");
+        const localPersonalStr = localStorage.getItem("onboarding_personal");
+        if (localPersonalStr) {
+          const parsed = JSON.parse(localPersonalStr);
+          parsed.flightHours = null;
+          parsed.totalFlightHours = null;
+          parsed.flight_hours = null;
+          parsed.summary = null;
+          parsed.aboutMe = null;
+          parsed.description = null;
+          parsed.licenses = [];
+          parsed.ratings = [];
+          parsed.qualifications = null;
+          localStorage.setItem("onboarding_personal", JSON.stringify(parsed));
+        }
+      } catch (e) {
+        console.warn("localStorage clean notice:", e);
+      }
+
+      // 6. Refresh provider and Next.js router
+      try {
+        await supabase.rpc("get_my_profile");
+      } catch (e) {}
+
+      await revalidateProfileLayout();
+      await refetchProfile();
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("profile-updated"));
+      }
+      router.refresh();
+    } catch (err: any) {
+      console.error("Error resetting test data:", err);
+      alert("Error resetting test data: " + (err?.message || err));
+    } finally {
+      setIsResettingTestData(false);
+    }
+  };
 
   const loading = contextLoading;
 
@@ -1616,6 +1746,18 @@ export default function ProfilePage() {
             </div>
           </div>
         )}
+
+        {/* Temporary Debug Button */}
+        <div className="flex justify-center pt-6 pb-8">
+          <button
+            type="button"
+            onClick={handleResetTestData}
+            disabled={isResettingTestData}
+            className="bg-red-600 hover:bg-red-700 active:bg-red-800 disabled:opacity-50 text-white text-xs font-semibold py-2 px-4 rounded-xl shadow-sm transition-all cursor-pointer flex items-center gap-2"
+          >
+            {isResettingTestData ? "Resetting test data..." : "Reset Test Data"}
+          </button>
+        </div>
 
       </div>
 
