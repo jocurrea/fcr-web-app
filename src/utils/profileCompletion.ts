@@ -105,23 +105,25 @@ export interface ProfileAreasInput {
  * 6. Career and skills
  */
 export function computeProfileAreas(data: ProfileAreasInput) {
+  const isValidArray = (arr: any) => Array.isArray(arr) && arr.some(hasValue);
+
   // 1. Personal profile (nombre, fecha de nacimiento, nacionalidad etc.)
   const isPersonalDone = !!data?.name && typeof data.name === "string" && data.name.trim().length > 0;
 
   // 2. Licenses
-  const isLicensesDone = Array.isArray(data?.licenses) && data.licenses.length > 0;
+  const isLicensesDone = isValidArray(data?.licenses);
 
   // 3. Aircraft ratings
-  const isRatingsDone = Array.isArray(data?.ratings) && data.ratings.length > 0;
+  const isRatingsDone = isValidArray(data?.ratings);
 
   // 4. Work and qualifications
-  const isWorkQualificationsDone = (Array.isArray(data?.work) && data.work.length > 0) || (Array.isArray(data?.qualifications) && data.qualifications.length > 0);
+  const isWorkQualificationsDone = isValidArray(data?.work) || isValidArray(data?.qualifications);
 
   // 5. Professional profile
   const isProfessionalDone = (!!data?.flightHours && Number(data.flightHours) > 0) || (typeof data?.summary === "string" && data.summary.trim().length > 0);
 
   // 6. Career and skills
-  const isCareerSkillsDone = (Array.isArray(data?.skills) && data.skills.length > 0) || (Array.isArray(data?.languages) && data.languages.length > 0);
+  const isCareerSkillsDone = isValidArray(data?.skills) || isValidArray(data?.languages);
 
   const areas: CompletionArea[] = [
     {
