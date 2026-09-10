@@ -647,15 +647,7 @@ export function UserProfileProvider({
           companyName: mergedPersonal?.companyName || mergedPersonal?.linkedCompany || null,
         };
 
-        console.log("[DEBUG-PROFILE-PROGRESS] Input to computeProfileAreas:", JSON.stringify(areasInput, null, 2));
-
         const calculation = computeProfileAreas(areasInput);
-
-        console.log("[DEBUG-PROFILE-PROGRESS] Result:", {
-          percentage: calculation.percentage,
-          completedCount: calculation.completedCount,
-          areas: calculation.areas.map((a: any) => ({ key: a.key, isDone: a.isDone })),
-        });
 
         progress = calculation.percentage;
         setCompletionAreas(calculation.areas);
