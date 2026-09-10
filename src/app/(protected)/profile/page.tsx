@@ -157,6 +157,15 @@ export default function ProfilePage() {
       : [];
   const licensesList: string[] = rawLicenses.filter(Boolean);
 
+  const credentialsList: string[] =
+    Array.isArray(personal?.professionalCredentials) && personal.professionalCredentials.length > 0
+      ? personal.professionalCredentials
+      : licensesList.length > 0
+      ? licensesList
+      : personal?.licenseCertification
+      ? [personal.licenseCertification]
+      : [];
+
   const ratingsList: string[] = Array.isArray(ratings)
     ? ratings
         .map((r: any) => (typeof r === "string" ? r : r?.ratingName || r?.name || ""))
@@ -1088,7 +1097,11 @@ export default function ProfilePage() {
                   className="cursor-pointer"
                 >
                   <p className="text-[14px] text-gray-600 mb-1">Location</p>
-                  <p className="text-[14px] text-gray-400">Not added</p>
+                  <p className="text-[14px] text-gray-400">
+                    {personal?.locationCity && personal?.locationCountry
+                      ? `${personal.locationCity}, ${personal.locationCountry}`
+                      : personal?.location || personal?.cityCountry || "Not added"}
+                  </p>
                 </div>
                 <div className="h-[1px] w-full bg-gray-100"></div>
                 <div 
@@ -1096,7 +1109,13 @@ export default function ProfilePage() {
                   className="cursor-pointer"
                 >
                   <p className="text-[14px] text-gray-600 mb-1">Work experience</p>
-                  <p className="text-[14px] text-gray-400">Not added</p>
+                  <p className="text-[14px] text-gray-400">
+                    {workExperiences.length > 0
+                      ? (workExperiences[0]?.roleTitle || workExperiences[0]?.jobTitle
+                          ? `${workExperiences[0].roleTitle || workExperiences[0].jobTitle}${workExperiences.length > 1 ? ` (+${workExperiences.length - 1})` : ""}`
+                          : "Added")
+                      : "Not added"}
+                  </p>
                 </div>
                 <div className="h-[1px] w-full bg-gray-100"></div>
                 <div 
@@ -1104,7 +1123,9 @@ export default function ProfilePage() {
                   className="cursor-pointer"
                 >
                   <p className="text-[14px] text-gray-600 mb-1">Languages</p>
-                  <p className="text-[14px] text-gray-400">Not added</p>
+                  <p className="text-[14px] text-gray-400">
+                    {languagesList.length > 0 ? languagesList.join(", ") : "Not added"}
+                  </p>
                 </div>
               </div>
             </div>
@@ -1120,7 +1141,11 @@ export default function ProfilePage() {
                   Add
                 </button>
               </div>
-              <p className="text-[14px] text-gray-500">Add the skills that best describe your work.</p>
+              <p className="text-[14px] text-gray-500">
+                {skillsList.length > 0
+                  ? skillsList.join(", ")
+                  : "Add the skills that best describe your work."}
+              </p>
             </div>
 
             {/* 3. CONTACT & CREDENTIALS */}
@@ -1138,20 +1163,28 @@ export default function ProfilePage() {
               <div className="flex flex-col gap-3">
                 <div className="flex items-center gap-3">
                   <PhoneIcon className="w-5 h-5 text-gray-400" />
-                  {/* Remplazar con variable real cuando se conecte */}
-                  <span className="text-[14px] text-blue-600">693589632</span>
+                  <span className="text-[14px] text-blue-600">
+                    {personal?.contactPhone || personal?.phone || phoneValue || "Not added"}
+                  </span>
                 </div>
                 <div className="flex items-center gap-3">
                   <EnvelopeIcon className="w-5 h-5 text-gray-400" />
-                  {/* Remplazar con variable real cuando se conecte */}
-                  <span className="text-[14px] text-blue-600">celular@gmail.com</span>
+                  <span className="text-[14px] text-blue-600">
+                    {personal?.contactEmail || personal?.email || emailValue || "Not added"}
+                  </span>
                 </div>
                 
                 <div className="mt-2">
                   <p className="text-[14px] text-gray-900 mb-2 font-medium">Licenses & Certifications</p>
-                  <div className="inline-block px-4 py-1.5 bg-gray-50 border border-gray-100 rounded-[10px] text-[13px] text-gray-700">
-                    Fgh
-                  </div>
+                  {credentialsList.length > 0 ? (
+                    credentialsList.map((cred: string) => (
+                      <div key={cred} className="inline-block px-4 py-1.5 bg-gray-50 border border-gray-100 rounded-[10px] text-[13px] text-gray-700 mr-2 mb-1.5">
+                        {cred}
+                      </div>
+                    ))
+                  ) : (
+                    <span className="text-gray-400 text-[14px]">Not added</span>
+                  )}
                 </div>
               </div>
             </div>
