@@ -47,119 +47,128 @@ export async function requestCompanyAffiliationFallbackAction(
       };
     }
 
-    // 2. Initialize admin client with SUPABASE_SERVICE_ROLE_KEY
-    const adminClient = createAdminClient();
-
-    // 3. First, try executing the request_company_affiliation RPC via admin client (bypasses RLS)
+    // 2. First try calling official request_company_affiliation RPC via authenticated user client
     const paramVariations = [
       { target_company_id: companyId },
       { company_id: companyId },
       { p_company_id: companyId },
     ];
 
+    let lastRpcError: any = null;
     for (const params of paramVariations) {
-      const { data, error } = await adminClient.rpc("request_company_affiliation", params);
+      const { data, error } = await supabase.rpc("request_company_affiliation", params);
       if (!error) {
         return {
           success: true,
           affiliationId: typeof data === "string" ? data : (data as any)?.id,
-          message: "Affiliation request submitted successfully via admin RPC.",
+          message: "Affiliation request submitted successfully.",
         };
+      }
+      lastRpcError = error;
+    }
+
+    // 3. If service role key is configured, use admin client as privileged fallback
+    if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      try {
+        const adminClient = createAdminClient();
+
+        for (const params of paramVariations) {
+          const { data, error } = await adminClient.rpc("request_company_affiliation", params);
+          if (!error) {
+            return {
+              success: true,
+              affiliationId: typeof data === "string" ? data : (data as any)?.id,
+              message: "Affiliation request submitted successfully via admin RPC.",
+            };
+          }
+        }
+
+        // Check if an affiliation record already exists
+        const { data: existingAffiliation } = await adminClient
+          .from("company_affiliations")
+          .select("id, status")
+          .eq("user_id", user.id)
+          .eq("company_id", companyId)
+          .maybeSingle();
+
+        if (existingAffiliation) {
+          if (existingAffiliation.status === "pending") {
+            return {
+              success: true,
+              affiliationId: existingAffiliation.id,
+              message: "An affiliation request is already pending review.",
+            };
+          }
+
+          if (existingAffiliation.status === "verified") {
+            return {
+              success: true,
+              affiliationId: existingAffiliation.id,
+              message: "You are already verified with this company.",
+            };
+          }
+
+          const { data: updated, error: updateErr } = await adminClient
+            .from("company_affiliations")
+            .update({
+              status: "pending",
+              company_name_snapshot: (companyName || "").trim(),
+              source: "self_request",
+              requested_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+              rejection_reason: null,
+              reviewed_at: null,
+              reviewed_by_user_id: null,
+            })
+            .eq("id", existingAffiliation.id)
+            .select("id")
+            .single();
+
+          if (!updateErr && updated) {
+            return {
+              success: true,
+              affiliationId: updated.id,
+              message: "Affiliation request re-submitted for review.",
+            };
+          }
+        }
+
+        const nowIso = new Date().toISOString();
+        const { data: newAffiliation, error: insertErr } = await adminClient
+          .from("company_affiliations")
+          .insert({
+            user_id: user.id,
+            company_id: companyId,
+            company_name_snapshot: (companyName || "").trim(),
+            status: "pending",
+            source: "self_request",
+            is_primary: false,
+            requested_at: nowIso,
+            created_at: nowIso,
+            updated_at: nowIso,
+          })
+          .select("id")
+          .single();
+
+        if (!insertErr && newAffiliation) {
+          return {
+            success: true,
+            affiliationId: newAffiliation.id,
+            message: "Affiliation request submitted successfully.",
+          };
+        }
+      } catch (adminErr) {
+        console.warn("Admin client fallback warning:", adminErr);
       }
     }
 
-    // 4. If RPC is unavailable or rejected, insert/update directly into company_affiliations table
-    // Check if an affiliation record already exists
-    const { data: existingAffiliation, error: selectErr } = await adminClient
-      .from("company_affiliations")
-      .select("id, status")
-      .eq("user_id", user.id)
-      .eq("company_id", companyId)
-      .maybeSingle();
-
-    if (selectErr) {
-      console.warn("Notice querying existing affiliation:", selectErr.message);
-    }
-
-    if (existingAffiliation) {
-      if (existingAffiliation.status === "pending") {
-        return {
-          success: true,
-          affiliationId: existingAffiliation.id,
-          message: "An affiliation request is already pending review.",
-        };
-      }
-
-      if (existingAffiliation.status === "verified") {
-        return {
-          success: true,
-          affiliationId: existingAffiliation.id,
-          message: "You are already verified with this company.",
-        };
-      }
-
-      // If previous affiliation was rejected or revoked, reactivate to pending
-      const { data: updated, error: updateErr } = await adminClient
-        .from("company_affiliations")
-        .update({
-          status: "pending",
-          company_name_snapshot: (companyName || "").trim(),
-          source: "self_request",
-          requested_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          rejection_reason: null,
-          reviewed_at: null,
-          reviewed_by_user_id: null,
-        })
-        .eq("id", existingAffiliation.id)
-        .select("id")
-        .single();
-
-      if (updateErr) {
-        console.error("Error updating affiliation record:", updateErr);
-        return {
-          success: false,
-          error: updateErr.message || "Failed to reactivate affiliation request.",
-        };
-      }
-
-      return {
-        success: true,
-        affiliationId: updated.id,
-        message: "Affiliation request re-submitted for review.",
-      };
-    }
-
-    // Direct insertion of pending affiliation
-    const nowIso = new Date().toISOString();
-    const { data: newAffiliation, error: insertErr } = await adminClient
-      .from("company_affiliations")
-      .insert({
-        user_id: user.id,
-        company_id: companyId,
-        company_name_snapshot: (companyName || "").trim(),
-        status: "pending",
-        source: "self_request",
-        is_primary: false,
-        requested_at: nowIso,
-        created_at: nowIso,
-        updated_at: nowIso,
-      })
-      .select("id")
-      .single();
-
-    if (insertErr) {
-      console.error("Direct admin insert into company_affiliations failed:", insertErr);
-      return {
-        success: false,
-        error: insertErr.message || "Failed to save affiliation request.",
-      };
-    }
-
+    // 4. Return clean error from RPC if admin fallback is not available or also failed
     return {
-      success: true,
-      affiliationId: newAffiliation.id,
-      message: "Affiliation request submitted successfully.",
+      success: false,
+      error:
+        lastRpcError?.message ||
+        lastRpcError?.details ||
+        "Could not submit affiliation request. Please verify the company and try again.",
     };
   } catch (err: any) {
     console.error("requestCompanyAffiliationFallbackAction error:", err);
