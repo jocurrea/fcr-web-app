@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
+import { revalidateProfileLayout } from "@/actions/profile";
 
 /* ─────────────────────────────────────────────
  * Constants
@@ -37,50 +38,43 @@ const SESSION_STORAGE_KEY = "fcr_invitation_token";
 
 /* ─────────────────────────────────────────────
  * Hash-based token extraction hook
- *
- * Architecture rule: the invitation token is delivered
- * **strictly** via the URL hash fragment (#token=<value>).
- * It must never be read from search params / query string.
- *
- * Flow:
- *   1. Read window.location.hash on mount.
- *   2. Parse the "token" param from the hash fragment.
- *   3. Validate format with TOKEN_REGEX.
- *   4. Persist to sessionStorage immediately.
- *   5. Strip the hash from the visible URL via history.replaceState.
- *   6. If the hash is missing/empty, fall back to sessionStorage
- *      (handles the post-auth-redirect case).
  * ───────────────────────────────────────────── */
 function useHashToken(): { token: string; tokenError: string | null } {
   const [token, setToken] = useState("");
   const [tokenError, setTokenError] = useState<string | null>(null);
 
   useEffect(() => {
-    // --- Step 1: Read raw hash ---
+    // 1. Capture token from URL hash (#token=...)
     const rawHash = typeof window !== "undefined" ? window.location.hash : "";
-
     let extracted = "";
 
     if (rawHash && rawHash.length > 1) {
-      // Parse hash fragment as URLSearchParams (strip leading '#')
       try {
         const hashParams = new URLSearchParams(rawHash.substring(1));
         extracted = (hashParams.get("token") || "").trim();
-      } catch {
-        // Malformed hash – fall through to sessionStorage
-      }
+      } catch {}
     }
 
-    // --- Step 2: Fall back to sessionStorage (post-redirect) ---
-    if (!extracted) {
+    // 2. If present in hash, persist to sessionStorage and immediately strip from visible URL
+    if (extracted) {
+      try {
+        sessionStorage.setItem(SESSION_STORAGE_KEY, extracted);
+      } catch {}
+
+      if (typeof window !== "undefined") {
+        try {
+          const cleanUrl = window.location.pathname + window.location.search;
+          window.history.replaceState(null, "", cleanUrl);
+        } catch {}
+      }
+    } else {
+      // 3. Fallback to token previously saved in sessionStorage (e.g. across auth login/register redirect)
       try {
         extracted = (sessionStorage.getItem(SESSION_STORAGE_KEY) || "").trim();
-      } catch {
-        // sessionStorage unavailable (incognito edge-case) – ignore
-      }
+      } catch {}
     }
 
-    // --- Step 3: Validate ---
+    // 4. Validate presence and format
     if (!extracted) {
       setTokenError("No invitation token provided. Please use the link from your invitation email.");
       return;
@@ -91,26 +85,8 @@ function useHashToken(): { token: string; tokenError: string | null } {
       return;
     }
 
-    // --- Step 4: Persist to sessionStorage ---
-    try {
-      sessionStorage.setItem(SESSION_STORAGE_KEY, extracted);
-    } catch {
-      // Best-effort; if storage is full/blocked we still proceed
-    }
-
-    // --- Step 5: Strip hash from URL ---
-    if (rawHash && typeof window !== "undefined") {
-      try {
-        const cleanUrl =
-          window.location.pathname + window.location.search;
-        window.history.replaceState(null, "", cleanUrl);
-      } catch {
-        // history API unavailable – non-critical
-      }
-    }
-
     setToken(extracted);
-  }, []); // Run once on mount
+  }, []);
 
   return { token, tokenError };
 }
@@ -190,7 +166,6 @@ function AcceptInvitationContent() {
 
   // 2. Token Resolution via RPC
   useEffect(() => {
-    // Wait until the hash hook has settled — if tokenError is set, surface it
     if (tokenError) {
       setIsResolving(false);
       setResolveError(tokenError);
@@ -198,7 +173,6 @@ function AcceptInvitationContent() {
     }
 
     if (!token) {
-      // Hook hasn't resolved yet (still in its useEffect); stay in loading state
       return;
     }
 
@@ -207,48 +181,21 @@ function AcceptInvitationContent() {
       setResolveError(null);
 
       try {
-        // Primary RPC call per architecture specifications (raw_token)
-        let res = await supabase.rpc("resolve_company_affiliation_invitation", {
-          raw_token: token,
-        });
+        const { data: resData, error: resError } = await supabase.rpc(
+          "resolve_company_affiliation_invitation",
+          { raw_token: token }
+        );
 
-        if (res.error) {
-          // Fallback parameter signatures
-          const res2 = await supabase.rpc("resolve_company_affiliation_invitation", {
-            token: token,
-          });
-          if (!res2.error && res2.data) {
-            res = res2;
-          } else {
-            const res3 = await supabase.rpc("resolve_company_affiliation_invitation", {
-              invitation_token: token,
-            });
-            if (!res3.error && res3.data) {
-              res = res3;
-            } else {
-              const res4 = await supabase.rpc("resolve_company_affiliation_invitation", {
-                p_token: token,
-              });
-              if (!res4.error && res4.data) {
-                res = res4;
-              }
-            }
-          }
-        }
-
-        if (res.error) {
-          console.warn(
-            "Notice resolving invitation:",
-            res.error.message || res.error.details || res.error
-          );
+        if (resError) {
+          console.warn("Notice resolving invitation:", resError.message || resError);
           setResolveError(
-            res.error.message || "Invalid, expired, or previously processed invitation."
+            resError.message || "Invalid, expired, or previously processed invitation."
           );
           return;
         }
 
         const data: InvitationData =
-          (Array.isArray(res.data) ? res.data[0] : res.data) || {};
+          (Array.isArray(resData) ? resData[0] : resData) || {};
         setInvitation(data);
 
         // Check if invitation already has a final status
@@ -287,41 +234,37 @@ function AcceptInvitationContent() {
     setActionError(null);
 
     try {
-      let res = await supabase.rpc("accept_company_affiliation_invitation", {
-        raw_token: token,
-      });
+      const { error: acceptError } = await supabase.rpc(
+        "accept_company_affiliation_invitation",
+        { raw_token: token }
+      );
 
-      if (res.error) {
-        const res2 = await supabase.rpc("accept_company_affiliation_invitation", {
-          token: token,
-        });
-        if (!res2.error) {
-          res = res2;
-        } else {
-          const res3 = await supabase.rpc("accept_company_affiliation_invitation", {
-            invitation_token: token,
-          });
-          if (!res3.error) {
-            res = res3;
-          } else {
-            const res4 = await supabase.rpc("accept_company_affiliation_invitation", {
-              p_token: token,
-            });
-            if (!res4.error) {
-              res = res4;
-            }
-          }
-        }
+      if (acceptError) {
+        throw acceptError;
       }
 
-      if (res.error) {
-        throw res.error;
+      // Reload user profile via get_my_profile RPC
+      try {
+        await supabase.rpc("get_my_profile");
+      } catch (rpcErr) {
+        console.warn("Notice reloading get_my_profile:", rpcErr);
       }
 
-      setActionState("accepted");
+      // Revalidate layout and notify listeners
+      try {
+        await revalidateProfileLayout();
+      } catch {}
+
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("profile-updated"));
+      }
 
       // Clean up sessionStorage after successful acceptance
-      try { sessionStorage.removeItem(SESSION_STORAGE_KEY); } catch { /* ignore */ }
+      try {
+        sessionStorage.removeItem(SESSION_STORAGE_KEY);
+      } catch {}
+
+      setActionState("accepted");
     } catch (err: any) {
       console.error("Error accepting invitation:", err?.message || err);
       setActionError(
@@ -342,41 +285,21 @@ function AcceptInvitationContent() {
     setActionError(null);
 
     try {
-      let res = await supabase.rpc("decline_company_affiliation_invitation", {
-        raw_token: token,
-      });
+      const { error: declineError } = await supabase.rpc(
+        "decline_company_affiliation_invitation",
+        { raw_token: token }
+      );
 
-      if (res.error) {
-        const res2 = await supabase.rpc("decline_company_affiliation_invitation", {
-          token: token,
-        });
-        if (!res2.error) {
-          res = res2;
-        } else {
-          const res3 = await supabase.rpc("decline_company_affiliation_invitation", {
-            invitation_token: token,
-          });
-          if (!res3.error) {
-            res = res3;
-          } else {
-            const res4 = await supabase.rpc("decline_company_affiliation_invitation", {
-              p_token: token,
-            });
-            if (!res4.error) {
-              res = res4;
-            }
-          }
-        }
+      if (declineError) {
+        throw declineError;
       }
-
-      if (res.error) {
-        throw res.error;
-      }
-
-      setActionState("declined");
 
       // Clean up sessionStorage after successful decline
-      try { sessionStorage.removeItem(SESSION_STORAGE_KEY); } catch { /* ignore */ }
+      try {
+        sessionStorage.removeItem(SESSION_STORAGE_KEY);
+      } catch {}
+
+      setActionState("declined");
     } catch (err: any) {
       console.error("Error declining invitation:", err?.message || err);
       setActionError(
