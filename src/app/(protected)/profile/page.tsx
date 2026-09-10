@@ -96,21 +96,24 @@ export default function ProfilePage() {
   const lastName = personal?.lastName || "";
   const fullName = [firstName, lastName].filter(Boolean).join(" ").trim() || "Not added";
 
-  // Distinguish Aviation Professional vs Flight Crew
+  // 1. Captura del Rol
+  const professionalRole =
+    personal?.professionalRole ||
+    personal?.professional_role ||
+    personal?.role ||
+    personal?.category ||
+    accountType ||
+    "pilot";
+
+  // Distinguish Aviation Professional vs Flight Crew (pilot / crew)
   const isAviationProfessional =
+    professionalRole === "aviation_professional" ||
     accountType === "aviation_professional" ||
-    personal?.professionalRole === "aviation_professional" ||
-    personal?.category === "aviation_professional" ||
-    personal?.role === "aviation_professional";
+    personal?.category === "aviation_professional";
 
   const isFlightCrew = !isBusiness && !isAviationProfessional;
 
-  const rawRole =
-    personal?.professionalRole ||
-    personal?.roleTitle ||
-    personal?.role ||
-    personal?.category ||
-    personal?.professionalTitle;
+  const rawRole = professionalRole || personal?.roleTitle || personal?.professionalTitle;
 
   const roleLabel = isFlightCrew
     ? (rawRole === "crew" || rawRole === "Cabin Crew"
@@ -848,27 +851,103 @@ export default function ProfilePage() {
 
         </div>
 
-        {isFlightCrew ? (
+        {/* 1. ELEMENTO GLOBAL: BOTONES DE LIKES Y VISITANTES */}
+        <div className="flex justify-center gap-4 mt-4 mb-8">
+          <button
+            type="button"
+            onClick={handleOpenLikersModal}
+            className="flex items-center gap-2 border border-blue-600 text-blue-600 px-5 py-2 rounded-full font-semibold text-sm hover:bg-blue-50 transition-colors cursor-pointer"
+          >
+            <HeartIcon className="w-4 h-4" /> Profile likes
+          </button>
+          <button
+            type="button"
+            onClick={handleOpenVisitorsModal}
+            className="flex items-center gap-2 border border-blue-600 text-blue-600 px-5 py-2 rounded-full font-semibold text-sm hover:bg-blue-50 transition-colors cursor-pointer"
+          >
+            <EyeIcon className="w-4 h-4" /> Profile visitors
+          </button>
+        </div>
+
+        {/* 2. RENDERIZADO CONDICIONAL DE TARJETAS DE PROGRESO */}
+        {isAviationProfessional ? (
+          /* Condición B: aviation_professional (4 tarjetas de progreso) */
           <>
-            {/* 1. BOTONES DE LIKES Y VISITANTES */}
-            <div className="flex justify-center gap-4 mt-4 mb-8">
-              <button
-                type="button"
-                onClick={handleOpenLikersModal}
-                className="flex items-center gap-2 border border-blue-600 text-blue-600 px-5 py-2 rounded-full font-semibold text-sm"
-              >
-                <HeartIcon className="w-4 h-4" /> Profile likes
-              </button>
-              <button
-                type="button"
-                onClick={handleOpenVisitorsModal}
-                className="flex items-center gap-2 border border-blue-600 text-blue-600 px-5 py-2 rounded-full font-semibold text-sm"
-              >
-                <EyeIcon className="w-4 h-4" /> Profile visitors
-              </button>
+            <div className="flex justify-between items-start mb-4 px-1 bg-transparent">
+              <div>
+                <h2 className="text-[20px] font-bold text-gray-900 leading-tight">Complete your profile</h2>
+                <p className="text-[14px] text-gray-500 mt-0.5">5 of 9 profile areas complete</p>
+              </div>
+              <div className="bg-[#E6F4EA] text-[#137333] px-3 py-1 rounded-[8px] text-sm font-bold">
+                {profileProgress}%
+              </div>
             </div>
 
-            {/* 2. ENCABEZADO "COMPLETE YOUR PROFILE" (FONDO TRANSPARENTE) */}
+            <div className="flex flex-col gap-3">
+              {/* Tarjeta 1: Location */}
+              <div 
+                onClick={() => router.push("/onboarding?edit=true&step=5&section=location")}
+                className="bg-white rounded-[20px] p-4 flex items-center gap-4 shadow-sm border border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors"
+              >
+                <div className="w-10 h-10 rounded-full bg-[#F0F4FF] flex items-center justify-center flex-shrink-0">
+                  <PlusIcon className="w-5 h-5 text-blue-500" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-[15px] font-bold text-gray-900">Location</h3>
+                  <p className="text-[13px] text-gray-500 leading-snug mt-0.5">Add your location</p>
+                </div>
+                <ChevronRightIcon className="w-5 h-5 text-gray-400 flex-shrink-0" />
+              </div>
+
+              {/* Tarjeta 2: Languages */}
+              <div 
+                onClick={() => router.push("/onboarding?edit=true&step=5&section=languages")}
+                className="bg-white rounded-[20px] p-4 flex items-center gap-4 shadow-sm border border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors"
+              >
+                <div className="w-10 h-10 rounded-full bg-[#F0F4FF] flex items-center justify-center flex-shrink-0">
+                  <PlusIcon className="w-5 h-5 text-blue-500" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-[15px] font-bold text-gray-900">Languages</h3>
+                  <p className="text-[13px] text-gray-500 leading-snug mt-0.5">Add languages</p>
+                </div>
+                <ChevronRightIcon className="w-5 h-5 text-gray-400 flex-shrink-0" />
+              </div>
+
+              {/* Tarjeta 3: Work experience */}
+              <div 
+                onClick={() => router.push("/onboarding?edit=true&step=5&section=work")}
+                className="bg-white rounded-[20px] p-4 flex items-center gap-4 shadow-sm border border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors"
+              >
+                <div className="w-10 h-10 rounded-full bg-[#F0F4FF] flex items-center justify-center flex-shrink-0">
+                  <PlusIcon className="w-5 h-5 text-blue-500" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-[15px] font-bold text-gray-900">Work experience</h3>
+                  <p className="text-[13px] text-gray-500 leading-snug mt-0.5">Add work experience</p>
+                </div>
+                <ChevronRightIcon className="w-5 h-5 text-gray-400 flex-shrink-0" />
+              </div>
+
+              {/* Tarjeta 4: Skills and expertise */}
+              <div 
+                onClick={() => router.push("/onboarding?edit=true&step=6")}
+                className="bg-white rounded-[20px] p-4 flex items-center gap-4 shadow-sm border border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors"
+              >
+                <div className="w-10 h-10 rounded-full bg-[#F0F4FF] flex items-center justify-center flex-shrink-0">
+                  <PlusIcon className="w-5 h-5 text-blue-500" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-[15px] font-bold text-gray-900">Skills and expertise</h3>
+                  <p className="text-[13px] text-gray-500 leading-snug mt-0.5">Add skills and expertise</p>
+                </div>
+                <ChevronRightIcon className="w-5 h-5 text-gray-400 flex-shrink-0" />
+              </div>
+            </div>
+          </>
+        ) : (
+          /* Condición A: pilot o crew (5 tarjetas de progreso) */
+          <>
             <div className="flex justify-between items-start mb-4 px-1 bg-transparent">
               <div>
                 <h2 className="text-[20px] font-bold text-gray-900 leading-tight">Complete your profile</h2>
@@ -879,9 +958,7 @@ export default function ProfilePage() {
               </div>
             </div>
 
-            {/* 3. LAS 5 TARJETAS DE PROGRESO (LISTA VERTICAL) */}
             <div className="flex flex-col gap-3">
-              
               {/* Tarjeta 1: Personal profile */}
               <div 
                 onClick={() => router.push(getMissingAreaLink({ key: "personal_profile" }))}
@@ -956,40 +1033,51 @@ export default function ProfilePage() {
                 </div>
                 <ChevronRightIcon className="w-5 h-5 text-gray-400 flex-shrink-0" />
               </div>
-
             </div>
+          </>
+        )}
 
-            {/* --- INICIO SECCIONES INFERIORES --- */}
-
-            {/* 1. COMPANY AFFILIATION */}
-            <div className="mt-8 mb-6">
-              <h3 className="text-[15px] font-bold text-gray-900 mb-3 px-1">Company affiliation</h3>
-              <div 
-                onClick={() => router.push("/business/affiliate")}
-                className="bg-white rounded-[20px] p-4 flex items-center gap-4 shadow-sm border border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors"
-              >
-                <div className="w-10 h-10 rounded-full bg-[#F0F4FF] flex items-center justify-center flex-shrink-0">
-                  <BuildingOfficeIcon className="w-5 h-5 text-blue-500" />
-                </div>
-                <div className="flex-1">
-                  <h4 className="text-[15px] font-bold text-gray-900">Link your employer</h4>
-                  <p className="text-[13px] text-gray-500 leading-tight mt-0.5">Search registered companies and request verification.</p>
-                </div>
-                <ChevronRightIcon className="w-5 h-5 text-gray-400 flex-shrink-0" />
-              </div>
+        {/* 3. ELEMENTO GLOBAL: COMPANY AFFILIATION */}
+        <div className="mt-8 mb-6">
+          <h3 className="text-[15px] font-bold text-gray-900 mb-3 px-1">Company affiliation</h3>
+          <div 
+            onClick={() => router.push("/business/affiliate")}
+            className="bg-white rounded-[20px] p-4 flex items-center gap-4 shadow-sm border border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors"
+          >
+            <div className="w-10 h-10 rounded-full bg-[#F0F4FF] flex items-center justify-center flex-shrink-0">
+              <BuildingOfficeIcon className="w-5 h-5 text-blue-500" />
             </div>
+            <div className="flex-1">
+              <h4 className="text-[15px] font-bold text-gray-900">
+                {affiliationName || "Link your employer"}
+              </h4>
+              <p className="text-[13px] text-gray-500 leading-tight mt-0.5">
+                {affiliationName
+                  ? isAffiliationPending
+                    ? "Pending Verification"
+                    : isAffiliationVerified
+                    ? "Verified Company"
+                    : "Search registered companies and request verification."
+                  : "Search registered companies and request verification."}
+              </p>
+            </div>
+            <ChevronRightIcon className="w-5 h-5 text-gray-400 flex-shrink-0" />
+          </div>
+        </div>
 
-            {/* 2. PILOT BADGE / WINGS CARD */}
+        {/* 4. SECCIONES ESPECÍFICAS DE ROL */}
+        {isFlightCrew && (
+          <>
+            {/* PILOT BADGE / WINGS CARD */}
             <div className="bg-white rounded-[20px] p-5 shadow-sm border border-gray-100 mb-4 relative">
               <button 
                 onClick={() => router.push("/onboarding?edit=true&step=1")}
-                className="absolute top-4 right-4 text-blue-600 font-semibold text-sm"
+                className="absolute top-4 right-4 text-blue-600 font-semibold text-sm cursor-pointer"
               >
                 Edit
               </button>
               
               <div className="flex flex-col items-center justify-center mb-6 mt-4">
-                 {/* Aquí va el componente o imagen de las alas */}
                  <Image alt="Titanium Badge" className="object-contain mb-3" height={80} src="/silver.png" width={192}/>
                  <h3 className="text-lg font-bold text-gray-900">Titanium</h3>
               </div>
@@ -1006,13 +1094,13 @@ export default function ProfilePage() {
               </div>
             </div>
 
-            {/* 3. LICENSES CARD */}
+            {/* LICENSES CARD */}
             <div className="bg-white rounded-[20px] p-5 shadow-sm border border-gray-100 mb-6">
               <div className="flex justify-between items-start mb-6">
                 <h3 className="text-lg font-bold text-gray-900">Licenses</h3>
                 <button 
                   onClick={() => router.push("/onboarding?edit=true&step=2")}
-                  className="text-blue-600 font-semibold text-sm"
+                  className="text-blue-600 font-semibold text-sm cursor-pointer"
                 >
                   Manage
                 </button>
@@ -1030,97 +1118,8 @@ export default function ProfilePage() {
                  </div>
               </div>
             </div>
-
-            {/* --- FIN SECCIONES INFERIORES --- */}
           </>
-        ) : (
-          <div className="w-full flex flex-col gap-4">
-            {/* 2. BOTONES DE INTERACCIÓN (Profile Likes & Profile Visitors) */}
-            <div className="flex justify-center items-center gap-3.5 mt-4 w-full">
-              <button
-                type="button"
-                onClick={handleOpenLikersModal}
-                className="flex-1 max-w-[160px] py-2.5 px-4 rounded-full border border-[#1d4ed8] text-[#1d4ed8] bg-transparent hover:bg-blue-50/60 transition-all font-bold text-xs flex items-center justify-center gap-2 cursor-pointer shadow-2xs active:scale-95"
-              >
-                <Heart className="w-4 h-4 text-[#1d4ed8] shrink-0" />
-                <span>Profile likes</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={handleOpenVisitorsModal}
-                className="flex-1 max-w-[160px] py-2.5 px-4 rounded-full border border-[#1d4ed8] text-[#1d4ed8] bg-transparent hover:bg-blue-50/60 transition-all font-bold text-xs flex items-center justify-center gap-2 cursor-pointer shadow-2xs active:scale-95"
-              >
-                <Eye className="w-4 h-4 text-[#1d4ed8] shrink-0" />
-                <span>Profile visitors</span>
-              </button>
-            </div>
-
-            {/* TOP PROGRESS SECTION (Profile Completion) */}
-            <div className="flex justify-between items-center mb-4 px-1 bg-transparent">
-              <div>
-                <h2 className="text-xl font-bold text-gray-900">Complete your profile</h2>
-                <p className="text-sm text-gray-500 mt-0.5">{completedCount} of 5 profile areas complete</p>
-              </div>
-              <div className="bg-[#E6F4EA] text-[#137333] px-3 py-1 rounded-lg text-sm font-bold">
-                {profileProgress}%
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-3 mb-6">
-              {pendingAreas.map((area) => (
-                <div
-                  key={area.id}
-                  onClick={() => router.push(area.href)}
-                  className="bg-white rounded-[20px] p-4 flex items-center gap-4 border border-gray-100 shadow-sm cursor-pointer"
-                >
-                  <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center flex-shrink-0">
-                    <PlusIcon className="w-5 h-5 text-blue-500" />
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="text-[15px] font-bold text-gray-900">{area.title}</h3>
-                    <p className="text-[13px] text-gray-500 leading-tight mt-0.5">{area.description}</p>
-                  </div>
-                  <ChevronRightIcon className="w-5 h-5 text-gray-400 flex-shrink-0" />
-                </div>
-              ))}
-            </div>
-
-        {/* COMPANY AFFILIATION SECTION */}
-        <div className="mt-8 mb-4">
-          {/* Small floating section label on the gray background */}
-          <h3 className="text-[15px] font-bold text-gray-900 mb-3 px-1">Company affiliation</h3>
-          
-          {/* Single flat card */}
-          <div
-            onClick={() => router.push("/business/affiliate")}
-            className="bg-white rounded-[20px] p-4 flex items-center gap-4 shadow-sm cursor-pointer border border-gray-100"
-          >
-            {/* Left: Blue Building Icon */}
-            <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center flex-shrink-0">
-              <BuildingOfficeIcon className="w-5 h-5 text-blue-500" /> 
-            </div>
-            
-            {/* Middle: Text Stack */}
-            <div className="flex-1">
-              <h4 className="text-[15px] font-bold text-gray-900">
-                {affiliationName || "Link your employer"}
-              </h4>
-              <p className="text-[13px] text-gray-500 leading-tight mt-0.5">
-                {affiliationName
-                  ? isAffiliationPending
-                    ? "Pending Verification"
-                    : isAffiliationVerified
-                    ? "Verified Company"
-                    : "Search registered companies and request verification."
-                  : "Search registered companies and request verification."}
-              </p>
-            </div>
-            
-            {/* Right: Chevron */}
-            <ChevronRightIcon className="w-5 h-5 text-gray-400 flex-shrink-0" />
-          </div>
-        </div>
+        )}
 
         {/* =========================================================================
             CORE PROFILE CARDS (Aviation Professional Detailed Profile)
@@ -1586,8 +1585,6 @@ export default function ProfilePage() {
           </div>
         </div>
           </>
-        )}
-          </div>
         )}
 
         {/* User Posts Section */}
