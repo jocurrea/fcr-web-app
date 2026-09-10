@@ -105,7 +105,20 @@ export interface ProfileAreasInput {
  * 6. Career and skills
  */
 export function computeProfileAreas(data: ProfileAreasInput) {
-  const isValidArray = (arr: any) => Array.isArray(arr) && arr.some(hasValue);
+  const isMeaningfulItem = (item: any): boolean => {
+    if (!item) return false;
+    if (typeof item === 'string') {
+      const trimmed = item.trim();
+      return trimmed.length > 0 && trimmed !== '[object Object]';
+    }
+    if (typeof item === 'object') {
+      const keys = Object.keys(item).filter(k => k !== 'id' && k !== '__typename');
+      return keys.length > 0;
+    }
+    return true;
+  };
+
+  const isValidArray = (arr: any) => Array.isArray(arr) && arr.some(isMeaningfulItem);
 
   // 1. Personal profile (nombre, fecha de nacimiento, nacionalidad etc.)
   const isPersonalDone = !!data?.name && typeof data.name === "string" && data.name.trim().length > 0;
