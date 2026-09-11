@@ -62,7 +62,7 @@ export default function OnboardingPage() {
         const [{ data: userRecord }, { data: resumeRecord }] = await Promise.all([
           supabase
             .from("users")
-            .select("id, onboarded, accountType, firstName, lastName, profileImage, email, phone, location, availability_status")
+            .select("id, onboarded, accountType, role, professionalRole, professionalTitleKey, firstName, lastName, profileImage, email, phone, location, availability_status")
             .eq("id", session.user.id)
             .maybeSingle(),
           supabase
@@ -75,16 +75,21 @@ export default function OnboardingPage() {
         const onboarded = !!userRecord?.onboarded;
         const accountType = userRecord?.accountType || "";
 
-        const metaAccountType = session.user.user_metadata?.accountType;
+        const metaAccountType = session.user.user_metadata?.accountType || session.user.user_metadata?.category;
         const savedPersonalRaw = localStorage.getItem("onboarding_personal");
         const localPersonal = savedPersonalRaw ? JSON.parse(savedPersonalRaw) : {};
-        const localCat = localPersonal.category || localPersonal.role;
+        const localCat = localPersonal.category || localPersonal.role || localPersonal.professionalRole;
 
         let currentCategory: "flight_crew" | "aviation_professional" = "flight_crew";
         const urlCat = urlParams.get("category");
         if (urlCat === "flight_crew" || urlCat === "aviation_professional") {
           currentCategory = urlCat;
-        } else if (metaAccountType === "aviation_professional" || localCat === "aviation_professional") {
+        } else if (
+          metaAccountType === "aviation_professional" ||
+          localCat === "aviation_professional" ||
+          userRecord?.professionalRole === "aviation_professional" ||
+          userRecord?.role === "aviation_professional"
+        ) {
           currentCategory = "aviation_professional";
         } else if (accountType === "flight_crew" || accountType === "aviation_professional") {
           currentCategory = accountType;
@@ -103,6 +108,8 @@ export default function OnboardingPage() {
           ...(crewData.personal || {}),
           ...localPersonal,
           category: currentCategory,
+          professionalRole: currentCategory === "aviation_professional" ? (localPersonal.professionalRole || "aviation_professional") : localPersonal.professionalRole,
+          professionalTitleKey: localPersonal.professionalTitleKey || userRecord?.professionalTitleKey || (currentCategory === "aviation_professional" ? "operations_officer" : null),
           firstName: localPersonal.firstName || crewData.personal?.firstName || userRecord?.firstName || "",
           lastName: localPersonal.lastName || crewData.personal?.lastName || userRecord?.lastName || "",
           email: localPersonal.email || crewData.personal?.email || userRecord?.email || session.user.email || "",
@@ -110,6 +117,7 @@ export default function OnboardingPage() {
           location: localPersonal.location || crewData.personal?.location || userRecord?.location || "",
           availabilityStatus:
             localPersonal.availabilityStatus ||
+            localPersonal.workAvailabilityStatus ||
             crewData.personal?.availabilityStatus ||
             userRecord?.availability_status ||
             "active",
@@ -229,7 +237,7 @@ export default function OnboardingPage() {
       // Fetch existing user to avoid overwriting previously selected roles with null
       const { data: existingUser } = await supabase
         .from("users")
-        .select("role, professionalRole, accountType, professionalTitleKey")
+        .select("role, professionalRole, accountType, professionalTitleKey, professionalTitleOther, firstName, lastName, profileImage")
         .eq("id", session.user.id)
         .maybeSingle();
 
@@ -252,10 +260,29 @@ export default function OnboardingPage() {
         ? "crew"
         : (existingUser?.professionalRole || "pilot");
 
+      // Extract specific professional title key from catalogue (e.g. operations_officer, aircraft_mechanic, other)
+      const validProfessionalTitleKey = isAviationPro
+        ? personalData?.professionalTitleKey ||
+          (personalData?.role && personalData.role !== "aviation_professional" ? personalData.role : null) ||
+          existingUser?.professionalTitleKey ||
+          "operations_officer"
+        : null;
+
+      const validProfessionalTitleOther = isAviationPro
+        ? personalData?.professionalTitleOther ||
+          personalData?.customRole ||
+          personalData?.otherRole ||
+          personalData?.specifiedRole ||
+          existingUser?.professionalTitleOther ||
+          null
+        : null;
+
       const validRole =
-        personalData?.role ||
-        existingUser?.role ||
-        (isAviationPro ? "aviation_professional" : isCrew ? "crew" : "pilot");
+        isAviationPro && validProfessionalTitleKey
+          ? validProfessionalTitleKey
+          : personalData?.role ||
+            existingUser?.role ||
+            (isCrew ? "crew" : "pilot");
 
       // Must strictly match users_account_type_check: 'flight_crew' | 'business'
       const validAccountType: "flight_crew" | "business" = "flight_crew";
@@ -269,7 +296,23 @@ export default function OnboardingPage() {
           ? "Cabin Crew"
           : "Pilot");
 
-      // 1. Update DB records in parallel
+      const finalFirstName = personalData?.firstName || existingUser?.firstName || "Unknown";
+      const finalLastName = personalData?.lastName || existingUser?.lastName || "";
+      const finalProfileImage =
+        avatarPhoto ||
+        personalData?.profileImage ||
+        personalData?.photoUrl ||
+        existingUser?.profileImage ||
+        localStorage.getItem("userProfilePhoto") ||
+        null;
+
+      const finalAvailabilityStatus =
+        personalData?.workAvailabilityStatus ||
+        personalData?.availabilityStatus ||
+        personalData?.availability ||
+        "active";
+
+      // 1. Update DB records in parallel (resumes, users, and user_profiles)
       await Promise.allSettled([
         supabase.from("resumes").upsert(
           {
@@ -282,20 +325,35 @@ export default function OnboardingPage() {
         supabase.from("users").upsert(
           {
             id: session.user.id,
-            firstName: personalData?.firstName || "Unknown",
-            lastName: personalData?.lastName || "",
-            ...(avatarPhoto ? { profileImage: avatarPhoto } : {}),
+            firstName: finalFirstName,
+            lastName: finalLastName,
+            ...(finalProfileImage ? { profileImage: finalProfileImage } : {}),
             email: personalData?.email || session.user.email,
             phone: personalData?.phone || null,
             location: personalData?.location || null,
-            availability_status: personalData?.availabilityStatus || "active",
+            availability_status: finalAvailabilityStatus,
             onboarded: 1,
             accountType: validAccountType,
             role: validRole,
             professionalRole: validProfessionalRole,
-            ...(isAviationPro ? { professionalTitleKey: validRole } : {}),
+            ...(isAviationPro && validProfessionalTitleKey ? {
+              professionalTitleKey: validProfessionalTitleKey,
+              ...(validProfessionalTitleOther ? { professionalTitleOther: validProfessionalTitleOther } : { professionalTitleOther: null }),
+            } : {}),
           },
           { onConflict: "id" }
+        ),
+
+        supabase.from("user_profiles").upsert(
+          {
+            userId: session.user.id,
+            workAvailabilityStatus: finalAvailabilityStatus,
+            contactEmail: personalData?.email || session.user.email,
+            contactPhone: personalData?.phone || null,
+            locationCity: personalData?.city || null,
+            locationCountry: personalData?.country || null,
+          },
+          { onConflict: "userId" }
         ),
       ]);
 

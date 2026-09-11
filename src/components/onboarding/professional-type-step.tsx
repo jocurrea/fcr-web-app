@@ -10,33 +10,53 @@ interface ProfessionalTypeStepProps {
   onBack?: () => void;
 }
 
-const ROLES = [
+const DEFAULT_ROLES = [
   {
     id: "operations_officer",
     label: "Operations Officer",
+    allowsCustom: false,
     icon: <IdCard className="w-6 h-6 text-gray-500" />
   },
   {
     id: "aircraft_mechanic",
     label: "Aircraft Mechanic",
+    allowsCustom: false,
     icon: <Wrench className="w-6 h-6 text-gray-500" />
   },
   {
     id: "air_traffic_controller",
     label: "Air Traffic Controller",
+    allowsCustom: false,
     icon: <Radio className="w-6 h-6 text-gray-500" />
   },
   {
     id: "aeronautical_engineer",
     label: "Aeronautical Engineer",
+    allowsCustom: false,
     icon: <Settings className="w-6 h-6 text-gray-500" />
   },
   {
     id: "other",
     label: "Other Aviation Professional",
+    allowsCustom: true,
     icon: <MoreHorizontal className="w-6 h-6 text-gray-500" />
   }
 ];
+
+const getRoleIcon = (key: string) => {
+  switch (key) {
+    case "operations_officer":
+      return <IdCard className="w-6 h-6 text-gray-500" />;
+    case "aircraft_mechanic":
+      return <Wrench className="w-6 h-6 text-gray-500" />;
+    case "air_traffic_controller":
+      return <Radio className="w-6 h-6 text-gray-500" />;
+    case "aeronautical_engineer":
+      return <Settings className="w-6 h-6 text-gray-500" />;
+    default:
+      return <MoreHorizontal className="w-6 h-6 text-gray-500" />;
+  }
+};
 
 // Validates exclusively alphabetic characters (including accents) and spaces
 const isAlphaOnly = (val: string) => /^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s]+$/.test(val) && /[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ]/.test(val);
@@ -44,28 +64,57 @@ const sanitizeAlpha = (val: string) => val.replace(/[^a-zA-ZáéíóúÁÉÍÓÚ
 
 export function ProfessionalTypeStep({ onNext, onBack }: ProfessionalTypeStepProps) {
   const router = useRouter();
+  const [roleList, setRoleList] = useState(DEFAULT_ROLES);
   const [selectedRole, setSelectedRole] = useState<string | null>(null);
   const [customRole, setCustomRole] = useState("");
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
+    async function loadTitles() {
+      try {
+        const { data, error } = await supabase
+          .from("professional_titles")
+          .select("key, label, allows_custom_text, sort_order, is_active")
+          .eq("is_active", true)
+          .order("sort_order", { ascending: true });
+
+        if (!error && data && data.length > 0) {
+          const mapped = data.map((t) => ({
+            id: t.key,
+            label: t.label,
+            allowsCustom: !!t.allows_custom_text,
+            icon: getRoleIcon(t.key),
+          }));
+          setRoleList(mapped);
+        }
+      } catch (err) {
+        console.warn("Notice loading professional_titles from DB:", err);
+      }
+    }
+
+    loadTitles();
+
     try {
       const saved = localStorage.getItem("onboarding_personal");
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (parsed.professionalRole) {
+        if (parsed.professionalTitleKey) {
+          setSelectedRole(parsed.professionalTitleKey);
+        } else if (parsed.professionalRole) {
           setSelectedRole(parsed.professionalRole);
-          if (parsed.professionalRole === "other") {
-            setCustomRole(
-              parsed.customRole ||
-              parsed.otherRole ||
-              parsed.specifiedRole ||
-              (parsed.professionalTitle && parsed.professionalTitle !== "Other Aviation Professional" ? parsed.professionalTitle : "") ||
-              ""
-            );
-          }
-        } else if (parsed.role && ROLES.some(r => r.id === parsed.role)) {
+        } else if (parsed.role) {
           setSelectedRole(parsed.role);
+        }
+
+        if (parsed.professionalTitleKey === "other" || parsed.professionalRole === "other" || parsed.role === "other") {
+          setCustomRole(
+            parsed.professionalTitleOther ||
+            parsed.customRole ||
+            parsed.otherRole ||
+            parsed.specifiedRole ||
+            (parsed.professionalTitle && parsed.professionalTitle !== "Other Aviation Professional" ? parsed.professionalTitle : "") ||
+            ""
+          );
         }
       }
     } catch (e) {
@@ -90,6 +139,8 @@ export function ProfessionalTypeStep({ onNext, onBack }: ProfessionalTypeStepPro
         delete parsed.professionalRole;
         delete parsed.professional_role;
         delete parsed.professionalTitle;
+        delete parsed.professionalTitleKey;
+        delete parsed.professionalTitleOther;
         delete parsed.professionalRoleLabel;
         localStorage.setItem("onboarding_personal", JSON.stringify(parsed));
       }
@@ -103,24 +154,26 @@ export function ProfessionalTypeStep({ onNext, onBack }: ProfessionalTypeStepPro
     }
   };
 
+  const selectedRoleObj = roleList.find((r) => r.id === selectedRole);
+  const requiresCustomText = selectedRole === "other" || !!selectedRoleObj?.allowsCustom;
+
   const isFormValid = Boolean(
     selectedRole &&
-      (selectedRole !== "other" ||
+      (!requiresCustomText ||
         (customRole.trim().length > 0 && isAlphaOnly(customRole.trim())))
   );
 
   const handleNextClick = async () => {
     if (!isFormValid || isSaving || !selectedRole) return;
-    if (selectedRole === "other" && !isAlphaOnly(customRole.trim())) return;
+    if (requiresCustomText && !isAlphaOnly(customRole.trim())) return;
 
     setIsSaving(true);
     try {
-      const selectedObj = ROLES.find(r => r.id === selectedRole);
       const roleLabel =
-        selectedRole === "other" && customRole.trim()
+        requiresCustomText && customRole.trim()
           ? customRole.trim()
-          : selectedObj
-          ? selectedObj.label
+          : selectedRoleObj
+          ? selectedRoleObj.label
           : "Aviation Professional";
 
       const existing = localStorage.getItem("onboarding_personal");
@@ -130,11 +183,13 @@ export function ProfessionalTypeStep({ onNext, onBack }: ProfessionalTypeStepPro
         ...parsed,
         category: "aviation_professional",
         role: selectedRole,
-        professionalRole: roleLabel,
-        professional_role: roleLabel,
-        customRole: selectedRole === "other" ? customRole.trim() : "",
-        otherRole: selectedRole === "other" ? customRole.trim() : "",
-        specifiedRole: selectedRole === "other" ? customRole.trim() : "",
+        professionalRole: "aviation_professional",
+        professional_role: "aviation_professional",
+        professionalTitleKey: selectedRole,
+        professionalTitleOther: requiresCustomText ? customRole.trim() : null,
+        customRole: requiresCustomText ? customRole.trim() : "",
+        otherRole: requiresCustomText ? customRole.trim() : "",
+        specifiedRole: requiresCustomText ? customRole.trim() : "",
         professionalTitle: roleLabel,
         professionalRoleLabel: roleLabel
       };
@@ -143,23 +198,24 @@ export function ProfessionalTypeStep({ onNext, onBack }: ProfessionalTypeStepPro
 
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
-        // 1. Update public.users table with professionalRole, role, and accountType matching DB schema
+        // 1. Update public.users table with professionalRole, role, and professionalTitleKey
         await Promise.allSettled([
           supabase.from("users").update({
             accountType: "flight_crew",
             role: selectedRole,
             professionalRole: "aviation_professional",
             professionalTitleKey: selectedRole,
-            ...(selectedRole === "other" && customRole.trim() ? { professionalTitleOther: customRole.trim() } : {}),
+            ...(requiresCustomText && customRole.trim() ? { professionalTitleOther: customRole.trim() } : { professionalTitleOther: null }),
           }).eq("id", session.user.id),
 
-          // 2. Update auth user metadata (matching mobile payload format)
+          // 2. Update auth user metadata
           supabase.auth.updateUser({
             data: {
               accountType: "aviation_professional",
               role: selectedRole,
               professionalRole: "aviation_professional",
               professional_role: "aviation_professional",
+              professionalTitleKey: selectedRole,
               category: "aviation_professional",
               professionalTitle: roleLabel,
               professionalRoleLabel: roleLabel,
