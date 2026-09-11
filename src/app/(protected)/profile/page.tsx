@@ -91,97 +91,6 @@ export default function ProfilePage() {
   const [loadingVisitors, setLoadingVisitors] = useState(false);
   const [loadingLikers, setLoadingLikers] = useState(false);
 
-  // Temporary Dev Tool State for forcing active onboarding status
-  const [isForcingStatus, setIsForcingStatus] = useState(false);
-  const [forceStatusError, setForceStatusError] = useState<string | null>(null);
-
-  const handleForceActiveStatus = async () => {
-    setIsForcingStatus(true);
-    setForceStatusError(null);
-    try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-
-      if (!session?.user) {
-        alert("No active session found. Please sign in.");
-        return;
-      }
-
-      const userId = session.user.id;
-
-      // 1. Update users table with canonical onboarded and active status
-      const { error: userError } = await supabase
-        .from("users")
-        .update({
-          onboarded: 1,
-          isBanned: 0,
-        })
-        .eq("id", userId);
-
-      if (userError) {
-        console.warn("Notice updating users table with onboarded=1:", userError.message);
-      }
-
-      // Also try additional status fields if they exist in schema
-      try {
-        await supabase
-          .from("users")
-          .update({
-            is_active: true,
-            status: "active",
-            onboarding_status: "completed",
-          } as any)
-          .eq("id", userId);
-      } catch (_) {}
-
-      // 2. Update user_profiles table if present
-      try {
-        await supabase
-          .from("user_profiles")
-          .update({
-            workAvailabilityStatus: "active",
-            is_active: true,
-            status: "active",
-          } as any)
-          .eq("userId", userId);
-      } catch (_) {}
-
-      // 3. Update Supabase Auth user metadata
-      try {
-        await supabase.auth.updateUser({
-          data: {
-            onboarded: true,
-            is_active: true,
-            status: "active",
-            onboarding_status: "completed",
-          },
-        });
-      } catch (_) {}
-
-      // 4. Set onboarding cookie for client & middleware synchronization
-      document.cookie = "flightcrew_onboarded=true; path=/; max-age=31536000; SameSite=Lax";
-
-      // 5. Update local storage cache
-      try {
-        const savedPersonal = localStorage.getItem("onboarding_personal");
-        const parsed = savedPersonal ? JSON.parse(savedPersonal) : {};
-        parsed.onboarded = true;
-        parsed.onboarding_status = "completed";
-        parsed.status = "active";
-        localStorage.setItem("onboarding_personal", JSON.stringify(parsed));
-      } catch (_) {}
-
-      // 6. Reload the page on success
-      window.location.reload();
-    } catch (err: any) {
-      console.error("Error forcing active status:", err);
-      setForceStatusError(err?.message || "Failed to force active status.");
-      alert(`Error forcing active status: ${err?.message || "Unknown error"}`);
-    } finally {
-      setIsForcingStatus(false);
-    }
-  };
 
   const loading = contextLoading;
 
@@ -696,21 +605,7 @@ export default function ProfilePage() {
                 </Link>
               </div>
               <span className="text-xs text-gray-500 mt-1 font-medium">Corporate associate account</span>
-              {/* Temporary Dev Tool Button: Force Active Status */}
-              <div className="mt-2">
-                <button
-                  type="button"
-                  onClick={handleForceActiveStatus}
-                  disabled={isForcingStatus}
-                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-500 hover:bg-amber-600 text-white shadow-xs transition-all cursor-pointer active:scale-95 disabled:opacity-50"
-                  title="Force Active Status (Dev Tool)"
-                >
-                  {isForcingStatus ? "Activating..." : "⚡ Force Active Status"}
-                </button>
-                {forceStatusError && (
-                  <p className="text-[11px] text-red-600 font-medium mt-1">{forceStatusError}</p>
-                )}
-              </div>
+
             </div>
           </div>
         </div>
@@ -930,25 +825,7 @@ export default function ProfilePage() {
             {roleLabel}
           </p>
 
-          {/* Temporary Dev Tool Button: Force Active Status */}
-          <div className="mt-2 flex flex-col items-center">
-            <button
-              type="button"
-              onClick={handleForceActiveStatus}
-              disabled={isForcingStatus}
-              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-500 hover:bg-amber-600 text-white shadow-xs transition-all cursor-pointer active:scale-95 disabled:opacity-50"
-              title="Force Active Status (Dev Tool)"
-            >
-              {isForcingStatus ? (
-                <span>Activating...</span>
-              ) : (
-                <span>⚡ Force Active Status</span>
-              )}
-            </button>
-            {forceStatusError && (
-              <p className="text-[11px] text-red-600 font-medium mt-1">{forceStatusError}</p>
-            )}
-          </div>
+
 
           {/* Location subtext with interactive navigation shortcut */}
           {locationValue ? (
