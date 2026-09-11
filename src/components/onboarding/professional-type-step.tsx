@@ -10,7 +10,7 @@ interface ProfessionalTypeStepProps {
   onBack?: () => void;
 }
 
-const DEFAULT_ROLES = [
+export const ROLES = [
   {
     id: "operations_officer",
     label: "Operations Officer",
@@ -64,7 +64,7 @@ const sanitizeAlpha = (val: string) => val.replace(/[^a-zA-ZáéíóúÁÉÍÓÚ
 
 export function ProfessionalTypeStep({ onNext, onBack }: ProfessionalTypeStepProps) {
   const router = useRouter();
-  const [roleList, setRoleList] = useState(DEFAULT_ROLES);
+  const [roleList, setRoleList] = useState(ROLES);
   const [selectedRole, setSelectedRole] = useState<string | null>(null);
   const [customRole, setCustomRole] = useState("");
   const [isSaving, setIsSaving] = useState(false);
@@ -310,9 +310,9 @@ export function ProfessionalTypeStep({ onNext, onBack }: ProfessionalTypeStepPro
 
         {/* 3. Options List (Cards) */}
         <div className="flex flex-col gap-3.5 flex-1">
-          {ROLES.map((role) => {
+          {(roleList && roleList.length > 0 ? roleList : ROLES).map((role) => {
             const isSelected = selectedRole === role.id;
-            const isOtherRole = role.id === "other";
+            const isOtherRole = role.id === "other" || !!role.allowsCustom;
 
             return (
               <div key={role.id} className="flex flex-col gap-2">
