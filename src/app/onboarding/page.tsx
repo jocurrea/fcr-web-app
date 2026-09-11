@@ -306,11 +306,15 @@ export default function OnboardingPage() {
         localStorage.getItem("userProfilePhoto") ||
         null;
 
-      const finalAvailabilityStatus =
+      // Normalize availability status: DB check constraint on user_profiles.workAvailabilityStatus
+      // only accepts 'active' or 'available_for_work'. Map legacy 'available' to the canonical value.
+      const rawAvailability =
         personalData?.workAvailabilityStatus ||
         personalData?.availabilityStatus ||
         personalData?.availability ||
-        "active";
+        "available_for_work";
+      const finalAvailabilityStatus: "active" | "available_for_work" =
+        rawAvailability === "active" ? "active" : "available_for_work";
 
       // 1. Update DB records in parallel (resumes, users, and user_profiles)
       await Promise.allSettled([
@@ -344,6 +348,8 @@ export default function OnboardingPage() {
           { onConflict: "id" }
         ),
 
+        // user_profiles upsert: must include Aviation Professional fields so
+        // sync_legacy_user_profile_to_canonical_trigger can populate aviation_professional_profiles
         supabase.from("user_profiles").upsert(
           {
             userId: session.user.id,
@@ -352,9 +358,28 @@ export default function OnboardingPage() {
             contactPhone: personalData?.phone || null,
             locationCity: personalData?.city || null,
             locationCountry: personalData?.country || null,
+            // Required by aviation_professional_profiles canonical sync trigger:
+            ...(isAviationPro && validProfessionalTitleKey ? {
+              professionalCredentials: personalData?.professionalCredentials || [],
+            } : {}),
           },
           { onConflict: "userId" }
         ),
+
+        // For Aviation Professionals: write directly to aviation_professional_profiles
+        // to guarantee the canonical extension row exists (sync trigger may be async).
+        ...(isAviationPro && validProfessionalTitleKey ? [
+          supabase.from("aviation_professional_profiles").upsert(
+            {
+              userId: session.user.id,
+              professionalTitleKey: validProfessionalTitleKey,
+              ...(validProfessionalTitleOther ? { professionalTitleOther: validProfessionalTitleOther } : { professionalTitleOther: null }),
+              workAvailabilityStatus: finalAvailabilityStatus,
+              professionalCredentials: personalData?.professionalCredentials || [],
+            },
+            { onConflict: "userId" }
+          ),
+        ] : []),
       ]);
 
       // 2. Mandatory JWT update: update auth user metadata with onboarded: true and role

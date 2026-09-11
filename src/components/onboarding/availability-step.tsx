@@ -7,14 +7,20 @@ import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 
 interface AvailabilityStepProps {
-  onNext?: (status: "active" | "available") => void;
+  onNext?: (status: "active" | "available_for_work") => void;
   onBack?: () => void;
 }
+
+// Map UI option to canonical DB value
+// user_profiles.workAvailabilityStatus CHECK: 'active' OR 'available_for_work'
+type UIStatus = "active" | "available";
+const toCanonicalStatus = (s: UIStatus): "active" | "available_for_work" =>
+  s === "active" ? "active" : "available_for_work";
 
 export function AvailabilityStep({ onNext, onBack }: AvailabilityStepProps) {
   const router = useRouter();
 
-  const [selectedStatus, setSelectedStatus] = useState<"active" | "available">("available");
+  const [selectedStatus, setSelectedStatus] = useState<UIStatus>("available");
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
@@ -46,6 +52,9 @@ export function AvailabilityStep({ onNext, onBack }: AvailabilityStepProps) {
         "Aviation Professional";
 
       // Read all required fields from localStorage so the DB trigger fires correctly
+      const canonicalStatus = toCanonicalStatus(selectedStatus);
+
+      // Read all required fields from localStorage so the DB trigger fires correctly
       const savedPhoto = localStorage.getItem("userProfilePhoto");
       const finalFirstName = parsed.firstName || "";
       const finalLastName = parsed.lastName || "";
@@ -62,8 +71,8 @@ export function AvailabilityStep({ onNext, onBack }: AvailabilityStepProps) {
       const updated = {
         ...parsed,
         availabilityStatus: selectedStatus,
-        workAvailabilityStatus: selectedStatus,  // key read by handleFinish
-        availability_status: selectedStatus,
+        workAvailabilityStatus: canonicalStatus,  // canonical value for DB
+        availability_status: canonicalStatus,
         category: "aviation_professional",
         role: finalProfessionalTitleKey || roleKey,
         professionalRole: "aviation_professional",
@@ -80,13 +89,25 @@ export function AvailabilityStep({ onNext, onBack }: AvailabilityStepProps) {
           ...(finalFirstName ? { firstName: finalFirstName } : {}),
           ...(finalLastName ? { lastName: finalLastName } : {}),
           ...(finalProfileImage ? { profileImage: finalProfileImage } : {}),
-          availability_status: selectedStatus,
+          availability_status: canonicalStatus,
           onboarded: 1,
           accountType: "flight_crew",  // constraint: 'flight_crew' | 'business'
           role: finalProfessionalTitleKey || roleKey || "operations_officer",
           professionalRole: "aviation_professional",
           ...(finalProfessionalTitleKey ? { professionalTitleKey: finalProfessionalTitleKey } : {}),
         }, { onConflict: "id" });
+
+        // Write directly to aviation_professional_profiles (canonical extension table)
+        // This ensures the row exists before the RPC request_company_affiliation is called
+        if (finalProfessionalTitleKey) {
+          await supabase.from("aviation_professional_profiles").upsert({
+            userId: session.user.id,
+            professionalTitleKey: finalProfessionalTitleKey,
+            ...(parsed.professionalTitleOther ? { professionalTitleOther: parsed.professionalTitleOther } : { professionalTitleOther: null }),
+            workAvailabilityStatus: canonicalStatus,
+            professionalCredentials: parsed.professionalCredentials || [],
+          }, { onConflict: "userId" });
+        }
 
         // Update resumes table
         const { data: currentResume } = await supabase
@@ -115,12 +136,12 @@ export function AvailabilityStep({ onNext, onBack }: AvailabilityStepProps) {
           data: {
             onboarded: true,
             accountType: "aviation_professional",
-            role: roleKey || "aviation_professional",
+            role: finalProfessionalTitleKey || roleKey || "aviation_professional",
             professionalRole: "aviation_professional",
             professional_role: "aviation_professional",
             professionalRoleLabel: roleLabel,
             professionalTitle: roleLabel,
-            availability_status: selectedStatus,
+            availability_status: canonicalStatus,
             crew_data_saved: true,
           },
         });
@@ -137,7 +158,7 @@ export function AvailabilityStep({ onNext, onBack }: AvailabilityStepProps) {
       }
 
       if (onNext) {
-        onNext(selectedStatus);
+        onNext(canonicalStatus);
       } else {
         router.refresh();
         router.push("/home");
