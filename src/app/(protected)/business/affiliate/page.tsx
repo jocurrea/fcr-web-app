@@ -15,7 +15,6 @@ import {
   Search,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { bypassCompanyAffiliationAction } from "@/actions/bypassAffiliation";
 import { CompanySearchAutocomplete, type CompanySelection } from "@/components/profile/company-search-autocomplete";
 import { cn } from "@/lib/utils";
 
@@ -142,40 +141,13 @@ export default function BusinessAffiliatePage() {
         return;
       }
 
-      // QA Temporal Bypass: Force active onboarded individual professional status before calling RPC
-      try {
-        await supabase
-          .from("users")
-          .update({
-            onboarded: 1,
-            isBanned: 0,
-            status: "active",
-            is_active: true,
-            onboarding_status: "completed",
-          } as any)
-          .eq("id", session.user.id);
-      } catch (bypassErr) {
-        console.warn("QA Bypass users update notice:", bypassErr);
-      }
-
-      try {
-        await supabase
-          .from("user_profiles")
-          .update({
-            workAvailabilityStatus: "active",
-            status: "active",
-            is_active: true,
-          } as any)
-          .eq("userId", session.user.id);
-      } catch (_) {}
-
       if (selectedCompany.id) {
-        // TEMPORAL QA BYPASS: Llamada RPC comentada temporalmente por bloqueo 403 de RLS
-        /*
+        // 1. Registered Business Account -> strictly call request_company_affiliation RPC
         const res = await supabase.rpc("request_company_affiliation", {
           target_company_id: selectedCompany.id,
         });
 
+        // Strict verification: halt execution on error or non-200/204 status
         if (res.error || (res.status && res.status !== 200 && res.status !== 204)) {
           console.error("Supabase RPC request_company_affiliation error:", res.error, "Status:", res.status);
           const errorMsg =
@@ -188,22 +160,8 @@ export default function BusinessAffiliatePage() {
           setIsSubmitting(false);
           return;
         }
-        */
 
-        // Ejecución de Bypass directo usando Service Role Key en Server Action
-        const bypassRes = await bypassCompanyAffiliationAction({
-          companyId: selectedCompany.id,
-          companyName: selectedCompany.name,
-        });
-
-        if (!bypassRes.success) {
-          console.error("QA Bypass Server Action error:", bypassRes.error);
-          setErrorMessage(bypassRes.error || "Failed to submit affiliation request. Please try again.");
-          setIsSubmitting(false);
-          return;
-        }
-
-        // Database confirmed operation successfully via Bypass
+        // Database confirmed operation successfully
         setSuccessMessage(
           `Affiliation request sent to ${selectedCompany.name}! Awaiting review by company administrator.`
         );
