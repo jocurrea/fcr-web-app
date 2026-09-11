@@ -173,6 +173,16 @@ export default function BusinessAffiliatePage() {
       }
 
       if (selectedCompany.id) {
+        // Actualización silenciosa para asegurar que el usuario esté marcado como onboarded
+        try {
+          await supabase
+            .from("users")
+            .update({ onboarded: 1 })
+            .eq("id", session.user.id);
+        } catch (e) {
+          console.warn("Silent onboarded update notice:", e);
+        }
+
         // 1. Registered Business Account -> strictly call request_company_affiliation RPC
         const res = await supabase.rpc("request_company_affiliation", {
           target_company_id: selectedCompany.id,
