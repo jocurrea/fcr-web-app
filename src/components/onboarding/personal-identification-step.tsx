@@ -284,7 +284,7 @@ export function PersonalIdentificationStep({ onNext, onBack }: PersonalIdentific
           firstName: firstName.trim(),
           lastName: lastName.trim(),
           ...(photoPreview ? { profileImage: photoPreview } : {}),
-          accountType: "aviation_professional"
+          accountType: "flight_crew",  // constraint: only 'flight_crew' | 'business' accepted
         }, { onConflict: "id" });
       }
 

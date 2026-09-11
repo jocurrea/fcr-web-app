@@ -45,29 +45,47 @@ export function AvailabilityStep({ onNext, onBack }: AvailabilityStepProps) {
         parsed.professionalRole ||
         "Aviation Professional";
 
+      // Read all required fields from localStorage so the DB trigger fires correctly
+      const savedPhoto = localStorage.getItem("userProfilePhoto");
+      const finalFirstName = parsed.firstName || "";
+      const finalLastName = parsed.lastName || "";
+      const finalProfileImage = savedPhoto || parsed.profileImage || parsed.photoUrl || null;
+
+      // professionalTitleKey must be a catalogue key (e.g. operations_officer), not the label string
+      const finalProfessionalTitleKey =
+        parsed.professionalTitleKey && parsed.professionalTitleKey !== "aviation_professional"
+          ? parsed.professionalTitleKey
+          : roleKey && roleKey !== "aviation_professional"
+          ? roleKey
+          : null;
+
       const updated = {
         ...parsed,
         availabilityStatus: selectedStatus,
+        workAvailabilityStatus: selectedStatus,  // key read by handleFinish
         availability_status: selectedStatus,
         category: "aviation_professional",
-        role: roleKey,
-        professionalRole: roleLabel,
-        professional_role: roleLabel,
+        role: finalProfessionalTitleKey || roleKey,
+        professionalRole: "aviation_professional",
+        professional_role: "aviation_professional",
       };
 
       localStorage.setItem("onboarding_personal", JSON.stringify(updated));
 
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
-        // Update users table with availability_status, role, and professionalRole matching schema
+        // Update users table with ALL fields required by the onboarded trigger
         await supabase.from("users").upsert({
           id: session.user.id,
+          ...(finalFirstName ? { firstName: finalFirstName } : {}),
+          ...(finalLastName ? { lastName: finalLastName } : {}),
+          ...(finalProfileImage ? { profileImage: finalProfileImage } : {}),
           availability_status: selectedStatus,
           onboarded: 1,
-          accountType: "flight_crew",
-          role: roleKey || "aviation_professional",
+          accountType: "flight_crew",  // constraint: 'flight_crew' | 'business'
+          role: finalProfessionalTitleKey || roleKey || "operations_officer",
           professionalRole: "aviation_professional",
-          professionalTitleKey: roleKey || "aviation_professional",
+          ...(finalProfessionalTitleKey ? { professionalTitleKey: finalProfessionalTitleKey } : {}),
         }, { onConflict: "id" });
 
         // Update resumes table
