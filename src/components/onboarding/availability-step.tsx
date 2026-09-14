@@ -90,7 +90,6 @@ export function AvailabilityStep({ onNext, onBack }: AvailabilityStepProps) {
           ...(finalLastName ? { lastName: finalLastName } : {}),
           ...(finalProfileImage ? { profileImage: finalProfileImage } : {}),
           availability_status: canonicalStatus,
-          onboarded: 1,
           accountType: "flight_crew",  // constraint: 'flight_crew' | 'business'
           role: finalProfessionalTitleKey || roleKey || "operations_officer",
           professionalRole: "aviation_professional",
@@ -166,7 +165,7 @@ export function AvailabilityStep({ onNext, onBack }: AvailabilityStepProps) {
     } catch (err) {
       console.error("Error saving availability status:", err);
       if (onNext) {
-        onNext(selectedStatus);
+        onNext(toCanonicalStatus(selectedStatus));
       }
     } finally {
       setIsSaving(false);

@@ -316,73 +316,119 @@ export default function OnboardingPage() {
       const finalAvailabilityStatus: "active" | "available_for_work" =
         rawAvailability === "active" ? "active" : "available_for_work";
 
-      // 1. Update DB records in parallel (resumes, users, and user_profiles)
-      await Promise.allSettled([
-        supabase.from("resumes").upsert(
-          {
-            userId: session.user.id,
-            data: crewData,
-          },
-          { onConflict: "userId" }
-        ),
+      const userId = session.user.id;
 
-        supabase.from("users").upsert(
-          {
-            id: session.user.id,
-            firstName: finalFirstName,
-            lastName: finalLastName,
-            ...(finalProfileImage ? { profileImage: finalProfileImage } : {}),
-            email: personalData?.email || session.user.email,
-            phone: personalData?.phone || null,
-            location: personalData?.location || null,
-            availability_status: finalAvailabilityStatus,
-            onboarded: 1,
-            accountType: validAccountType,
-            role: validRole,
-            professionalRole: validProfessionalRole,
-            ...(isAviationPro && validProfessionalTitleKey ? {
-              professionalTitleKey: validProfessionalTitleKey,
-              ...(validProfessionalTitleOther ? { professionalTitleOther: validProfessionalTitleOther } : { professionalTitleOther: null }),
-            } : {}),
-          },
-          { onConflict: "id" }
-        ),
+      // ─────────────────────────────────────────────────────────────────
+      // PASO 1: Guardar rol y professionalTitleKey en users
+      // ─────────────────────────────────────────────────────────────────
+      const { error: usersRoleError } = await supabase.from("users").upsert(
+        {
+          id: userId,
+          accountType: validAccountType,
+          role: validRole,
+          professionalRole: validProfessionalRole,
+          ...(isAviationPro && validProfessionalTitleKey ? {
+            professionalTitleKey: validProfessionalTitleKey,
+            ...(validProfessionalTitleOther
+              ? { professionalTitleOther: validProfessionalTitleOther }
+              : { professionalTitleOther: null }),
+          } : {}),
+        },
+        { onConflict: "id" }
+      );
+      if (usersRoleError) {
+        console.error("[Onboarding] STEP 1 – users role/professionalTitleKey upsert FAILED:", usersRoleError);
+      }
 
-        // user_profiles upsert: must include Aviation Professional fields so
-        // sync_legacy_user_profile_to_canonical_trigger can populate aviation_professional_profiles
-        supabase.from("user_profiles").upsert(
+      // ─────────────────────────────────────────────────────────────────
+      // PASO 2: Guardar workAvailabilityStatus en user_profiles
+      // ─────────────────────────────────────────────────────────────────
+      const { error: userProfilesError } = await supabase.from("user_profiles").upsert(
+        {
+          userId,
+          // Strict: only 'active' or 'available_for_work' are accepted by the DB check constraint
+          workAvailabilityStatus: finalAvailabilityStatus,
+          contactEmail: personalData?.email || session.user.email,
+          contactPhone: personalData?.phone || null,
+          locationCity: personalData?.city || null,
+          locationCountry: personalData?.country || null,
+          ...(isAviationPro && validProfessionalTitleKey ? {
+            professionalCredentials: personalData?.professionalCredentials || [],
+          } : {}),
+        },
+        { onConflict: "userId" }
+      );
+      if (userProfilesError) {
+        console.error("[Onboarding] STEP 2 – user_profiles workAvailabilityStatus upsert FAILED:", userProfilesError);
+      }
+
+      // ─────────────────────────────────────────────────────────────────
+      // PASO 3: Guardar el resto de la información del perfil
+      // ─────────────────────────────────────────────────────────────────
+
+      // 3a. Resto de campos de users (nombre, foto, email, etc.)
+      const { error: usersProfileError } = await supabase.from("users").upsert(
+        {
+          id: userId,
+          firstName: finalFirstName,
+          lastName: finalLastName,
+          ...(finalProfileImage ? { profileImage: finalProfileImage } : {}),
+          email: personalData?.email || session.user.email,
+          phone: personalData?.phone || null,
+          location: personalData?.location || null,
+          availability_status: finalAvailabilityStatus,
+        },
+        { onConflict: "id" }
+      );
+      if (usersProfileError) {
+        console.error("[Onboarding] STEP 3a – users profile info upsert FAILED:", usersProfileError);
+      }
+
+      // 3b. Resumes
+      const { error: resumesError } = await supabase.from("resumes").upsert(
+        {
+          userId,
+          data: crewData,
+        },
+        { onConflict: "userId" }
+      );
+      if (resumesError) {
+        console.error("[Onboarding] STEP 3b – resumes upsert FAILED:", resumesError);
+      }
+
+      // 3c. Aviation Professional canonical extension row (if applicable)
+      if (isAviationPro && validProfessionalTitleKey) {
+        const { error: aviationProfileError } = await supabase.from("aviation_professional_profiles").upsert(
           {
-            userId: session.user.id,
+            userId,
+            professionalTitleKey: validProfessionalTitleKey,
+            ...(validProfessionalTitleOther
+              ? { professionalTitleOther: validProfessionalTitleOther }
+              : { professionalTitleOther: null }),
             workAvailabilityStatus: finalAvailabilityStatus,
-            contactEmail: personalData?.email || session.user.email,
-            contactPhone: personalData?.phone || null,
-            locationCity: personalData?.city || null,
-            locationCountry: personalData?.country || null,
-            // Required by aviation_professional_profiles canonical sync trigger:
-            ...(isAviationPro && validProfessionalTitleKey ? {
-              professionalCredentials: personalData?.professionalCredentials || [],
-            } : {}),
+            professionalCredentials: personalData?.professionalCredentials || [],
           },
           { onConflict: "userId" }
-        ),
+        );
+        if (aviationProfileError) {
+          console.error("[Onboarding] STEP 3c – aviation_professional_profiles upsert FAILED:", aviationProfileError);
+        }
+      }
 
-        // For Aviation Professionals: write directly to aviation_professional_profiles
-        // to guarantee the canonical extension row exists (sync trigger may be async).
-        ...(isAviationPro && validProfessionalTitleKey ? [
-          supabase.from("aviation_professional_profiles").upsert(
-            {
-              userId: session.user.id,
-              professionalTitleKey: validProfessionalTitleKey,
-              ...(validProfessionalTitleOther ? { professionalTitleOther: validProfessionalTitleOther } : { professionalTitleOther: null }),
-              workAvailabilityStatus: finalAvailabilityStatus,
-              professionalCredentials: personalData?.professionalCredentials || [],
-            },
-            { onConflict: "userId" }
-          ),
-        ] : []),
-      ]);
+      // ─────────────────────────────────────────────────────────────────
+      // PASO 4 (CLAVE): Marcar al usuario como onboarded EXPLÍCITAMENTE
+      // Solo se ejecuta después de que todos los upserts anteriores hayan
+      // resuelto. Los triggers de Supabase NO hacen esto automáticamente.
+      // ─────────────────────────────────────────────────────────────────
+      const { error: onboardedError } = await supabase
+        .from("users")
+        .update({ onboarded: 1 })
+        .eq("id", userId);
+      if (onboardedError) {
+        console.error("[Onboarding] STEP 4 – users onboarded:1 update FAILED:", onboardedError);
+      }
 
-      // 2. Mandatory JWT update: update auth user metadata with onboarded: true and role
+      // 5. Mandatory JWT update: update auth user metadata with onboarded: true and role
       try {
         await supabase.auth.updateUser({
           data: {
@@ -401,14 +447,14 @@ export default function OnboardingPage() {
         console.warn("[Onboarding] Auth metadata update warning:", authErr);
       }
 
-      // 3. Immediately refresh session so new JWT is issued and persisted to cookies
+      // 6. Immediately refresh session so new JWT is issued and persisted to cookies
       try {
         await supabase.auth.refreshSession();
       } catch (refErr) {
         console.warn("[Onboarding] Refresh session error:", refErr);
       }
 
-      // 4. Finalize company affiliation request if selected during onboarding
+      // 7. Finalize company affiliation request if selected during onboarding
       try {
         const targetCompId = personalData?.linkedCompanyId || personalData?.companyId;
         const targetCompName = personalData?.linkedCompany || personalData?.companyName || personalData?.company;
