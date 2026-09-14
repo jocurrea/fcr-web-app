@@ -21,6 +21,10 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
+import {
+  getPendingAffiliationsAdminFallback,
+  type PendingAffiliationItem,
+} from "@/actions/affiliations";
 
 export interface AffiliationRequest {
   id: string;
@@ -49,38 +53,6 @@ interface AffiliationRequestsManagerProps {
   className?: string;
   onCountChange?: (count: number) => void;
   hideHeader?: boolean;
-}
-
-// Enrich raw company_affiliations rows with user profile data (name, photo, role)
-async function enrichAffiliations(
-  affiliations: Array<{ id: string; user_id: string; [key: string]: any }>
-): Promise<AffiliationRequest[]> {
-  const userIds = affiliations.map((a) => a.user_id).filter(Boolean);
-  if (userIds.length === 0) return affiliations as AffiliationRequest[];
-
-  const { data: usersData } = await supabase
-    .from("users")
-    .select("id, firstName, lastName, profileImage, role, professionalRole, professionalTitleKey, email")
-    .in("id", userIds);
-
-  const userMap: Record<string, any> = {};
-  (usersData || []).forEach((u) => {
-    userMap[u.id] = u;
-  });
-
-  return affiliations.map((aff) => {
-    const u = userMap[aff.user_id] || {};
-    return {
-      ...aff,
-      user_id: aff.user_id,
-      first_name: u.firstName || null,
-      last_name: u.lastName || null,
-      full_name: [u.firstName, u.lastName].filter(Boolean).join(" ") || null,
-      profile_image: u.profileImage || null,
-      email: u.email || null,
-      role: u.professionalTitleKey || u.role || u.professionalRole || null,
-    };
-  });
 }
 
 export function AffiliationRequestsManager({
@@ -134,8 +106,12 @@ export function AffiliationRequestsManager({
         console.log("[AffiliationRequests] RPC returned 0 results — trying direct table fallback...");
       }
 
-      // ── Fallback: query company_affiliations directly for the current user's company
-      // 1. Get the current user's session
+      // ── Fallback: Server Action with admin client (bypasses RLS)
+      // The direct client query on company_affiliations returns 403 Forbidden.
+      // We delegate to a Server Action that verifies ownership and uses
+      // the service role key to read and enrich the pending affiliations.
+
+      // Find the company owned by the current user
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         setError("Not authenticated.");
@@ -144,7 +120,6 @@ export function AffiliationRequestsManager({
         return;
       }
 
-      // 2. Get the company owned by this user (correct column: owner_user_id)
       const { data: companyRecord, error: companyErr } = await supabase
         .from("companies")
         .select("id, name")
@@ -166,35 +141,27 @@ export function AffiliationRequestsManager({
         return;
       }
 
-      // 3. Fetch pending affiliations for this company
-      const { data: affiliations, error: affErr } = await supabase
-        .from("company_affiliations")
-        .select(`
-          id,
-          user_id,
-          company_id,
-          status,
-          requested_at,
-          created_at,
-          company_name_snapshot
-        `)
-        .eq("company_id", companyRecord.id)
-        .eq("status", "pending")
-        .order("created_at", { ascending: false });
+      // Call the Server Action — runs on the server with service role key
+      const fallbackResult = await getPendingAffiliationsAdminFallback(companyRecord.id);
 
-      console.log("[AffiliationRequests] Direct affiliations:", { affiliations, affErr });
+      console.log("[AffiliationRequests] Admin fallback result:", fallbackResult);
 
-      if (!affErr && affiliations && affiliations.length > 0) {
-        const enriched = await enrichAffiliations(affiliations);
-        setRequests(enriched);
-        if (onCountChange) onCountChange(enriched.length);
-      } else {
+      if (!fallbackResult.success || !fallbackResult.data) {
+        console.error("[AffiliationRequests] Admin fallback failed:", fallbackResult.error);
         if (res.error) {
           setError(res.error.message || "Failed to load pending requests.");
         }
         setRequests([]);
         if (onCountChange) onCountChange(0);
+        return;
       }
+
+      // Map PendingAffiliationItem → AffiliationRequest
+      const mapped: AffiliationRequest[] = fallbackResult.data.map(
+        (item: PendingAffiliationItem) => item as AffiliationRequest
+      );
+      setRequests(mapped);
+      if (onCountChange) onCountChange(mapped.length);
     } catch (err: any) {
       console.error("[AffiliationRequests] Exception:", err);
       setError(err?.message || "Failed to load pending requests. Please try again.");

@@ -462,3 +462,129 @@ export async function getCompanyInvitationsAction(
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// getPendingAffiliationsAdminFallback
+// Called when the RPC get_pending_company_affiliation_requests returns empty
+// and the direct client query is blocked by RLS (403 Forbidden).
+// Uses the Supabase Service Role Key to bypass RLS and read company_affiliations
+// + enrich with user profile data (name, photo, role) from the users table.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface PendingAffiliationItem {
+  id: string;
+  user_id: string;
+  company_id: string;
+  status: string;
+  requested_at: string | null;
+  created_at: string | null;
+  company_name_snapshot: string | null;
+  first_name: string | null;
+  last_name: string | null;
+  full_name: string | null;
+  profile_image: string | null;
+  email: string | null;
+  role: string | null;
+}
+
+export interface GetPendingAffiliationsResult {
+  success: boolean;
+  data?: PendingAffiliationItem[];
+  error?: string;
+}
+
+export async function getPendingAffiliationsAdminFallback(
+  companyId: string
+): Promise<GetPendingAffiliationsResult> {
+  try {
+    if (!companyId) {
+      return { success: false, error: "Company ID is required." };
+    }
+
+    // 1. Verify caller is authenticated (do NOT skip this check)
+    const supabase = await createClient();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return { success: false, error: "Unauthorized." };
+    }
+
+    // 2. Verify the caller actually owns this company (security check)
+    const { data: company, error: companyCheckErr } = await supabase
+      .from("companies")
+      .select("id, owner_user_id")
+      .eq("id", companyId)
+      .maybeSingle();
+
+    if (companyCheckErr || !company) {
+      return { success: false, error: "Company not found." };
+    }
+
+    if (company.owner_user_id !== user.id) {
+      return { success: false, error: "Unauthorized: you do not own this company." };
+    }
+
+    // 3. Use admin client to bypass RLS and read pending affiliations
+    const adminClient = createAdminClient();
+
+    const { data: affiliations, error: affErr } = await adminClient
+      .from("company_affiliations")
+      .select("id, user_id, company_id, status, requested_at, created_at, company_name_snapshot")
+      .eq("company_id", companyId)
+      .eq("status", "pending")
+      .order("created_at", { ascending: false });
+
+    if (affErr) {
+      console.error("[getPendingAffiliationsAdminFallback] company_affiliations query failed:", affErr);
+      return { success: false, error: affErr.message };
+    }
+
+    if (!affiliations || affiliations.length === 0) {
+      return { success: true, data: [] };
+    }
+
+    // 4. Enrich with user profile data from users table (also via admin client)
+    const userIds = affiliations.map((a) => a.user_id).filter(Boolean);
+
+    const { data: usersData } = await adminClient
+      .from("users")
+      .select("id, firstName, lastName, profileImage, role, professionalRole, professionalTitleKey, email")
+      .in("id", userIds);
+
+    const userMap: Record<string, any> = {};
+    (usersData || []).forEach((u: any) => {
+      userMap[u.id] = u;
+    });
+
+    const enriched: PendingAffiliationItem[] = affiliations.map((aff: any) => {
+      const u = userMap[aff.user_id] || {};
+      const firstName = u.firstName || null;
+      const lastName = u.lastName || null;
+      return {
+        id: aff.id,
+        user_id: aff.user_id,
+        company_id: aff.company_id,
+        status: aff.status,
+        requested_at: aff.requested_at || null,
+        created_at: aff.created_at || null,
+        company_name_snapshot: aff.company_name_snapshot || null,
+        first_name: firstName,
+        last_name: lastName,
+        full_name: [firstName, lastName].filter(Boolean).join(" ") || null,
+        profile_image: u.profileImage || null,
+        email: u.email || null,
+        role: u.professionalTitleKey || u.role || u.professionalRole || null,
+      };
+    });
+
+    return { success: true, data: enriched };
+  } catch (err: any) {
+    console.error("[getPendingAffiliationsAdminFallback] Unexpected error:", err);
+    return {
+      success: false,
+      error: err?.message || "An unexpected error occurred.",
+    };
+  }
+}
