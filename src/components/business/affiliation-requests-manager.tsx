@@ -51,6 +51,38 @@ interface AffiliationRequestsManagerProps {
   hideHeader?: boolean;
 }
 
+// Enrich raw company_affiliations rows with user profile data (name, photo, role)
+async function enrichAffiliations(
+  affiliations: Array<{ id: string; user_id: string; [key: string]: any }>
+): Promise<AffiliationRequest[]> {
+  const userIds = affiliations.map((a) => a.user_id).filter(Boolean);
+  if (userIds.length === 0) return affiliations as AffiliationRequest[];
+
+  const { data: usersData } = await supabase
+    .from("users")
+    .select("id, firstName, lastName, profileImage, role, professionalRole, professionalTitleKey, email")
+    .in("id", userIds);
+
+  const userMap: Record<string, any> = {};
+  (usersData || []).forEach((u) => {
+    userMap[u.id] = u;
+  });
+
+  return affiliations.map((aff) => {
+    const u = userMap[aff.user_id] || {};
+    return {
+      ...aff,
+      user_id: aff.user_id,
+      first_name: u.firstName || null,
+      last_name: u.lastName || null,
+      full_name: [u.firstName, u.lastName].filter(Boolean).join(" ") || null,
+      profile_image: u.profileImage || null,
+      email: u.email || null,
+      role: u.professionalTitleKey || u.role || u.professionalRole || null,
+    };
+  });
+}
+
 export function AffiliationRequestsManager({
   className = "",
   onCountChange,
@@ -81,21 +113,140 @@ export function AffiliationRequestsManager({
     setError(null);
 
     try {
+      // ── Primary: Supabase RPC (returns pending requests for the current business user)
       let res = await supabase.rpc("get_pending_company_affiliation_requests");
 
+      console.log("[AffiliationRequests] RPC result:", {
+        data: res.data,
+        error: res.error,
+        status: res.status,
+      });
+
+      if (!res.error && Array.isArray(res.data) && res.data.length > 0) {
+        setRequests(res.data as AffiliationRequest[]);
+        if (onCountChange) onCountChange(res.data.length);
+        return;
+      }
+
       if (res.error) {
-        console.error("Error fetching pending affiliation requests:", res.error);
-        setError(res.error.message || "Failed to load pending requests.");
+        console.error("[AffiliationRequests] RPC error — trying direct table fallback:", res.error);
+      } else {
+        console.log("[AffiliationRequests] RPC returned 0 results — trying direct table fallback...");
+      }
+
+      // ── Fallback: query company_affiliations directly for the current user's company
+      // 1. Get the current user's session
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        setError("Not authenticated.");
         setRequests([]);
         if (onCountChange) onCountChange(0);
         return;
       }
 
-      const data: AffiliationRequest[] = Array.isArray(res.data) ? res.data : [];
-      setRequests(data);
-      if (onCountChange) onCountChange(data.length);
+      // 2. Get the company linked to the current business user
+      const { data: userRecord, error: userErr } = await supabase
+        .from("users")
+        .select("id, accountType")
+        .eq("id", session.user.id)
+        .maybeSingle();
+
+      if (userErr) {
+        console.error("[AffiliationRequests] Error fetching user record:", userErr);
+      }
+
+      // 3. Get the company owned by this user
+      const { data: companyRecord, error: companyErr } = await supabase
+        .from("companies")
+        .select("id, name")
+        .eq("ownerId", session.user.id)
+        .maybeSingle();
+
+      console.log("[AffiliationRequests] Company lookup:", { companyRecord, companyErr });
+
+      if (companyErr || !companyRecord) {
+        // Try alternate column names
+        const { data: companyRecord2 } = await supabase
+          .from("companies")
+          .select("id, name")
+          .eq("owner_id", session.user.id)
+          .maybeSingle();
+
+        console.log("[AffiliationRequests] Company alt lookup:", companyRecord2);
+
+        if (!companyRecord2) {
+          // If RPC had an error, surface it; otherwise show empty
+          if (res.error) {
+            setError(res.error.message || "Failed to load pending requests.");
+          } else {
+            setError(null);
+          }
+          setRequests([]);
+          if (onCountChange) onCountChange(0);
+          return;
+        }
+
+        // 4. Fetch pending affiliations for this company
+        const { data: affiliations, error: affErr } = await supabase
+          .from("company_affiliations")
+          .select(`
+            id,
+            user_id,
+            company_id,
+            status,
+            requested_at,
+            created_at,
+            company_name_snapshot
+          `)
+          .eq("company_id", companyRecord2.id)
+          .eq("status", "pending")
+          .order("created_at", { ascending: false });
+
+        console.log("[AffiliationRequests] Direct affiliations (alt):", { affiliations, affErr });
+
+        if (!affErr && affiliations && affiliations.length > 0) {
+          // Enrich with user data
+          const enriched = await enrichAffiliations(affiliations);
+          setRequests(enriched);
+          if (onCountChange) onCountChange(enriched.length);
+        } else {
+          setRequests([]);
+          if (onCountChange) onCountChange(0);
+        }
+        return;
+      }
+
+      // 4. Fetch pending affiliations for this company
+      const { data: affiliations, error: affErr } = await supabase
+        .from("company_affiliations")
+        .select(`
+          id,
+          user_id,
+          company_id,
+          status,
+          requested_at,
+          created_at,
+          company_name_snapshot
+        `)
+        .eq("company_id", companyRecord.id)
+        .eq("status", "pending")
+        .order("created_at", { ascending: false });
+
+      console.log("[AffiliationRequests] Direct affiliations:", { affiliations, affErr });
+
+      if (!affErr && affiliations && affiliations.length > 0) {
+        const enriched = await enrichAffiliations(affiliations);
+        setRequests(enriched);
+        if (onCountChange) onCountChange(enriched.length);
+      } else {
+        if (res.error) {
+          setError(res.error.message || "Failed to load pending requests.");
+        }
+        setRequests([]);
+        if (onCountChange) onCountChange(0);
+      }
     } catch (err: any) {
-      console.error("Exception fetching pending affiliation requests:", err);
+      console.error("[AffiliationRequests] Exception:", err);
       setError(err?.message || "Failed to load pending requests. Please try again.");
       setRequests([]);
       if (onCountChange) onCountChange(0);
