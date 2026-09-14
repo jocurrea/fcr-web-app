@@ -529,9 +529,18 @@ export async function getPendingAffiliationsAdminFallback(
     // 3. Try admin client first (bypasses RLS completely)
     let affiliations: any[] | null = null;
     let affErr: any = null;
+    let adminClient: any = null;
 
-    if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
-      const adminClient = createAdminClient();
+    try {
+      if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
+        adminClient = createAdminClient();
+      }
+    } catch (e) {
+      console.warn("[getPendingAffiliationsAdminFallback] Admin client init failed:", e);
+      adminClient = null;
+    }
+
+    if (adminClient) {
       const res = await adminClient
         .from("company_affiliations")
         .select("id, user_id, company_id, status, requested_at, created_at, company_name_snapshot")
@@ -543,7 +552,7 @@ export async function getPendingAffiliationsAdminFallback(
       console.log("[getPendingAffiliationsAdminFallback] Admin client result:", { count: affiliations?.length, affErr });
     } else {
       // 3b. Fallback: authenticated server client (relies on RLS allowing the company owner to read)
-      console.warn("[getPendingAffiliationsAdminFallback] SUPABASE_SERVICE_ROLE_KEY not set — using authenticated server client.");
+      console.warn("[getPendingAffiliationsAdminFallback] Using authenticated server client (no admin client).");
       const res = await supabase
         .from("company_affiliations")
         .select("id, user_id, company_id, status, requested_at, created_at, company_name_snapshot")
@@ -568,9 +577,7 @@ export async function getPendingAffiliationsAdminFallback(
     const userIds = affiliations.map((a) => a.user_id).filter(Boolean);
 
     // Use admin client if available, otherwise use authenticated server client
-    const queryClient = process.env.SUPABASE_SERVICE_ROLE_KEY
-      ? createAdminClient()
-      : supabase;
+    const queryClient = adminClient || supabase;
 
     const { data: usersData } = await queryClient
       .from("users")
