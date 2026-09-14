@@ -526,15 +526,34 @@ export async function getPendingAffiliationsAdminFallback(
       return { success: false, error: "Unauthorized: you do not own this company." };
     }
 
-    // 3. Use admin client to bypass RLS and read pending affiliations
-    const adminClient = createAdminClient();
+    // 3. Try admin client first (bypasses RLS completely)
+    let affiliations: any[] | null = null;
+    let affErr: any = null;
 
-    const { data: affiliations, error: affErr } = await adminClient
-      .from("company_affiliations")
-      .select("id, user_id, company_id, status, requested_at, created_at, company_name_snapshot")
-      .eq("company_id", companyId)
-      .eq("status", "pending")
-      .order("created_at", { ascending: false });
+    if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      const adminClient = createAdminClient();
+      const res = await adminClient
+        .from("company_affiliations")
+        .select("id, user_id, company_id, status, requested_at, created_at, company_name_snapshot")
+        .eq("company_id", companyId)
+        .eq("status", "pending")
+        .order("created_at", { ascending: false });
+      affiliations = res.data;
+      affErr = res.error;
+      console.log("[getPendingAffiliationsAdminFallback] Admin client result:", { count: affiliations?.length, affErr });
+    } else {
+      // 3b. Fallback: authenticated server client (relies on RLS allowing the company owner to read)
+      console.warn("[getPendingAffiliationsAdminFallback] SUPABASE_SERVICE_ROLE_KEY not set — using authenticated server client.");
+      const res = await supabase
+        .from("company_affiliations")
+        .select("id, user_id, company_id, status, requested_at, created_at, company_name_snapshot")
+        .eq("company_id", companyId)
+        .eq("status", "pending")
+        .order("created_at", { ascending: false });
+      affiliations = res.data;
+      affErr = res.error;
+      console.log("[getPendingAffiliationsAdminFallback] Server client result:", { count: affiliations?.length, affErr });
+    }
 
     if (affErr) {
       console.error("[getPendingAffiliationsAdminFallback] company_affiliations query failed:", affErr);
@@ -545,10 +564,15 @@ export async function getPendingAffiliationsAdminFallback(
       return { success: true, data: [] };
     }
 
-    // 4. Enrich with user profile data from users table (also via admin client)
+    // 4. Enrich with user profile data
     const userIds = affiliations.map((a) => a.user_id).filter(Boolean);
 
-    const { data: usersData } = await adminClient
+    // Use admin client if available, otherwise use authenticated server client
+    const queryClient = process.env.SUPABASE_SERVICE_ROLE_KEY
+      ? createAdminClient()
+      : supabase;
+
+    const { data: usersData } = await queryClient
       .from("users")
       .select("id, firstName, lastName, profileImage, role, professionalRole, professionalTitleKey, email")
       .in("id", userIds);
