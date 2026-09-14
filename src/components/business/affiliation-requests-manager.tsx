@@ -144,79 +144,29 @@ export function AffiliationRequestsManager({
         return;
       }
 
-      // 2. Get the company linked to the current business user
-      const { data: userRecord, error: userErr } = await supabase
-        .from("users")
-        .select("id, accountType")
-        .eq("id", session.user.id)
-        .maybeSingle();
-
-      if (userErr) {
-        console.error("[AffiliationRequests] Error fetching user record:", userErr);
-      }
-
-      // 3. Get the company owned by this user
+      // 2. Get the company owned by this user (correct column: owner_user_id)
       const { data: companyRecord, error: companyErr } = await supabase
         .from("companies")
         .select("id, name")
-        .eq("ownerId", session.user.id)
+        .eq("owner_user_id", session.user.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
         .maybeSingle();
 
-      console.log("[AffiliationRequests] Company lookup:", { companyRecord, companyErr });
+      console.log("[AffiliationRequests] Company lookup (owner_user_id):", { companyRecord, companyErr });
 
       if (companyErr || !companyRecord) {
-        // Try alternate column names
-        const { data: companyRecord2 } = await supabase
-          .from("companies")
-          .select("id, name")
-          .eq("owner_id", session.user.id)
-          .maybeSingle();
-
-        console.log("[AffiliationRequests] Company alt lookup:", companyRecord2);
-
-        if (!companyRecord2) {
-          // If RPC had an error, surface it; otherwise show empty
-          if (res.error) {
-            setError(res.error.message || "Failed to load pending requests.");
-          } else {
-            setError(null);
-          }
-          setRequests([]);
-          if (onCountChange) onCountChange(0);
-          return;
-        }
-
-        // 4. Fetch pending affiliations for this company
-        const { data: affiliations, error: affErr } = await supabase
-          .from("company_affiliations")
-          .select(`
-            id,
-            user_id,
-            company_id,
-            status,
-            requested_at,
-            created_at,
-            company_name_snapshot
-          `)
-          .eq("company_id", companyRecord2.id)
-          .eq("status", "pending")
-          .order("created_at", { ascending: false });
-
-        console.log("[AffiliationRequests] Direct affiliations (alt):", { affiliations, affErr });
-
-        if (!affErr && affiliations && affiliations.length > 0) {
-          // Enrich with user data
-          const enriched = await enrichAffiliations(affiliations);
-          setRequests(enriched);
-          if (onCountChange) onCountChange(enriched.length);
+        if (res.error) {
+          setError(res.error.message || "Failed to load pending requests.");
         } else {
-          setRequests([]);
-          if (onCountChange) onCountChange(0);
+          setError(null);
         }
+        setRequests([]);
+        if (onCountChange) onCountChange(0);
         return;
       }
 
-      // 4. Fetch pending affiliations for this company
+      // 3. Fetch pending affiliations for this company
       const { data: affiliations, error: affErr } = await supabase
         .from("company_affiliations")
         .select(`
