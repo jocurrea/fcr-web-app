@@ -338,6 +338,7 @@ export default function OnboardingPage() {
       );
       if (usersRoleError) {
         console.error("[Onboarding] STEP 1 – users role/professionalTitleKey upsert FAILED:", usersRoleError);
+        throw new Error(`Failed to save role information: ${usersRoleError.message}`);
       }
 
       // ─────────────────────────────────────────────────────────────────
@@ -360,6 +361,7 @@ export default function OnboardingPage() {
       );
       if (userProfilesError) {
         console.error("[Onboarding] STEP 2 – user_profiles workAvailabilityStatus upsert FAILED:", userProfilesError);
+        throw new Error(`Failed to save availability status: ${userProfilesError.message}`);
       }
 
       // ─────────────────────────────────────────────────────────────────
@@ -382,6 +384,7 @@ export default function OnboardingPage() {
       );
       if (usersProfileError) {
         console.error("[Onboarding] STEP 3a – users profile info upsert FAILED:", usersProfileError);
+        throw new Error(`Failed to save personal profile: ${usersProfileError.message}`);
       }
 
       // 3b. Resumes
@@ -394,6 +397,7 @@ export default function OnboardingPage() {
       );
       if (resumesError) {
         console.error("[Onboarding] STEP 3b – resumes upsert FAILED:", resumesError);
+        throw new Error(`Failed to save professional data: ${resumesError.message}`);
       }
 
       // 3c. Aviation Professional canonical extension row (if applicable)
@@ -412,6 +416,7 @@ export default function OnboardingPage() {
         );
         if (aviationProfileError) {
           console.error("[Onboarding] STEP 3c – aviation_professional_profiles upsert FAILED:", aviationProfileError);
+          throw new Error(`Failed to save aviation profile details: ${aviationProfileError.message}`);
         }
       }
 
@@ -426,6 +431,7 @@ export default function OnboardingPage() {
         .eq("id", userId);
       if (onboardedError) {
         console.error("[Onboarding] STEP 4 – users onboarded:1 update FAILED:", onboardedError);
+        throw new Error(`Failed to finalize onboarding status: ${onboardedError.message}`);
       }
 
       // 5. Mandatory JWT update: update auth user metadata with onboarded: true and role
