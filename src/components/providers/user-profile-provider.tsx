@@ -238,10 +238,7 @@ export function UserProfileProvider({
         companyRes.status === "fulfilled"
           ? (companyRes.value as any)?.data
           : null;
-      const explicitAffiliationData = 
-        affiliationsRes.status === "fulfilled" 
-          ? (affiliationsRes.value as any)?.data 
-          : null;
+
 
       if (myProfileData) {
         setProfileData(myProfileData);
