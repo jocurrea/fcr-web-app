@@ -628,38 +628,62 @@ export async function reviewCompanyAffiliationRequestAction(
       return { success: false, error: "Unauthorized. Please sign in." };
     }
 
-    const params: any = {
-      id: requestId,
-      decision: decision,
-      rejection_reason: rejectionReason || null
-    };
+    const p_status = decision === "approved" ? "verified" : "rejected";
+    const rpcAttempts = [
+      // Combinations from the architecture doc
+      { id: requestId, decision: decision, rejection_reason: rejectionReason || null },
+      { id: requestId, status: p_status, rejection_reason: rejectionReason || null },
+      { id: requestId, status: p_status, reason: rejectionReason || null },
+      
+      // Combinations with affiliation_id
+      { affiliation_id: requestId, decision: decision, rejection_reason: rejectionReason || null },
+      { affiliation_id: requestId, status: p_status, rejection_reason: rejectionReason || null },
+      { affiliation_id: requestId, status: p_status, reason: rejectionReason || null },
+      { affiliation_id: requestId, decision: decision, reason: rejectionReason || null },
+      
+      // Combinations with request_id
+      { request_id: requestId, decision: decision, rejection_reason: rejectionReason || null },
+      { request_id: requestId, status: p_status, rejection_reason: rejectionReason || null },
+      { request_id: requestId, status: p_status, reason: rejectionReason || null },
+
+      // Combinations with p_ prefix (what we created in the SQL script)
+      { p_affiliation_id: requestId, p_status: p_status, p_reason: rejectionReason || null },
+      { p_id: requestId, p_decision: decision, p_rejection_reason: rejectionReason || null },
+    ];
 
     let rpcSucceeded = false;
     let lastRpcError: any = null;
 
-    try {
-      const { error } = await supabase.rpc("review_company_affiliation_request", params);
-      if (!error) {
-        rpcSucceeded = true;
-      } else {
-        lastRpcError = error;
-        console.warn("[review_company_affiliation_request RPC attempt notice]:", params, error.message);
-      }
-    } catch (err: any) {
-      lastRpcError = err;
-    }
-
-    if (!rpcSucceeded && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    for (const params of rpcAttempts) {
       try {
-        const adminClient = createAdminClient();
-        const { error: adminError } = await adminClient.rpc("review_company_affiliation_request", params);
-        if (!adminError) {
+        const { error } = await supabase.rpc("review_company_affiliation_request", params);
+        if (!error) {
           rpcSucceeded = true;
+          console.log("SUCCESSFULLY FOUND RPC SIGNATURE:", Object.keys(params));
+          break;
         } else {
-          lastRpcError = adminError;
+          lastRpcError = error;
         }
       } catch (err: any) {
         lastRpcError = err;
+      }
+    }
+
+    if (!rpcSucceeded && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      for (const params of rpcAttempts) {
+        try {
+          const adminClient = createAdminClient();
+          const { error: adminError } = await adminClient.rpc("review_company_affiliation_request", params);
+          if (!adminError) {
+            rpcSucceeded = true;
+            console.log("SUCCESSFULLY FOUND RPC SIGNATURE (ADMIN):", Object.keys(params));
+            break;
+          } else {
+            lastRpcError = adminError;
+          }
+        } catch (err: any) {
+          lastRpcError = err;
+        }
       }
     }
 
