@@ -5,7 +5,7 @@ import { supabaseUrl, supabaseAnonKey } from "@/lib/env";
 export default async function DiagnosticPage() {
   const log: string[] = ["Iniciando diagnóstico en el servidor..."];
   
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
     cookies: {
       getAll() {
