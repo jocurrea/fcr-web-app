@@ -589,6 +589,16 @@ export default function OnboardingPage() {
     );
   }
 
+  // Render global submit error if any
+  const ErrorBanner = submitError ? (
+    <div className="fixed top-4 left-1/2 -translate-x-1/2 w-[90%] max-w-md bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg shadow-lg z-[100] flex items-center justify-between">
+      <span className="font-medium text-sm">{submitError}</span>
+      <button onClick={() => setSubmitError(null)} className="ml-4 text-red-700 hover:text-red-900 font-bold">
+        ×
+      </button>
+    </div>
+  ) : null;
+
   // ============================================
   // FLIGHT CREW WIZARD FLOW (Pilots & Cabin Crew)
   // ============================================
@@ -629,15 +639,6 @@ export default function OnboardingPage() {
   // ============================================
   // AVIATION PROFESSIONAL WIZARD FLOW (6 Steps)
   // ============================================
-  // Render global submit error if any
-  const ErrorBanner = submitError ? (
-    <div className="fixed top-4 left-1/2 -translate-x-1/2 w-[90%] max-w-md bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg shadow-lg z-[100] flex items-center justify-between">
-      <span className="font-medium text-sm">{submitError}</span>
-      <button onClick={() => setSubmitError(null)} className="ml-4 text-red-700 hover:text-red-900 font-bold">
-        ×
-      </button>
-    </div>
-  ) : null;
 
   if (step === 1) {
     return <>{ErrorBanner}<ProfessionalTypeStep onBack={handleBack} onNext={() => setStep(2)} /></>;
