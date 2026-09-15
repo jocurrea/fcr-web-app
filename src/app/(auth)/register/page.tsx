@@ -216,15 +216,6 @@ function RegisterForm() {
       const session = data.session;
       const newUserId = session.user.id;
 
-      const { error: setSessionError } = await supabase.auth.setSession({
-        access_token: session.access_token,
-        refresh_token: session.refresh_token,
-      });
-
-      if (setSessionError) {
-        console.warn("[Register] Error forcing client session initialization:", setSessionError);
-      }
-
       // Bind current_user_id immediately to the new user ID
       localStorage.setItem("current_user_id", newUserId);
 
@@ -310,8 +301,9 @@ function RegisterForm() {
         window.dispatchEvent(new CustomEvent("profile-updated"));
       }
 
-      // Navigate with full browser replace to guarantee complete session isolation
-      window.location.replace("/role-selection");
+      // Navigate with Next.js router to guarantee cookie propagation and server-side refresh
+      router.push("/role-selection");
+      router.refresh();
     } catch (err: any) {
       setError(err.message || "An error occurred during registration");
     } finally {
