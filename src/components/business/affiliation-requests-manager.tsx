@@ -19,7 +19,7 @@ import {
   RefreshCw,
   Search,
 } from "lucide-react";
-import { supabase } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 
 export interface AffiliationRequest {
@@ -56,6 +56,7 @@ export function AffiliationRequestsManager({
   onCountChange,
   hideHeader = false,
 }: AffiliationRequestsManagerProps) {
+  const supabase = createClient();
   const [requests, setRequests] = useState<AffiliationRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
