@@ -363,6 +363,9 @@ export default function OnboardingPage() {
           locationCountry: personalData?.country || null,
           ...(isAviationPro && validProfessionalTitleKey ? {
             professionalCredentials: personalData?.professionalCredentials || [],
+            bio: personalData?.summary || null,
+            spokenLanguages: personalData?.languages || [],
+            professionalWorkExperiences: personalData?.workExperiences || [],
           } : {}),
         },
         { onConflict: "userId" }
@@ -370,6 +373,22 @@ export default function OnboardingPage() {
       if (userProfilesError) {
         console.error("[Onboarding] STEP 2 – user_profiles workAvailabilityStatus upsert FAILED:", userProfilesError);
         throw new Error(`Failed to save availability status: ${userProfilesError.message}`);
+      }
+
+      // 2.5 Save skills
+      if (isAviationPro && personalData?.skills && Array.isArray(personalData.skills)) {
+        try {
+          await supabase.rpc("replace_standardized_user_skills", {
+            p_skills: personalData.skills
+          });
+        } catch (e) {
+          // Fallback if parameter is different
+          try {
+            await supabase.rpc("replace_standardized_user_skills", {
+              skills: personalData.skills
+            });
+          } catch (e2) {}
+        }
       }
 
       // ─────────────────────────────────────────────────────────────────
