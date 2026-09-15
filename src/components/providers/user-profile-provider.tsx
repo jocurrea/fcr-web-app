@@ -516,21 +516,7 @@ export function UserProfileProvider({
 
       // 10. Resolve affiliation info (E01-HU11)
       let resolvedAffiliation: AffiliationInfo | null = null;
-      if (explicitAffiliationData) {
-        // Handle case where companies might be an array or object
-        const companyData = Array.isArray(explicitAffiliationData.companies) 
-          ? explicitAffiliationData.companies[0] 
-          : explicitAffiliationData.companies;
-          
-        resolvedAffiliation = {
-          name: companyData?.name || explicitAffiliationData.company_name_snapshot || "Company Name",
-          id: explicitAffiliationData.id || explicitAffiliationData.company_id, // Use affiliation row ID so hasAffiliationId is true
-          status: explicitAffiliationData.status,
-          logo: companyData?.logo_url || null,
-          location: companyData?.location || null,
-        };
-        setAffiliationInfo(resolvedAffiliation);
-      } else if (myProfileData) {
+      if (myProfileData) {
         const aff =
           myProfileData.affiliation ||
           myProfileData.company_affiliation ||
