@@ -359,8 +359,8 @@ export default function OnboardingPage() {
           workAvailabilityStatus: finalAvailabilityStatus,
           contactEmail: personalData?.email || session.user.email,
           contactPhone: personalData?.phone || null,
-          locationCity: personalData?.city || null,
-          locationCountry: personalData?.country || null,
+          locationCity: personalData?.city || personalData?.location || "Not specified",
+          locationCountry: personalData?.country || "Not specified",
           ...(isAviationPro && validProfessionalTitleKey ? {
             professionalCredentials: personalData?.professionalCredentials || [],
             bio: personalData?.summary || null,
