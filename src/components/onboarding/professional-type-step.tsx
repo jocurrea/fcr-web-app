@@ -94,32 +94,62 @@ export function ProfessionalTypeStep({ onNext, onBack }: ProfessionalTypeStepPro
 
     loadTitles();
 
-    try {
-      const saved = localStorage.getItem("onboarding_personal");
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed.professionalTitleKey) {
-          setSelectedRole(parsed.professionalTitleKey);
-        } else if (parsed.professionalRole) {
-          setSelectedRole(parsed.professionalRole);
-        } else if (parsed.role) {
-          setSelectedRole(parsed.role);
+    async function loadSavedRole() {
+      try {
+        const saved = localStorage.getItem("onboarding_personal");
+        let initialRole: string | null = null;
+        let initialCustom: string = "";
+
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed.professionalTitleKey) {
+            initialRole = parsed.professionalTitleKey;
+          } else if (parsed.professionalRole && parsed.professionalRole !== "aviation_professional") {
+            initialRole = parsed.professionalRole;
+          } else if (parsed.role && parsed.role !== "aviation_professional") {
+            initialRole = parsed.role;
+          }
+
+          if (parsed.professionalTitleKey === "other" || parsed.professionalRole === "other" || parsed.role === "other") {
+            initialCustom =
+              parsed.professionalTitleOther ||
+              parsed.customRole ||
+              parsed.otherRole ||
+              parsed.specifiedRole ||
+              (parsed.professionalTitle && parsed.professionalTitle !== "Other Aviation Professional" ? parsed.professionalTitle : "") ||
+              "";
+          }
         }
 
-        if (parsed.professionalTitleKey === "other" || parsed.professionalRole === "other" || parsed.role === "other") {
-          setCustomRole(
-            parsed.professionalTitleOther ||
-            parsed.customRole ||
-            parsed.otherRole ||
-            parsed.specifiedRole ||
-            (parsed.professionalTitle && parsed.professionalTitle !== "Other Aviation Professional" ? parsed.professionalTitle : "") ||
-            ""
-          );
+        if (!initialRole) {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session) {
+            const { data: u } = await supabase
+              .from("users")
+              .select("role, professionalTitleKey, professionalTitleOther")
+              .eq("id", session.user.id)
+              .maybeSingle();
+            if (u) {
+              initialRole = u.professionalTitleKey || (u.role !== "aviation_professional" ? u.role : null);
+              if (initialRole === "other") {
+                initialCustom = u.professionalTitleOther || "";
+              }
+            }
+          }
         }
+
+        if (initialRole) {
+          setSelectedRole(initialRole);
+        }
+        if (initialCustom) {
+          setCustomRole(initialCustom);
+        }
+      } catch (e) {
+        console.error(e);
       }
-    } catch (e) {
-      console.error(e);
     }
+
+    loadSavedRole();
   }, []);
 
   const handleRoleSelect = (roleId: string) => {
@@ -131,20 +161,24 @@ export function ProfessionalTypeStep({ onNext, onBack }: ProfessionalTypeStepPro
 
   const handleBackClick = () => {
     try {
-      const personalRaw = localStorage.getItem("onboarding_personal");
-      if (personalRaw) {
-        const parsed = JSON.parse(personalRaw);
-        delete parsed.category;
-        delete parsed.role;
-        delete parsed.professionalRole;
-        delete parsed.professional_role;
-        delete parsed.professionalTitle;
-        delete parsed.professionalTitleKey;
-        delete parsed.professionalTitleOther;
-        delete parsed.professionalRoleLabel;
-        localStorage.setItem("onboarding_personal", JSON.stringify(parsed));
+      const urlParams = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
+      const isEdit = urlParams?.get("edit") === "true";
+      if (!isEdit) {
+        const personalRaw = localStorage.getItem("onboarding_personal");
+        if (personalRaw) {
+          const parsed = JSON.parse(personalRaw);
+          delete parsed.category;
+          delete parsed.role;
+          delete parsed.professionalRole;
+          delete parsed.professional_role;
+          delete parsed.professionalTitle;
+          delete parsed.professionalTitleKey;
+          delete parsed.professionalTitleOther;
+          delete parsed.professionalRoleLabel;
+          localStorage.setItem("onboarding_personal", JSON.stringify(parsed));
+        }
+        localStorage.removeItem("onboarding_role");
       }
-      localStorage.removeItem("onboarding_role");
     } catch (e) {}
 
     if (onBack) {

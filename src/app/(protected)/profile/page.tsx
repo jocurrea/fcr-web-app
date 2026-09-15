@@ -803,9 +803,9 @@ export default function ProfilePage() {
 
               {/* Edit Pencil Icon on Avatar */}
               <Link
-                href={isFlightCrew ? "/onboarding?edit=true&step=1" : "/onboarding?edit=true&step=2"}
+                href="/onboarding?edit=true&step=1"
                 className="absolute bottom-1 right-1 w-8 h-8 rounded-full bg-white border border-gray-200 shadow-sm flex items-center justify-center text-gray-700 hover:text-[#1d4ed8] hover:bg-gray-50 transition-colors cursor-pointer"
-                title="Edit photo"
+                title="Edit profile"
               >
                 <Pencil className="w-3.5 h-3.5" />
               </Link>

@@ -351,7 +351,7 @@ export default function PublicProfilePage() {
 
               {isOwnProfile && (
                 <Link
-                  href="/onboarding?edit=true"
+                  href="/onboarding?edit=true&step=1"
                   className="w-7 h-7 rounded-full bg-gray-50 hover:bg-blue-50 border border-gray-200/80 flex items-center justify-center text-gray-500 hover:text-[#1d4ed8] transition-colors cursor-pointer shrink-0"
                   title="Edit Profile"
                 >

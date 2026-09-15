@@ -56,7 +56,11 @@ export default function OnboardingPage() {
           const parsedStep = parseInt(urlStep, 10);
           if (!isNaN(parsedStep) && parsedStep >= 1) {
             setStep(parsedStep);
+          } else {
+            setStep(1);
           }
+        } else {
+          setStep(1);
         }
         
         // Fetch User and Resume records from database
@@ -89,7 +93,8 @@ export default function OnboardingPage() {
           metaAccountType === "aviation_professional" ||
           localCat === "aviation_professional" ||
           userRecord?.professionalRole === "aviation_professional" ||
-          userRecord?.role === "aviation_professional"
+          userRecord?.role === "aviation_professional" ||
+          !!userRecord?.professionalTitleKey
         ) {
           currentCategory = "aviation_professional";
         } else if (accountType === "flight_crew" || accountType === "aviation_professional") {

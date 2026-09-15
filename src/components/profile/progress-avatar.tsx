@@ -26,7 +26,7 @@ export function ProgressAvatar({
   showBadge = true,
   showRing = true,
   showEditIcon = false,
-  editLink = "/onboarding?edit=true",
+  editLink = "/onboarding?edit=true&step=1",
   accountType,
 }: ProgressAvatarProps) {
   // Business accounts do not use profile completion percentages or progress rings
