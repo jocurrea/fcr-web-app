@@ -628,12 +628,13 @@ export async function reviewCompanyAffiliationRequestAction(
       return { success: false, error: "Unauthorized. Please sign in." };
     }
 
-    const p_status = decision === "approved" ? "verified" : "rejected";
-    const params = {
-      p_affiliation_id: requestId,
-      p_status: p_status,
-      p_reason: rejectionReason || null
+    const params: any = {
+      id: requestId,
+      decision: decision
     };
+    if (rejectionReason) {
+      params.rejection_reason = rejectionReason;
+    }
 
     let rpcSucceeded = false;
     let lastRpcError: any = null;
