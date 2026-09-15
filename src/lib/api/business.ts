@@ -550,7 +550,7 @@ export async function submitBusinessOnboarding(
     if (error) throw new Error(error.message);
     const data = updatedData && updatedData.length > 0 ? (updatedData[0] as CompanyRow) : company;
 
-    const { error: userError } = await supabase.auth.updateUser({ data: { accountType: "business", onboarded: true } });
+    const { error: userError } = await supabase.auth.updateUser({ data: { accountType: "business", onboarded: 1 } });
     if (userError) throw new Error(userError.message);
 
     await supabase.from("users").update({ 

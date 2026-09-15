@@ -188,7 +188,7 @@ function RegisterForm() {
             platformRole: "user",
             employer: employerName,
             invited_by_company_id: invitedCompany?.id,
-            onboarded: false,
+            onboarded: 0,
             role: null,
             professionalRole: null,
           },

@@ -253,14 +253,13 @@ export async function requestCompanyAffiliationFallbackAction(
         success: true,
         message: "Affiliation request submitted successfully.",
       };
-    } catch (tabErr) {
+    } catch (tabErr: any) {
       console.warn("Direct table fallback notice:", tabErr);
+      return {
+        success: false,
+        error: "Failed to insert affiliation request. Please verify your profile is fully onboarded."
+      };
     }
-
-    return {
-      success: true,
-      message: `Affiliation request recorded for ${companyName || "company"}.`,
-    };
   } catch (err: any) {
     console.error("requestCompanyAffiliationFallbackAction error:", err);
     return {

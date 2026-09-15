@@ -445,7 +445,7 @@ export default function OnboardingPage() {
       try {
         await supabase.auth.updateUser({
           data: {
-            onboarded: true,
+            onboarded: 1,
             accountType: category,
             category: category,
             role: validRole,

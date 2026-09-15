@@ -133,7 +133,7 @@ export function AvailabilityStep({ onNext, onBack }: AvailabilityStepProps) {
         // Update auth user metadata
         await supabase.auth.updateUser({
           data: {
-            onboarded: true,
+            onboarded: 1,
             accountType: "aviation_professional",
             role: finalProfessionalTitleKey || roleKey || "aviation_professional",
             professionalRole: "aviation_professional",
