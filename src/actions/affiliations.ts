@@ -628,7 +628,8 @@ export async function reviewCompanyAffiliationRequestAction(
       return { success: false, error: "Unauthorized. Please sign in." };
     }
 
-    const p_status = decision === "approved" ? "verified" : "rejected";
+    // The RPC explicitly expects "approve" or "reject" without the 'd'
+    const rpcDecision = decision === "approved" ? "approve" : "reject";
     
     // Generate an expansive list of parameter names to guarantee finding the RPC signature
     const possibleIdNames = ["id", "affiliation_id", "request_id", "p_id", "p_affiliation_id", "p_request_id", "_id", "_affiliation_id", "in_id", "req_id"];
@@ -641,14 +642,12 @@ export async function reviewCompanyAffiliationRequestAction(
     for (const idName of possibleIdNames) {
       for (const statusName of possibleStatusNames) {
         // 2-arity for approval
-        rpcAttempts.push({ [idName]: requestId, [statusName]: p_status });
-        rpcAttempts.push({ [idName]: requestId, [statusName]: decision });
+        rpcAttempts.push({ [idName]: requestId, [statusName]: rpcDecision });
         
         // 3-arity for rejection
         if (rejectionReason) {
           for (const reasonName of possibleReasonNames) {
-            rpcAttempts.push({ [idName]: requestId, [statusName]: p_status, [reasonName]: rejectionReason });
-            rpcAttempts.push({ [idName]: requestId, [statusName]: decision, [reasonName]: rejectionReason });
+            rpcAttempts.push({ [idName]: requestId, [statusName]: rpcDecision, [reasonName]: rejectionReason });
           }
         }
       }
