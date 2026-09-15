@@ -31,6 +31,7 @@ export default function OnboardingPage() {
   const [isCheckingAccess, setIsCheckingAccess] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -425,6 +426,24 @@ export default function OnboardingPage() {
           console.error("[Onboarding] STEP 3c – aviation_professional_profiles upsert FAILED:", aviationProfileError);
           throw new Error(`Failed to save aviation profile details: ${aviationProfileError.message}`);
         }
+        
+        // Mobile App Compatibility: ensure legacy table is also populated
+        try {
+          await supabase.from("aviation_professionals").upsert(
+            {
+              id: userId,
+              user_id: userId,
+              role: validProfessionalTitleKey,
+              role_other: validProfessionalTitleOther || null,
+              availability: finalAvailabilityStatus,
+              first_name: finalFirstName,
+              last_name: finalLastName,
+            },
+            { onConflict: "id" }
+          );
+        } catch (legacyErr) {
+          console.warn("[Onboarding] Legacy aviation_professionals sync notice:", legacyErr);
+        }
       }
 
       // ─────────────────────────────────────────────────────────────────
@@ -515,46 +534,50 @@ export default function OnboardingPage() {
       }
     } catch (err: any) {
       console.error("[Onboarding] Sync error:", err);
-    } finally {
-      // 4. Overwrite cookies and storage immediately before navigation
-      try {
-        document.cookie = "flightcrew_onboarded=true; path=/; max-age=31536000; SameSite=Lax";
-        sessionStorage.setItem("flightcrew_onboarded", "true");
-        localStorage.setItem("flightcrew_onboarded", "true");
-      } catch (e) {
-        console.error("Storage error:", e);
-      }
-
-      // 5. Explicit architecture rule: Re-fetch canonical user data via get_my_profile() RPC
-      // and revalidate server layouts so the Navbar/Avatar immediately updates with fresh percentage
-      try {
-        await supabase.rpc("get_my_profile");
-        await revalidateProfileLayout();
-      } catch (rErr) {
-        console.warn("[Onboarding] get_my_profile sync notice:", rErr);
-      }
-
-      if (typeof window !== "undefined") {
-        window.dispatchEvent(new CustomEvent("profile-updated"));
-      }
-
+      setSubmitError(err.message || "An unexpected error occurred while saving your data. Please try again.");
       setIsSaving(false);
+      return; // Stop execution, do not redirect
+    }
 
-      if (isEditMode) {
-        router.refresh();
-        router.push("/profile");
-      } else {
-        // Invalidate Next.js server cache and navigate to /home
-        router.refresh();
-        router.push("/home");
+    // --- SUCCESS PATH (Only executes if no errors were thrown above) ---
+    // 4. Overwrite cookies and storage immediately before navigation
+    try {
+      document.cookie = "flightcrew_onboarded=true; path=/; max-age=31536000; SameSite=Lax";
+      sessionStorage.setItem("flightcrew_onboarded", "true");
+      localStorage.setItem("flightcrew_onboarded", "true");
+    } catch (e) {
+      console.error("Storage error:", e);
+    }
 
-        // Fallback for full page refresh if client transition is delayed
-        setTimeout(() => {
-          if (typeof window !== "undefined" && window.location.pathname !== "/home") {
-            window.location.replace("/home");
-          }
-        }, 400);
-      }
+    // 5. Explicit architecture rule: Re-fetch canonical user data via get_my_profile() RPC
+    // and revalidate server layouts so the Navbar/Avatar immediately updates with fresh percentage
+    try {
+      await supabase.rpc("get_my_profile");
+      await revalidateProfileLayout();
+    } catch (rErr) {
+      console.warn("[Onboarding] get_my_profile sync notice:", rErr);
+    }
+
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("profile-updated"));
+    }
+
+    setIsSaving(false);
+
+    if (isEditMode) {
+      router.refresh();
+      router.push("/profile");
+    } else {
+      // Invalidate Next.js server cache and navigate to /home
+      router.refresh();
+      router.push("/home");
+
+      // Fallback for full page refresh if client transition is delayed
+      setTimeout(() => {
+        if (typeof window !== "undefined" && window.location.pathname !== "/home") {
+          window.location.replace("/home");
+        }
+      }, 400);
     }
   };
 
@@ -572,6 +595,7 @@ export default function OnboardingPage() {
   if (category === "flight_crew") {
     return (
       <div className="min-h-screen bg-white">
+        {ErrorBanner}
         <div className="mx-auto max-w-xl h-screen flex flex-col px-4 sm:px-6">
           {/* Header */}
           <header className="flex items-center py-4 mt-2">
@@ -605,32 +629,42 @@ export default function OnboardingPage() {
   // ============================================
   // AVIATION PROFESSIONAL WIZARD FLOW (6 Steps)
   // ============================================
+  // Render global submit error if any
+  const ErrorBanner = submitError ? (
+    <div className="fixed top-4 left-1/2 -translate-x-1/2 w-[90%] max-w-md bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg shadow-lg z-[100] flex items-center justify-between">
+      <span className="font-medium text-sm">{submitError}</span>
+      <button onClick={() => setSubmitError(null)} className="ml-4 text-red-700 hover:text-red-900 font-bold">
+        ×
+      </button>
+    </div>
+  ) : null;
+
   if (step === 1) {
-    return <ProfessionalTypeStep onBack={handleBack} onNext={() => setStep(2)} />;
+    return <>{ErrorBanner}<ProfessionalTypeStep onBack={handleBack} onNext={() => setStep(2)} /></>;
   }
 
   if (step === 2) {
-    return <PersonalIdentificationStep onBack={handleBack} onNext={() => setStep(3)} />;
+    return <>{ErrorBanner}<PersonalIdentificationStep onBack={handleBack} onNext={() => setStep(3)} /></>;
   }
 
   if (step === 3) {
-    return <ProfessionalSummaryStep onBack={handleBack} onNext={() => setStep(4)} />;
+    return <>{ErrorBanner}<ProfessionalSummaryStep onBack={handleBack} onNext={() => setStep(4)} /></>;
   }
 
   if (step === 4) {
-    return <ContactCredentialsStep onBack={handleBack} onNext={() => setStep(5)} />;
+    return <>{ErrorBanner}<ContactCredentialsStep onBack={handleBack} onNext={() => setStep(5)} /></>;
   }
 
   if (step === 5) {
-    return <ComplementaryInfoStep onBack={handleBack} onNext={() => setStep(6)} onSkip={() => setStep(6)} />;
+    return <>{ErrorBanner}<ComplementaryInfoStep onBack={handleBack} onNext={() => setStep(6)} onSkip={() => setStep(6)} /></>;
   }
 
   if (step === 6) {
-    return <SkillsStep onBack={handleBack} onNext={() => setStep(7)} />;
+    return <>{ErrorBanner}<SkillsStep onBack={handleBack} onNext={() => setStep(7)} /></>;
   }
 
   if (step === 7) {
-    return <AvailabilityStep onBack={handleBack} onNext={handleFinish} />;
+    return <>{ErrorBanner}<AvailabilityStep onBack={handleBack} onNext={handleFinish} /></>;
   }
 
   return null;

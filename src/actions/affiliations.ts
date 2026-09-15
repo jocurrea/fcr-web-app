@@ -450,13 +450,102 @@ export async function getCompanyInvitationsAction(
         .select("id, company_id, invited_email, status, expires_at, created_at")
         .eq("company_id", companyId)
         .order("created_at", { ascending: false });
+
       if (adminData) {
         return { success: true, data: adminData };
       }
     }
 
-    return { success: false, error: error?.message || "Failed to load invitations." };
+    return { success: false, error: "Failed to fetch company invitations." };
   } catch (err: any) {
-    return { success: false, error: err?.message };
+    console.error("getCompanyInvitationsAction exception:", err);
+    return {
+      success: false,
+      error:
+        err?.message ||
+        "An unexpected error occurred while fetching invitations.",
+    };
+  }
+}
+
+/**
+ * 5. Get Pending Company Affiliation Requests Action
+ * Reads pending company_affiliations directly securely using adminClient
+ */
+export async function getPendingCompanyAffiliationRequestsAction(): Promise<{ success: boolean; data?: any[]; error?: string }> {
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+      return { success: false, error: "Unauthorized." };
+    }
+
+    // 1. Get the company owned by this user
+    const { data: companies } = await supabase
+      .from("companies")
+      .select("id")
+      .eq("owner_user_id", user.id)
+      .limit(1);
+
+    const companyId = companies?.[0]?.id;
+    if (!companyId) {
+      return { success: true, data: [] };
+    }
+
+    // 2. Fetch the pending requests via admin client to bypass RLS issues and RPC issues
+    if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      const adminClient = createAdminClient();
+      const { data, error } = await adminClient
+        .from("company_affiliations")
+        .select(`
+          id,
+          user_id,
+          professional_id,
+          company_id,
+          status,
+          created_at,
+          requested_role,
+          user:users(firstName, lastName, username, profileImage, email, location)
+        `)
+        .eq("company_id", companyId)
+        .eq("status", "pending")
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        throw error;
+      }
+
+      // Map the output to match what the UI expects (AffiliationRequest interface)
+      const mappedData = (data || []).map((req: any) => ({
+        id: req.id,
+        user_id: req.user_id,
+        professional_id: req.professional_id,
+        company_id: req.company_id,
+        status: req.status,
+        created_at: req.created_at,
+        requested_role: req.requested_role,
+        first_name: req.user?.firstName || null,
+        last_name: req.user?.lastName || null,
+        full_name: [req.user?.firstName, req.user?.lastName].filter(Boolean).join(" ") || null,
+        username: req.user?.username || null,
+        profile_image: req.user?.profileImage || null,
+        email: req.user?.email || null,
+        location: req.user?.location || null,
+      }));
+
+      return { success: true, data: mappedData };
+    }
+
+    // If no service key, fallback to standard RPC
+    const { data: rpcData, error: rpcError } = await supabase.rpc("get_pending_company_affiliation_requests");
+    if (!rpcError && rpcData) {
+      return { success: true, data: rpcData };
+    }
+    
+    return { success: false, error: rpcError?.message || "Failed to fetch pending requests." };
+  } catch (err: any) {
+    console.error("getPendingCompanyAffiliationRequestsAction exception:", err);
+    return { success: false, error: err?.message || "An unexpected error occurred." };
   }
 }

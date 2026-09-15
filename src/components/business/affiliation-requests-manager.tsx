@@ -76,24 +76,25 @@ export function AffiliationRequestsManager({
   const [rejectReason, setRejectReason] = useState("");
   const [rejectError, setRejectError] = useState<string | null>(null);
 
-  // Fetch pending requests via get_pending_company_affiliation_requests RPC
+  // Fetch pending requests via Server Action to bypass RLS and buggy RPCs
   const fetchRequests = useCallback(async () => {
     setIsLoading(true);
     setError(null);
 
     try {
-      const { data, error } = await supabase.rpc("get_pending_company_affiliation_requests");
+      const { getPendingCompanyAffiliationRequestsAction } = await import("@/actions/affiliations");
+      const res = await getPendingCompanyAffiliationRequestsAction();
 
-      console.log("RPC Data:", data, "RPC Error:", error);
+      console.log("Action Data:", res.data, "Action Error:", res.error);
 
-      if (error) {
-        setError(error.message || "Failed to load pending requests.");
+      if (!res.success) {
+        setError(res.error || "Failed to load pending requests.");
         setRequests([]);
         if (onCountChange) onCountChange(0);
         return;
       }
 
-      const requestsData = Array.isArray(data) ? data : [];
+      const requestsData = Array.isArray(res.data) ? res.data : [];
       setRequests(requestsData as AffiliationRequest[]);
       if (onCountChange) onCountChange(requestsData.length);
     } catch (err: any) {
