@@ -23,7 +23,8 @@ export default function RoleSelectionPage() {
       const { data: { session } } = await supabase.auth.getSession();
 
       if (!session) {
-        router.push("/login");
+        // If session is hydrating, do not trigger a redirect loop with /login
+        setIsCheckingAccess(false);
         return;
       }
 
@@ -46,6 +47,23 @@ export default function RoleSelectionPage() {
         accountType = userRecord.accountType || userRecord.role || '';
       }
 
+      const effectiveRole =
+        accountType ||
+        userRecord?.role ||
+        userRecord?.professionalRole ||
+        session.user.user_metadata?.accountType ||
+        session.user.user_metadata?.role ||
+        session.user.user_metadata?.professionalRole ||
+        session.user.user_metadata?.professional_role ||
+        "";
+
+      const hasRole = Boolean(
+        effectiveRole &&
+        effectiveRole !== "individual" &&
+        effectiveRole !== "corporate_member" &&
+        effectiveRole !== "null"
+      );
+
       // Check companies only for APPROVED / ACTIVE status (not draft/pending during onboarding)
       const { data: companies } = await supabase
         .from("companies")
@@ -54,28 +72,24 @@ export default function RoleSelectionPage() {
         .order("created_at", { ascending: false })
         .limit(1);
 
+      let hasActiveCompany = false;
       if (companies && companies.length > 0) {
         const status = companies[0].status;
         if (status === "approved" || status === "active") {
-          isDbOnboarded = true;
+          hasActiveCompany = true;
         }
       }
 
       if (!isMounted) return;
 
-      // Only redirect out of /role-selection to /home if user is fully onboarded AND NOT explicitly editing/changing role
-      if (isDbOnboarded && !isProfileEdit && !params.get("from") && !params.get("edit")) {
-        if (typeof window !== "undefined") {
-          try {
-            document.cookie = "flightcrew_onboarded=true; path=/; max-age=31536000";
-            sessionStorage.setItem("flightcrew_onboarded", "true");
-            localStorage.setItem("flightcrew_onboarded", "true");
-            window.history.replaceState(null, "", "/home");
-          } catch (e) {}
-          window.location.replace("/home");
-        } else {
-          router.replace("/home");
-        }
+      // Only redirect out of /role-selection to /home if user is fully onboarded AND has a valid role AND NOT explicitly editing/changing role
+      if ((isDbOnboarded || hasActiveCompany) && hasRole && !isProfileEdit && !params.get("from") && !params.get("edit")) {
+        try {
+          document.cookie = "flightcrew_onboarded=true; path=/; max-age=31536000";
+          sessionStorage.setItem("flightcrew_onboarded", "true");
+          localStorage.setItem("flightcrew_onboarded", "true");
+        } catch (e) {}
+        router.replace("/home");
         return;
       }
 

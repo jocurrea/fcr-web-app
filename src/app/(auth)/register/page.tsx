@@ -301,9 +301,8 @@ function RegisterForm() {
         window.dispatchEvent(new CustomEvent("profile-updated"));
       }
 
-      // Navigate with Next.js router to guarantee cookie propagation and server-side refresh
-      router.push("/role-selection");
-      router.refresh();
+      // Navigate with Next.js router to role-selection
+      router.replace("/role-selection");
     } catch (err: any) {
       setError(err.message || "An error occurred during registration");
     } finally {

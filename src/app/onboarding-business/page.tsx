@@ -25,7 +25,7 @@ export default function OnboardingBusinessPage() {
       const { data: { session } } = await supabase.auth.getSession();
 
       if (!session) {
-        router.push("/login");
+        setIsCheckingAccess(false);
         return;
       }
 

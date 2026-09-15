@@ -95,8 +95,15 @@ export default function OnboardingPage() {
           currentCategory = accountType;
         }
 
-        // If completed and not editing, go to home
-        if (onboarded && !editMode) {
+        const hasRole = Boolean(
+          accountType &&
+          accountType !== "individual" &&
+          accountType !== "corporate_member" &&
+          accountType !== "null"
+        );
+
+        // If completed with role and not editing, go to home
+        if (onboarded && hasRole && !editMode) {
           router.replace("/home");
           return;
         }

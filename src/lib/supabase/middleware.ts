@@ -79,9 +79,12 @@ export async function updateSession(request: NextRequest) {
   // Helper to carry cookies over redirects
   const makeRedirect = (target: string) => {
     const redirectUrl = new URL(target, request.url);
+    if (redirectUrl.pathname === pathname) {
+      return response;
+    }
     const redirectRes = NextResponse.redirect(redirectUrl);
     response.cookies.getAll().forEach((c) => {
-      redirectRes.cookies.set(c.name, c.value, c);
+      redirectRes.cookies.set(c.name, c.value);
     });
     return redirectRes;
   };
@@ -178,14 +181,14 @@ export async function updateSession(request: NextRequest) {
 
   // 1. User is NOT fully onboarded or has no role
   if (!isOnboarded || !hasRole) {
-    // Allow public welcome, auth routes, static legal pages, and onboarding flow
-    if (isPublicAuthRoute || isPublicStaticRoute || isOnboardingRoute) {
-      return response;
+    // If authenticated user without role is on login or welcome, send to role-selection
+    if (pathname === "/login" || pathname === "/welcome" || isRoot) {
+      return makeRedirect("/role-selection");
     }
 
-    // Root route "/" always lands on /welcome as the primary landing page
-    if (isRoot) {
-      return makeRedirect("/welcome");
+    // Allow public auth routes (e.g. register), static legal pages, and onboarding flow
+    if (isPublicAuthRoute || isPublicStaticRoute || isOnboardingRoute) {
+      return response;
     }
 
     // Attempting to access /home or any protected route forces /role-selection

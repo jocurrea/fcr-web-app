@@ -146,23 +146,23 @@ export default function LoginPage() {
           localStorage.setItem("flightcrew_onboarded", "true");
         } catch (e) {}
 
-        window.location.replace("/home");
+        router.replace("/home");
         return;
       }
 
       // 3. Ruta de Nuevos Usuarios: La redirección hacia /role-selection debe ser estrictamente
       // exclusiva para usuarios nuevos cuyo registro indique onboarded === false o nulo
       if (effectiveRole === "business") {
-        window.location.replace("/onboarding-business");
+        router.replace("/onboarding-business");
         return;
       }
 
-      window.location.replace("/role-selection");
+      router.replace("/role-selection");
     } catch (redirectErr) {
       console.error("[Login] Redirect error:", redirectErr);
-      window.location.replace("/home");
+      router.replace("/home");
     }
-  }, [cleanResidualParams]);
+  }, [cleanResidualParams, router]);
 
   useEffect(() => {
     // Capture invitation token if present in URL
@@ -176,9 +176,19 @@ export default function LoginPage() {
 
     cleanResidualParams();
 
-    // If an existing session is already active, redirect according to onboarded status
+    // If an existing session is already active, verify validity before redirecting
     async function checkExistingSession() {
       try {
+        const { data: { user }, error: userErr } = await supabase.auth.getUser();
+        if (userErr || !user) {
+          // If no verified user session exists, purge any stale local tokens to avoid loops
+          await supabase.auth.signOut({ scope: "local" }).catch(() => {});
+          localStorage.removeItem("current_user_id");
+          localStorage.removeItem("account_type");
+          localStorage.removeItem("flightcrew_onboarded");
+          return;
+        }
+
         const { data: { session } } = await supabase.auth.getSession();
         if (session?.user) {
           await handlePostLoginRedirect(session.user.id, session);
@@ -208,7 +218,7 @@ export default function LoginPage() {
         await handlePostLoginRedirect(data.session.user.id, data.session);
       } else {
         // Fallback
-        window.location.replace("/home");
+        router.replace("/home");
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : (typeof err === "object" && err !== null && "message" in err ? String((err as { message: unknown }).message) : "");
