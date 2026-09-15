@@ -32,6 +32,7 @@ export interface AffiliationInfo {
   id: string | null;
   status: string;
   logo?: string | null;
+  location?: string | null;
 }
 
 export interface UserProfileContextValue {
@@ -204,8 +205,8 @@ export function UserProfileProvider({
         localStorage.setItem("current_user_id", userId);
       }
 
-      // 1. Unified parallel fetch for canonical get_my_profile() RPC, users, resumes, user_profiles, companies
-      const [myProfileRes, userRes, resumeRes, userProfileRes, companyRes] =
+      // 1. Unified parallel fetch for canonical get_my_profile() RPC, users, resumes, user_profiles, companies, and explicit company_affiliations
+      const [myProfileRes, userRes, resumeRes, userProfileRes, companyRes, affiliationsRes] =
         await Promise.allSettled([
           supabase.rpc("get_my_profile"),
           supabase.from("users").select("*").eq("id", userId).maybeSingle(),
@@ -219,6 +220,13 @@ export function UserProfileProvider({
             .eq("owner_user_id", userId)
             .order("created_at", { ascending: false })
             .limit(1),
+          supabase
+            .from("company_affiliations")
+            .select("id, status, company_id, companies(name, logo_url, location)")
+            .eq("user_id", userId)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle(),
         ]);
 
       const myProfileData =
@@ -235,6 +243,10 @@ export function UserProfileProvider({
       const companies =
         companyRes.status === "fulfilled"
           ? (companyRes.value as any)?.data
+          : null;
+      const explicitAffiliationData = 
+        affiliationsRes.status === "fulfilled" 
+          ? (affiliationsRes.value as any)?.data 
           : null;
 
       if (myProfileData) {
@@ -513,7 +525,16 @@ export function UserProfileProvider({
 
       // 10. Resolve affiliation info (E01-HU11)
       let resolvedAffiliation: AffiliationInfo | null = null;
-      if (myProfileData) {
+      if (explicitAffiliationData) {
+        resolvedAffiliation = {
+          name: explicitAffiliationData.companies?.name || "Company Name",
+          id: explicitAffiliationData.company_id,
+          status: explicitAffiliationData.status,
+          logo: explicitAffiliationData.companies?.logo_url || null,
+          location: explicitAffiliationData.companies?.location || null,
+        };
+        setAffiliationInfo(resolvedAffiliation);
+      } else if (myProfileData) {
         const aff =
           myProfileData.affiliation ||
           myProfileData.company_affiliation ||
