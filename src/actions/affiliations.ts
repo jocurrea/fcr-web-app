@@ -631,6 +631,9 @@ export async function reviewCompanyAffiliationRequestAction(
     // The RPC explicitly expects "approve" or "reject" without the 'd'
     const rpcDecision = decision === "approved" ? "approve" : "reject";
     
+    // The database table column 'status' expects "verified" or "rejected" (for the fallback)
+    const p_status = decision === "approved" ? "verified" : "rejected";
+    
     // Generate an expansive list of parameter names to guarantee finding the RPC signature
     const possibleIdNames = ["id", "affiliation_id", "request_id", "p_id", "p_affiliation_id", "p_request_id", "_id", "_affiliation_id", "in_id", "req_id"];
     const possibleStatusNames = ["status", "decision", "action", "new_status", "p_status", "p_decision", "_status", "in_status", "req_status", "state"];
