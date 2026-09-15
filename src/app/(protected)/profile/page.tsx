@@ -1059,14 +1059,16 @@ export default function ProfilePage() {
             onClick={() => router.push("/business/affiliate")}
             className="bg-white rounded-[20px] p-4 flex items-center gap-4 shadow-sm border border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors"
           >
-            <div className="w-12 h-12 rounded-xl overflow-hidden bg-gray-50 border border-gray-100 flex items-center justify-center flex-shrink-0">
+            <div className="w-12 h-12 flex items-center justify-center flex-shrink-0">
               {(isAffiliationVerified || isAffiliationPending) && affiliationInfo?.logo ? (
-                <img src={affiliationInfo.logo} alt="Company Logo" className="w-full h-full object-cover" />
+                <img src={affiliationInfo.logo} alt="Company Logo" className="w-full h-full object-cover rounded-lg" />
               ) : (
-                <BuildingOfficeIcon className="w-6 h-6 text-gray-400" />
+                <div className="w-full h-full rounded-lg overflow-hidden bg-gray-50 border border-gray-100 flex items-center justify-center">
+                  <BuildingOfficeIcon className="w-6 h-6 text-gray-400" />
+                </div>
               )}
             </div>
-            <div className="flex-1 min-w-0">
+            <div className="flex-1 min-w-0 flex flex-col justify-center">
               <div className="flex flex-row items-center gap-2">
                 <h4 className="text-[15px] font-bold text-gray-900 truncate">
                   {affiliationName || "Link your employer"}
@@ -1084,8 +1086,8 @@ export default function ProfilePage() {
               </div>
               
               {(isAffiliationVerified || isAffiliationPending) && affiliationInfo?.location && (
-                <div className="text-sm text-gray-500 flex items-center gap-1 mt-1">
-                  <MapPin className="w-4 h-4 text-gray-400" />
+                <div className="flex items-center text-sm text-gray-500 mt-1">
+                  <MapPin className="w-4 h-4 mr-1 text-gray-400" />
                   <span className="truncate">{affiliationInfo.location}</span>
                 </div>
               )}
