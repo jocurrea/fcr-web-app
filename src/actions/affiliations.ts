@@ -630,11 +630,9 @@ export async function reviewCompanyAffiliationRequestAction(
 
     const params: any = {
       id: requestId,
-      decision: decision
+      decision: decision,
+      rejection_reason: rejectionReason || null
     };
-    if (rejectionReason) {
-      params.rejection_reason = rejectionReason;
-    }
 
     let rpcSucceeded = false;
     let lastRpcError: any = null;
