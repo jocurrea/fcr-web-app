@@ -1059,7 +1059,7 @@ export default function ProfilePage() {
             onClick={() => router.push("/business/affiliate")}
             className="bg-white rounded-[20px] p-4 flex items-center gap-4 shadow-sm border border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors"
           >
-            <div className="w-12 h-12 rounded-full overflow-hidden bg-gray-50 border border-gray-100 flex items-center justify-center flex-shrink-0">
+            <div className="w-12 h-12 rounded-xl overflow-hidden bg-gray-50 border border-gray-100 flex items-center justify-center flex-shrink-0">
               {(isAffiliationVerified || isAffiliationPending) && affiliationInfo?.logo ? (
                 <img src={affiliationInfo.logo} alt="Company Logo" className="w-full h-full object-cover" />
               ) : (
@@ -1067,27 +1067,25 @@ export default function ProfilePage() {
               )}
             </div>
             <div className="flex-1 min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="flex flex-row items-center gap-2">
                 <h4 className="text-[15px] font-bold text-gray-900 truncate">
                   {affiliationName || "Link your employer"}
                 </h4>
                 {isAffiliationPending && (
-                  <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-amber-100 text-amber-800 shrink-0">
-                    <Clock className="w-3 h-3 mr-1" />
+                  <span className="bg-yellow-100 text-yellow-800 text-xs font-medium px-2 py-0.5 rounded-full shrink-0">
                     Pending Verification
                   </span>
                 )}
                 {isAffiliationVerified && (
-                  <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-green-100 text-green-800 shrink-0">
-                    <CheckCircle2 className="w-3 h-3 mr-1" />
+                  <span className="bg-green-100 text-green-800 text-xs font-medium px-2 py-0.5 rounded-full shrink-0">
                     Verified Company
                   </span>
                 )}
               </div>
               
               {(isAffiliationVerified || isAffiliationPending) && affiliationInfo?.location && (
-                <div className="flex items-center text-[13px] text-gray-500 mt-1">
-                  <MapPin className="w-3.5 h-3.5 mr-1 text-gray-400" />
+                <div className="text-sm text-gray-500 flex items-center gap-1 mt-1">
+                  <MapPin className="w-4 h-4 text-gray-400" />
                   <span className="truncate">{affiliationInfo.location}</span>
                 </div>
               )}
@@ -1100,7 +1098,10 @@ export default function ProfilePage() {
                 </div>
               )}
             </div>
-            <ChevronRightIcon className="w-5 h-5 text-gray-400 flex-shrink-0" />
+            {/* Ocultar la flecha si el estado es pendiente */}
+            {!isAffiliationPending && (
+              <ChevronRightIcon className="w-5 h-5 text-gray-400 flex-shrink-0" />
+            )}
           </div>
         </div>
 

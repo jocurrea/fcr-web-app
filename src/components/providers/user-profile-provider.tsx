@@ -222,7 +222,7 @@ export function UserProfileProvider({
             .limit(1),
           supabase
             .from("company_affiliations")
-            .select("id, status, company_id, companies(name, logo_url, location)")
+            .select("id, status, company_id, company_name_snapshot, companies:company_id(name, logo_url, location)")
             .eq("user_id", userId)
             .order("created_at", { ascending: false })
             .limit(1)
@@ -526,12 +526,17 @@ export function UserProfileProvider({
       // 10. Resolve affiliation info (E01-HU11)
       let resolvedAffiliation: AffiliationInfo | null = null;
       if (explicitAffiliationData) {
+        // Handle case where companies might be an array or object
+        const companyData = Array.isArray(explicitAffiliationData.companies) 
+          ? explicitAffiliationData.companies[0] 
+          : explicitAffiliationData.companies;
+          
         resolvedAffiliation = {
-          name: explicitAffiliationData.companies?.name || "Company Name",
-          id: explicitAffiliationData.company_id,
+          name: companyData?.name || explicitAffiliationData.company_name_snapshot || "Company Name",
+          id: explicitAffiliationData.id || explicitAffiliationData.company_id, // Use affiliation row ID so hasAffiliationId is true
           status: explicitAffiliationData.status,
-          logo: explicitAffiliationData.companies?.logo_url || null,
-          location: explicitAffiliationData.companies?.location || null,
+          logo: companyData?.logo_url || null,
+          location: companyData?.location || null,
         };
         setAffiliationInfo(resolvedAffiliation);
       } else if (myProfileData) {
