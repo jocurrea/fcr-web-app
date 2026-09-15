@@ -205,8 +205,8 @@ export function UserProfileProvider({
         localStorage.setItem("current_user_id", userId);
       }
 
-      // 1. Unified parallel fetch for canonical get_my_profile() RPC, users, resumes, user_profiles, companies, and explicit company_affiliations
-      const [myProfileRes, userRes, resumeRes, userProfileRes, companyRes, affiliationsRes] =
+      // 1. Unified parallel fetch for canonical get_my_profile() RPC, users, resumes, user_profiles, companies
+      const [myProfileRes, userRes, resumeRes, userProfileRes, companyRes] =
         await Promise.allSettled([
           supabase.rpc("get_my_profile"),
           supabase.from("users").select("*").eq("id", userId).maybeSingle(),
@@ -220,20 +220,7 @@ export function UserProfileProvider({
             .eq("owner_user_id", userId)
             .order("created_at", { ascending: false })
             .limit(1),
-          supabase
-            .from("company_affiliations")
-            .select("*, companies(*)")
-            .eq("user_id", userId)
-            .order("created_at", { ascending: false })
-            .limit(1)
-            .maybeSingle(),
         ]);
-        
-      if (affiliationsRes.status === "rejected") {
-        console.error("Affiliation Join Query Rejected:", affiliationsRes.reason);
-      } else if (affiliationsRes.status === "fulfilled" && (affiliationsRes.value as any)?.error) {
-        console.error("Affiliation Join Error from Supabase:", (affiliationsRes.value as any).error);
-      }
 
 
       const myProfileData =
