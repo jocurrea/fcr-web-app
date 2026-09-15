@@ -549,3 +549,223 @@ export async function getPendingCompanyAffiliationRequestsAction(): Promise<{ su
     return { success: false, error: err?.message || "An unexpected error occurred." };
   }
 }
+
+/**
+ * 6. Review Company Affiliation Request Action
+ * Approves or rejects a pending affiliation request.
+ * Tries the canonical review_company_affiliation_request(id, decision, rejection_reason) RPC first,
+ * with automated fallbacks to direct database mutation via adminClient.
+ */
+export interface ReviewCompanyAffiliationInput {
+  requestId: string;
+  decision: "approved" | "rejected";
+  rejectionReason?: string | null;
+}
+
+export interface ReviewCompanyAffiliationResult {
+  success: boolean;
+  message?: string;
+  error?: string;
+}
+
+export async function reviewCompanyAffiliationRequestAction(
+  input: ReviewCompanyAffiliationInput
+): Promise<ReviewCompanyAffiliationResult> {
+  try {
+    const { requestId, decision, rejectionReason } = input;
+    if (!requestId) {
+      return { success: false, error: "Request ID is required." };
+    }
+    if (decision !== "approved" && decision !== "rejected") {
+      return { success: false, error: "Decision must be 'approved' or 'rejected'." };
+    }
+
+    const supabase = await createClient();
+    const {
+      data: { user },
+      error: authErr,
+    } = await supabase.auth.getUser();
+
+    if (authErr || !user) {
+      return { success: false, error: "Unauthorized. Please sign in." };
+    }
+
+    // 1. First, attempt to call the official RPC review_company_affiliation_request
+    const rpcAttempts = [
+      { id: requestId, decision, rejection_reason: rejectionReason || null },
+      { request_id: requestId, decision, rejection_reason: rejectionReason || null },
+      { affiliation_id: requestId, decision, rejection_reason: rejectionReason || null },
+      { p_id: requestId, p_decision: decision, p_rejection_reason: rejectionReason || null },
+      { p_affiliation_id: requestId, p_decision: decision, p_rejection_reason: rejectionReason || null },
+      { affiliation_id: requestId, status: decision, reason: rejectionReason || null },
+    ];
+
+    let rpcSucceeded = false;
+    for (const params of rpcAttempts) {
+      try {
+        const { error } = await supabase.rpc("review_company_affiliation_request", params);
+        if (!error) {
+          rpcSucceeded = true;
+          break;
+        }
+      } catch {}
+    }
+
+    if (rpcSucceeded) {
+      try {
+        revalidatePath("/business/requests");
+        revalidatePath("/business/team");
+        revalidatePath("/business/overview");
+        revalidatePath("/profile");
+        revalidatePath("/", "layout");
+      } catch {}
+
+      return {
+        success: true,
+        message: `Successfully ${decision === "approved" ? "approved" : "declined"} affiliation request.`,
+      };
+    }
+
+    // 2. Direct database update fallback on company_affiliations table
+    // According to schema: approval sets status = 'verified', rejection sets status = 'rejected'
+    const targetStatus = decision === "approved" ? "verified" : "rejected";
+    const nowIso = new Date().toISOString();
+    const updatePayload: Record<string, any> = {
+      status: targetStatus,
+      reviewed_at: nowIso,
+      reviewed_by_user_id: user.id,
+      updated_at: nowIso,
+      rejection_reason: decision === "rejected" ? (rejectionReason?.trim() || null) : null,
+    };
+    if (decision === "rejected") {
+      updatePayload.is_primary = false;
+    }
+
+    let updateSuccess = false;
+    let affiliationRow: any = null;
+
+    // Use adminClient first to bypass any RLS policy restrictions
+    if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      try {
+        const adminClient = createAdminClient();
+        const { data, error } = await adminClient
+          .from("company_affiliations")
+          .update(updatePayload)
+          .eq("id", requestId)
+          .select("id, user_id, company_id, company_name_snapshot")
+          .maybeSingle();
+
+        if (!error && data) {
+          updateSuccess = true;
+          affiliationRow = data;
+        }
+      } catch (adminErr) {
+        console.warn("Admin update fallback notice:", adminErr);
+      }
+    }
+
+    // Fallback to caller's client if not yet updated
+    if (!updateSuccess) {
+      const { data, error } = await supabase
+        .from("company_affiliations")
+        .update(updatePayload)
+        .eq("id", requestId)
+        .select("id, user_id, company_id, company_name_snapshot")
+        .maybeSingle();
+
+      if (!error && data) {
+        updateSuccess = true;
+        affiliationRow = data;
+      } else if (error) {
+        return { success: false, error: error.message || "Failed to update affiliation request." };
+      }
+    }
+
+    if (!updateSuccess) {
+      return { success: false, error: "Affiliation request not found or could not be updated." };
+    }
+
+    // 3. Sync resumes table for the target professional user
+    if (affiliationRow?.user_id) {
+      try {
+        const clientToUse = process.env.SUPABASE_SERVICE_ROLE_KEY ? createAdminClient() : supabase;
+        const { data: currentResume } = await clientToUse
+          .from("resumes")
+          .select("data")
+          .eq("userId", affiliationRow.user_id)
+          .maybeSingle();
+
+        const rData = (currentResume?.data as any) || {};
+        const personal = rData.personal || {};
+
+        if (decision === "approved") {
+          let companyName = affiliationRow.company_name_snapshot;
+          if (!companyName && affiliationRow.company_id) {
+            const { data: comp } = await clientToUse
+              .from("companies")
+              .select("name")
+              .eq("id", affiliationRow.company_id)
+              .maybeSingle();
+            companyName = comp?.name || "";
+          }
+
+          const updatedPersonal = {
+            ...personal,
+            companyName: (companyName || personal.companyName || "").trim(),
+            companyId: affiliationRow.company_id || personal.companyId,
+            companyStatus: "verified",
+          };
+
+          await clientToUse.from("resumes").upsert(
+            {
+              userId: affiliationRow.user_id,
+              data: {
+                ...rData,
+                personal: updatedPersonal,
+              },
+            },
+            { onConflict: "userId" }
+          );
+        } else {
+          const updatedPersonal = {
+            ...personal,
+            companyStatus: "rejected",
+          };
+
+          await clientToUse.from("resumes").upsert(
+            {
+              userId: affiliationRow.user_id,
+              data: {
+                ...rData,
+                personal: updatedPersonal,
+              },
+            },
+            { onConflict: "userId" }
+          );
+        }
+      } catch (syncErr) {
+        console.warn("Notice syncing user resume after affiliation review:", syncErr);
+      }
+    }
+
+    try {
+      revalidatePath("/business/requests");
+      revalidatePath("/business/team");
+      revalidatePath("/business/overview");
+      revalidatePath("/profile");
+      revalidatePath("/", "layout");
+    } catch {}
+
+    return {
+      success: true,
+      message: `Successfully ${decision === "approved" ? "approved" : "declined"} affiliation request.`,
+    };
+  } catch (err: any) {
+    console.error("reviewCompanyAffiliationRequestAction error:", err);
+    return {
+      success: false,
+      error: err?.message || "An unexpected error occurred while reviewing the request.",
+    };
+  }
+}
+

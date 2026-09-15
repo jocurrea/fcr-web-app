@@ -22,6 +22,11 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 
+import {
+  getPendingCompanyAffiliationRequestsAction,
+  reviewCompanyAffiliationRequestAction,
+} from "@/actions/affiliations";
+
 export interface AffiliationRequest {
   id: string;
   user_id?: string;
@@ -121,34 +126,13 @@ export function AffiliationRequestsManager({
     setFeedback(null);
 
     try {
-      let res = await supabase.rpc("review_company_affiliation_request", {
-        affiliation_id: requestId,
-        status: "approved",
-        reason: null,
+      const result = await reviewCompanyAffiliationRequestAction({
+        requestId,
+        decision: "approved",
       });
 
-      if (res.error) {
-        // Fallback parameter signatures
-        const res2 = await supabase.rpc("review_company_affiliation_request", {
-          p_affiliation_id: requestId,
-          p_status: "approved",
-          p_reason: null,
-        });
-        if (!res2.error) {
-          res = res2;
-        } else {
-          const res3 = await supabase.rpc("review_company_affiliation_request", {
-            id: requestId,
-            status: "approved",
-          });
-          if (!res3.error) {
-            res = res3;
-          }
-        }
-      }
-
-      if (res.error) {
-        throw res.error;
+      if (!result.success) {
+        throw new Error(result.error || "Failed to approve request.");
       }
 
       const profName =
@@ -159,7 +143,7 @@ export function AffiliationRequestsManager({
 
       setFeedback({
         type: "success",
-        message: `Successfully approved affiliation request for ${profName}.`,
+        message: result.message || `Successfully approved affiliation request for ${profName}.`,
       });
 
       // Refresh list
@@ -196,35 +180,14 @@ export function AffiliationRequestsManager({
     setRejectError(null);
 
     try {
-      let res = await supabase.rpc("review_company_affiliation_request", {
-        affiliation_id: requestId,
-        status: "rejected",
-        reason: rejectReason.trim() || null,
+      const result = await reviewCompanyAffiliationRequestAction({
+        requestId,
+        decision: "rejected",
+        rejectionReason: rejectReason.trim() || null,
       });
 
-      if (res.error) {
-        // Fallback parameter signatures
-        const res2 = await supabase.rpc("review_company_affiliation_request", {
-          p_affiliation_id: requestId,
-          p_status: "rejected",
-          p_reason: rejectReason.trim() || null,
-        });
-        if (!res2.error) {
-          res = res2;
-        } else {
-          const res3 = await supabase.rpc("review_company_affiliation_request", {
-            id: requestId,
-            status: "rejected",
-            reason: rejectReason.trim() || null,
-          });
-          if (!res3.error) {
-            res = res3;
-          }
-        }
-      }
-
-      if (res.error) {
-        throw res.error;
+      if (!result.success) {
+        throw new Error(result.error || "Failed to decline request.");
       }
 
       const profName =
@@ -235,7 +198,7 @@ export function AffiliationRequestsManager({
 
       setFeedback({
         type: "success",
-        message: `Affiliation request from ${profName} has been declined.`,
+        message: result.message || `Affiliation request from ${profName} has been declined.`,
       });
 
       setRejectingItem(null);
