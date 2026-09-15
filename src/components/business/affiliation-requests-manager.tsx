@@ -21,10 +21,6 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
-import {
-  getPendingAffiliationsAdminFallback,
-  type PendingAffiliationItem,
-} from "@/actions/affiliations";
 
 export interface AffiliationRequest {
   id: string;
@@ -85,83 +81,20 @@ export function AffiliationRequestsManager({
     setError(null);
 
     try {
-      // ── Primary: Supabase RPC (returns pending requests for the current business user)
-      let res = await supabase.rpc("get_pending_company_affiliation_requests");
+      const { data, error } = await supabase.rpc("get_pending_company_affiliation_requests");
 
-      console.log("[AffiliationRequests] RPC result:", {
-        data: res.data,
-        error: res.error,
-        status: res.status,
-      });
+      console.log("RPC Data:", data, "RPC Error:", error);
 
-      if (!res.error && Array.isArray(res.data) && res.data.length > 0) {
-        setRequests(res.data as AffiliationRequest[]);
-        if (onCountChange) onCountChange(res.data.length);
-        return;
-      }
-
-      if (res.error) {
-        console.error("[AffiliationRequests] RPC error — trying direct table fallback:", res.error);
-      } else {
-        console.log("[AffiliationRequests] RPC returned 0 results — trying direct table fallback...");
-      }
-
-      // ── Fallback: Server Action with admin client (bypasses RLS)
-      // The direct client query on company_affiliations returns 403 Forbidden.
-      // We delegate to a Server Action that verifies ownership and uses
-      // the service role key to read and enrich the pending affiliations.
-
-      // Find the company owned by the current user
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        setError("Not authenticated.");
+      if (error) {
+        setError(error.message || "Failed to load pending requests.");
         setRequests([]);
         if (onCountChange) onCountChange(0);
         return;
       }
 
-      const { data: companyRecord, error: companyErr } = await supabase
-        .from("companies")
-        .select("id, name")
-        .eq("owner_user_id", session.user.id)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      console.log("[AffiliationRequests] Company lookup (owner_user_id):", { companyRecord, companyErr });
-
-      if (companyErr || !companyRecord) {
-        if (res.error) {
-          setError(res.error.message || "Failed to load pending requests.");
-        } else {
-          setError(null);
-        }
-        setRequests([]);
-        if (onCountChange) onCountChange(0);
-        return;
-      }
-
-      // Call the Server Action — runs on the server with service role key
-      const fallbackResult = await getPendingAffiliationsAdminFallback(companyRecord.id);
-
-      console.log("[AffiliationRequests] Admin fallback result:", fallbackResult);
-
-      if (!fallbackResult.success || !fallbackResult.data) {
-        console.error("[AffiliationRequests] Admin fallback failed:", fallbackResult.error);
-        if (res.error) {
-          setError(res.error.message || "Failed to load pending requests.");
-        }
-        setRequests([]);
-        if (onCountChange) onCountChange(0);
-        return;
-      }
-
-      // Map PendingAffiliationItem → AffiliationRequest
-      const mapped: AffiliationRequest[] = fallbackResult.data.map(
-        (item: PendingAffiliationItem) => item as AffiliationRequest
-      );
-      setRequests(mapped);
-      if (onCountChange) onCountChange(mapped.length);
+      const requestsData = Array.isArray(data) ? data : [];
+      setRequests(requestsData as AffiliationRequest[]);
+      if (onCountChange) onCountChange(requestsData.length);
     } catch (err: any) {
       console.error("[AffiliationRequests] Exception:", err);
       setError(err?.message || "Failed to load pending requests. Please try again.");
