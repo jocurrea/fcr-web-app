@@ -497,26 +497,18 @@ export async function getPendingCompanyAffiliationRequestsAction(): Promise<{ su
     const companyName = activeCompany?.name || "Company";
 
     // 2. Fetch pending requests: try direct query or RPC
+    // 2. Fetch pending requests: strictly use the official RPC
     let rawRequests: any[] = [];
-
-    // Try direct query first
-    const { data: directData, error: directError } = await supabase
-      .from("company_affiliations")
-      .select("id, user_id, professional_id, company_id, company_name_snapshot, status, created_at, requested_at, requested_role")
-      .eq("company_id", companyId)
-      .eq("status", "pending")
-      .order("created_at", { ascending: false });
-
-    if (!directError && Array.isArray(directData) && directData.length > 0) {
-      rawRequests = directData;
-    } else {
-      // Try official RPC
-      const { data: rpcData, error: rpcError } = await supabase.rpc("get_pending_company_affiliation_requests");
-      if (!rpcError && Array.isArray(rpcData)) {
-        rawRequests = rpcData;
-      } else if (directData) {
-        rawRequests = directData;
-      }
+    
+    const { data: rpcData, error: rpcError } = await supabase.rpc("get_pending_company_affiliation_requests");
+    
+    if (rpcError) {
+      console.error("[get_pending_company_affiliation_requests RPC Error]:", rpcError);
+      return { success: false, error: rpcError.message || "Failed to fetch requests via RPC." };
+    }
+    
+    if (Array.isArray(rpcData)) {
+      rawRequests = rpcData;
     }
 
     // 3. Fetch user profiles for all applicant user_ids so we have real names and photos
