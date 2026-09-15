@@ -404,9 +404,6 @@ export default function OnboardingPage() {
           lastName: finalLastName,
           ...(finalProfileImage ? { profileImage: finalProfileImage } : {}),
           email: personalData?.email || session.user.email,
-          phone: personalData?.phone || null,
-          location: personalData?.location || null,
-          availability_status: finalAvailabilityStatus,
         },
         { onConflict: "id" }
       );
