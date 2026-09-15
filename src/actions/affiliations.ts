@@ -629,46 +629,49 @@ export async function reviewCompanyAffiliationRequestAction(
     }
 
     const p_status = decision === "approved" ? "verified" : "rejected";
-    const rpcAttempts = [
-      // 3-arity
-      { id: requestId, decision: decision, rejection_reason: rejectionReason || null },
-      { id: requestId, status: p_status, rejection_reason: rejectionReason || null },
-      { id: requestId, status: p_status, reason: rejectionReason || null },
-      { affiliation_id: requestId, decision: decision, rejection_reason: rejectionReason || null },
-      { affiliation_id: requestId, status: p_status, rejection_reason: rejectionReason || null },
-      { affiliation_id: requestId, status: p_status, reason: rejectionReason || null },
-      { affiliation_id: requestId, decision: decision, reason: rejectionReason || null },
-      { request_id: requestId, decision: decision, rejection_reason: rejectionReason || null },
-      { request_id: requestId, status: p_status, rejection_reason: rejectionReason || null },
-      { request_id: requestId, status: p_status, reason: rejectionReason || null },
-      { p_affiliation_id: requestId, p_status: p_status, p_reason: rejectionReason || null },
-      { p_id: requestId, p_decision: decision, p_rejection_reason: rejectionReason || null },
-      
-      // 2-arity (in case reason is omitted completely)
-      { id: requestId, decision: decision },
-      { id: requestId, status: p_status },
-      { affiliation_id: requestId, decision: decision },
-      { affiliation_id: requestId, status: p_status },
-      { request_id: requestId, decision: decision },
-      { request_id: requestId, status: p_status },
-      { p_affiliation_id: requestId, p_status: p_status },
-      { p_id: requestId, p_decision: decision }
-    ];
+    
+    // Generate an expansive list of parameter names to guarantee finding the RPC signature
+    const possibleIdNames = ["id", "affiliation_id", "request_id", "p_id", "p_affiliation_id", "p_request_id", "_id", "_affiliation_id", "in_id", "req_id"];
+    const possibleStatusNames = ["status", "decision", "action", "new_status", "p_status", "p_decision", "_status", "in_status", "req_status", "state"];
+    const possibleReasonNames = ["rejection_reason", "reason", "notes", "message", "p_rejection_reason", "p_reason", "_rejection_reason", "in_rejection_reason", "reject_reason"];
+
+    const rpcAttempts: any[] = [];
+    
+    // Build combinations dynamically
+    for (const idName of possibleIdNames) {
+      for (const statusName of possibleStatusNames) {
+        // 2-arity for approval
+        rpcAttempts.push({ [idName]: requestId, [statusName]: p_status });
+        rpcAttempts.push({ [idName]: requestId, [statusName]: decision });
+        
+        // 3-arity for rejection
+        if (rejectionReason) {
+          for (const reasonName of possibleReasonNames) {
+            rpcAttempts.push({ [idName]: requestId, [statusName]: p_status, [reasonName]: rejectionReason });
+            rpcAttempts.push({ [idName]: requestId, [statusName]: decision, [reasonName]: rejectionReason });
+          }
+        }
+      }
+    }
 
     let rpcSucceeded = false;
     let lastRpcError: any = null;
 
+    // Run sequentially to avoid rate limits, but it's fast because most fail instantly on the client-side of PostgREST
     for (const params of rpcAttempts) {
-      // Remove null keys to prevent strict arity mismatch in PostgREST
-      const cleanParams = Object.fromEntries(Object.entries(params).filter(([_, v]) => v !== null));
-      
       try {
-        const { error } = await supabase.rpc("review_company_affiliation_request", cleanParams);
+        const { error } = await supabase.rpc("review_company_affiliation_request", params);
         if (!error) {
           rpcSucceeded = true;
-          console.log("SUCCESSFULLY FOUND RPC SIGNATURE:", Object.keys(cleanParams));
+          console.log("SUCCESSFULLY FOUND RPC SIGNATURE:", Object.keys(params));
           break;
         } else {
+          // If the error is NOT 'Could not find the function', it means we hit the function but it failed internally (e.g. RLS). We should stop brute-forcing.
+          if (!error.message.includes("Could not find the function")) {
+            lastRpcError = error;
+            console.error("RPC hit but failed internally:", params, error);
+            break; 
+          }
           lastRpcError = error;
         }
       } catch (err: any) {
