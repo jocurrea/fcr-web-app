@@ -68,6 +68,8 @@ export async function updateSession(request: NextRequest) {
     pathname === "/privacyPolicy" ||
     pathname === "/termsAndConditions" ||
     pathname === "/community-safety" ||
+    pathname === "/diagnostic" ||
+    pathname === "/api/diagnostic" ||
     pathname === "/_not-found";
 
   const isOnboardingRoute =
