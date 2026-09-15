@@ -110,7 +110,6 @@ export function AffiliationRequestsManager({
 
   // Processing state per item
   const [processingId, setProcessingId] = useState<string | null>(null);
-  const [processingAction, setProcessingAction] = useState<"approved" | "rejected" | null>(null);
 
   // Feedback notification state
   const [feedback, setFeedback] = useState<{
@@ -118,10 +117,11 @@ export function AffiliationRequestsManager({
     message: string;
   } | null>(null);
 
-  // Rejection Modal State
-  const [rejectingItem, setRejectingItem] = useState<AffiliationRequest | null>(null);
-  const [rejectReason, setRejectReason] = useState("");
-  const [rejectError, setRejectError] = useState<string | null>(null);
+  // Confirmation Modal State (matching mobile app parity)
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedRequest, setSelectedRequest] = useState<AffiliationRequest | null>(null);
+  const [actionType, setActionType] = useState<"approve" | "reject" | null>(null);
+  const [isConfirming, setIsConfirming] = useState(false);
 
   // Fetch pending requests via Server Action to bypass RLS and buggy RPCs
   const fetchRequests = useCallback(async () => {
@@ -158,104 +158,86 @@ export function AffiliationRequestsManager({
     fetchRequests();
   }, [fetchRequests]);
 
-  // Handle Approve
-  const handleApprove = async (request: AffiliationRequest) => {
-    const requestId = request.id || request.affiliation_id;
-    if (!requestId || processingId) return;
-
-    setProcessingId(requestId);
-    setProcessingAction("approved");
-    setFeedback(null);
-
-    try {
-      const result = await reviewCompanyAffiliationRequestAction({
-        requestId,
-        decision: "approved",
-      });
-
-      if (!result.success) {
-        throw new Error(result.error || "Failed to approve request.");
-      }
-
-      const profName =
-        request.full_name ||
-        [request.first_name, request.last_name].filter(Boolean).join(" ") ||
-        request.username ||
-        "The professional";
-
-      setFeedback({
-        type: "success",
-        message: result.message || `Successfully approved affiliation request for ${profName}.`,
-      });
-
-      // Refresh list
-      await fetchRequests();
-    } catch (err: any) {
-      console.error("Error approving affiliation request:", err);
-      setFeedback({
-        type: "error",
-        message: err?.message || "Failed to approve the request. Please try again.",
-      });
-    } finally {
-      setProcessingId(null);
-      setProcessingAction(null);
-    }
-  };
-
-  // Open Rejection Modal
-  const openRejectModal = (request: AffiliationRequest) => {
-    setRejectingItem(request);
-    setRejectReason("");
-    setRejectError(null);
-  };
-
-  // Submit Rejection
-  const handleRejectSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!rejectingItem || processingId) return;
-
-    const requestId = rejectingItem.id || rejectingItem.affiliation_id;
+  // Real Supabase review execution triggered ONLY on modal confirmation
+  const handleConfirmAction = async () => {
+    if (!selectedRequest || !actionType || isConfirming) return;
+    const requestId = selectedRequest.id || selectedRequest.affiliation_id;
     if (!requestId) return;
 
+    setIsConfirming(true);
     setProcessingId(requestId);
-    setProcessingAction("rejected");
-    setRejectError(null);
+    setFeedback(null);
+
+    const decision = actionType === "approve" ? "approved" : "rejected";
 
     try {
       const result = await reviewCompanyAffiliationRequestAction({
         requestId,
-        decision: "rejected",
-        rejectionReason: rejectReason.trim() || null,
+        decision,
+        rejectionReason: null,
       });
 
       if (!result.success) {
-        throw new Error(result.error || "Failed to decline request.");
+        throw new Error(result.error || `Failed to ${actionType} request.`);
       }
 
       const profName =
-        rejectingItem.full_name ||
-        [rejectingItem.first_name, rejectingItem.last_name].filter(Boolean).join(" ") ||
-        rejectingItem.username ||
+        selectedRequest.full_name ||
+        [selectedRequest.first_name, selectedRequest.last_name].filter(Boolean).join(" ") ||
+        selectedRequest.user?.name ||
+        selectedRequest.username ||
         "The professional";
 
       setFeedback({
         type: "success",
-        message: result.message || `Affiliation request from ${profName} has been declined.`,
+        message:
+          actionType === "approve"
+            ? `Successfully approved affiliation request for ${profName}.`
+            : `Affiliation request from ${profName} has been rejected.`,
       });
 
-      setRejectingItem(null);
-      setRejectReason("");
+      setIsModalOpen(false);
+      setSelectedRequest(null);
+      setActionType(null);
 
       // Refresh list
       await fetchRequests();
     } catch (err: any) {
-      console.error("Error rejecting affiliation request:", err);
-      setRejectError(err?.message || "Failed to decline the request. Please try again.");
+      console.error(`Error processing ${actionType} request:`, err);
+      setFeedback({
+        type: "error",
+        message: err?.message || `Failed to ${actionType} the request. Please try again.`,
+      });
     } finally {
+      setIsConfirming(false);
       setProcessingId(null);
-      setProcessingAction(null);
     }
   };
+
+  const handleCloseModal = () => {
+    if (isConfirming) return;
+    setIsModalOpen(false);
+    setSelectedRequest(null);
+    setActionType(null);
+  };
+
+  const modalUserName =
+    selectedRequest?.full_name ||
+    [
+      selectedRequest?.user?.first_name || selectedRequest?.first_name,
+      selectedRequest?.user?.last_name || selectedRequest?.last_name,
+    ]
+      .filter(Boolean)
+      .join(" ") ||
+    selectedRequest?.user?.name ||
+    selectedRequest?.username ||
+    "The professional";
+
+  const modalCompanyName =
+    selectedRequest?.company?.name ||
+    selectedRequest?.company_name ||
+    selectedRequest?.company_name_snapshot ||
+    "your company";
 
   return (
     <div className={cn("space-y-5", className)}>
@@ -474,28 +456,28 @@ export function AffiliationRequestsManager({
                 <div className="grid grid-cols-2 gap-4 mt-2">
                   <button
                     type="button"
-                    onClick={() => openRejectModal(item)}
-                    disabled={isThisItemProcessing}
+                    onClick={() => {
+                      setSelectedRequest(item);
+                      setActionType("reject");
+                      setIsModalOpen(true);
+                    }}
+                    disabled={isConfirming && processingId === requestId}
                     className="w-full py-3 px-6 rounded-full border border-red-500 text-red-600 font-semibold text-base hover:bg-red-50 transition-colors flex items-center justify-center cursor-pointer disabled:opacity-50"
                   >
-                    {isThisItemProcessing && processingAction === "rejected" ? (
-                      <Loader2 className="w-5 h-5 animate-spin" />
-                    ) : (
-                      "Reject"
-                    )}
+                    Reject
                   </button>
 
                   <button
                     type="button"
-                    onClick={() => handleApprove(item)}
-                    disabled={isThisItemProcessing}
+                    onClick={() => {
+                      setSelectedRequest(item);
+                      setActionType("approve");
+                      setIsModalOpen(true);
+                    }}
+                    disabled={isConfirming && processingId === requestId}
                     className="w-full py-3 px-6 rounded-full bg-blue-600 text-white font-semibold text-base hover:bg-blue-700 transition-colors flex items-center justify-center shadow-sm cursor-pointer disabled:opacity-50"
                   >
-                    {isThisItemProcessing && processingAction === "approved" ? (
-                      <Loader2 className="w-5 h-5 animate-spin" />
-                    ) : (
-                      "Approve"
-                    )}
+                    Approve
                   </button>
                 </div>
               </div>
@@ -504,91 +486,62 @@ export function AffiliationRequestsManager({
         </div>
       )}
 
-      {/* Rejection Modal */}
-      {rejectingItem && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="bg-white rounded-3xl p-6 sm:p-7 max-w-md w-full border border-gray-100 shadow-2xl space-y-4">
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex items-center gap-2.5">
-                <div className="w-10 h-10 rounded-2xl bg-red-50 border border-red-100 flex items-center justify-center text-red-600">
-                  <XCircle className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-base font-extrabold text-gray-900">
-                    Reject Affiliation Request
-                  </h3>
-                  <p className="text-xs text-gray-500">
-                    {rejectingItem.full_name ||
-                      [rejectingItem.first_name, rejectingItem.last_name].filter(Boolean).join(" ") ||
-                      rejectingItem.username ||
-                      "The professional"}
-                  </p>
-                </div>
-              </div>
+      {/* Confirmation Modal (Mobile App Parity) */}
+      {isModalOpen && selectedRequest && actionType && (
+        <div
+          className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4 animate-in fade-in duration-150"
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !isConfirming) {
+              handleCloseModal();
+            }
+          }}
+        >
+          <div className="bg-white p-6 rounded-lg shadow-xl max-w-sm w-full mx-4 animate-in zoom-in-95 duration-150">
+            <h3 className="text-lg font-bold text-gray-900">
+              {actionType === "approve"
+                ? "Approve affiliation?"
+                : "Reject affiliation?"}
+            </h3>
+
+            <p className="text-sm text-gray-600 mt-3 leading-relaxed">
+              {actionType === "approve"
+                ? `${modalUserName} will appear as a Verified Employee of ${modalCompanyName}.`
+                : `Are you sure you want to reject the affiliation request from ${modalUserName}?`}
+            </p>
+
+            <div className="flex justify-end gap-4 mt-6">
+              <button
+                type="button"
+                onClick={handleCloseModal}
+                disabled={isConfirming}
+                className="text-sm font-bold text-gray-600 hover:text-gray-900 transition-colors uppercase cursor-pointer disabled:opacity-50"
+              >
+                CANCEL
+              </button>
 
               <button
                 type="button"
-                onClick={() => setRejectingItem(null)}
-                className="w-8 h-8 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-600 flex items-center justify-center transition-colors cursor-pointer"
+                onClick={handleConfirmAction}
+                disabled={isConfirming}
+                className={cn(
+                  "text-sm font-bold uppercase transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50",
+                  actionType === "approve"
+                    ? "text-blue-600 hover:text-blue-700"
+                    : "text-red-600 hover:text-red-700"
+                )}
               >
-                <X className="w-4 h-4" />
+                {isConfirming ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>PROCESSING...</span>
+                  </>
+                ) : actionType === "approve" ? (
+                  "APPROVE"
+                ) : (
+                  "REJECT"
+                )}
               </button>
             </div>
-
-            <form onSubmit={handleRejectSubmit} className="space-y-4">
-              <div className="space-y-1.5">
-                <label
-                  htmlFor="reject-reason"
-                  className="text-xs font-bold text-gray-700 block"
-                >
-                  Reason for rejection (Optional)
-                </label>
-                <textarea
-                  id="reject-reason"
-                  rows={3}
-                  value={rejectReason}
-                  onChange={(e) => setRejectReason(e.target.value)}
-                  placeholder="e.g. Unverified credentials, position not currently matching company records..."
-                  className="w-full p-3 rounded-2xl text-xs sm:text-sm bg-gray-50/70 border border-gray-200 focus:bg-white focus:border-red-500 focus:ring-2 focus:ring-red-200/40 transition-all resize-none placeholder:text-gray-400 outline-none"
-                  maxLength={300}
-                />
-                <span className="text-[11px] text-gray-400 block text-right">
-                  {rejectReason.length} / 300
-                </span>
-              </div>
-
-              {rejectError && (
-                <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs flex items-center gap-2">
-                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                  <span>{rejectError}</span>
-                </div>
-              )}
-
-              <div className="flex items-center justify-end gap-2.5 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setRejectingItem(null)}
-                  disabled={processingId !== null}
-                  className="py-2.5 px-4 rounded-xl font-bold text-xs sm:text-sm text-gray-600 hover:bg-gray-100 transition-colors cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={processingId !== null}
-                  className="py-2.5 px-5 rounded-xl font-bold text-xs sm:text-sm text-white bg-red-600 hover:bg-red-700 active:scale-[0.98] transition-all shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                >
-                  {processingId ? (
-                    <>
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      <span>Rejecting...</span>
-                    </>
-                  ) : (
-                    <span>Confirm Reject</span>
-                  )}
-                </button>
-              </div>
-            </form>
           </div>
         </div>
       )}
