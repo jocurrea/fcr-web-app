@@ -16,18 +16,18 @@ export default async function DiagnosticPage() {
 
   try {
     // 1. Get current user
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-    if (sessionError) throw new Error("Auth Error: " + sessionError.message);
-    if (!session?.user) {
-      log.push("❌ No hay usuario autenticado.");
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError) throw new Error("Auth Error: " + authError.message);
+    if (!user) {
+      log.push("❌ No hay usuario autenticado (supabase.auth.getUser() devolvió null).");
     } else {
-      log.push(`✅ Usuario autenticado: ${session.user.email} (ID: ${session.user.id})`);
+      log.push(`✅ Usuario autenticado: ${user.email} (ID: ${user.id})`);
 
       // 2. Check Companies Owned
       const { data: companies, error: compError } = await supabase
         .from("companies")
         .select("id, name, owner_user_id")
-        .eq("owner_user_id", session.user.id);
+        .eq("owner_user_id", user.id);
 
       if (compError) throw new Error("Companies Error: " + compError.message);
       
