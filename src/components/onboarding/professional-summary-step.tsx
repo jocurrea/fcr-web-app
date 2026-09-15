@@ -20,6 +20,7 @@ export function ProfessionalSummaryStep({ onNext, onBack }: ProfessionalSummaryS
   const [aboutMe, setAboutMe] = useState("");
   const [touched, setTouched] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   useEffect(() => {
     try {
@@ -47,6 +48,8 @@ export function ProfessionalSummaryStep({ onNext, onBack }: ProfessionalSummaryS
 
   const handleNextClick = async () => {
     setTouched(true);
+    setSubmitError(null);
+
     if (!isAboutMeValid || isSaving) return;
 
     setIsSaving(true);
@@ -79,13 +82,14 @@ export function ProfessionalSummaryStep({ onNext, onBack }: ProfessionalSummaryS
           ...updated
         };
 
-        await supabase.from("resumes").upsert({
+        const { error: upsertErr } = await supabase.from("resumes").upsert({
           userId: session.user.id,
           data: {
             ...resumeData,
             personal: updatedPersonal
           }
         }, { onConflict: "userId" });
+        if (upsertErr) throw upsertErr;
       }
 
       if (onNext) {
@@ -93,8 +97,9 @@ export function ProfessionalSummaryStep({ onNext, onBack }: ProfessionalSummaryS
       } else {
         router.push("/onboarding-complete");
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error saving about me summary:", err);
+      setSubmitError(err.message || "Failed to save information. Please try again.");
     } finally {
       setIsSaving(false);
     }
@@ -195,6 +200,11 @@ export function ProfessionalSummaryStep({ onNext, onBack }: ProfessionalSummaryS
             <p className="text-xs text-red-600 font-medium flex items-center gap-1 mt-1 px-0.5">
               <AlertCircle className="w-3.5 h-3.5" />
               This field is required.
+            </p>
+          )}
+          {submitError && (
+            <p className="text-sm text-red-600 font-medium bg-red-50 border border-red-200 rounded p-3 mt-2">
+              {submitError}
             </p>
           )}
         </div>

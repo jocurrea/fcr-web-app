@@ -49,6 +49,7 @@ export function SkillsStep({ onNext, onBack }: SkillsStepProps) {
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   useEffect(() => {
     try {
@@ -101,6 +102,7 @@ export function SkillsStep({ onNext, onBack }: SkillsStepProps) {
   const allDisplaySkills = Array.from(new Set([...selectedSkills, ...filteredSkills]));
 
   const handleContinue = async () => {
+    setSubmitError(null);
     if (isSaving) return;
 
     setIsSaving(true);
@@ -139,7 +141,7 @@ export function SkillsStep({ onNext, onBack }: SkillsStepProps) {
           ...updated,
         };
 
-        await supabase.from("resumes").upsert({
+        const { error: upsertErr } = await supabase.from("resumes").upsert({
           userId: session.user.id,
           data: {
             ...resumeData,
@@ -147,6 +149,7 @@ export function SkillsStep({ onNext, onBack }: SkillsStepProps) {
             skills: selectedSkills,
           },
         }, { onConflict: "userId" });
+        if (upsertErr) throw upsertErr;
       }
 
       if (onNext) {
@@ -154,11 +157,9 @@ export function SkillsStep({ onNext, onBack }: SkillsStepProps) {
       } else {
         router.push("/onboarding-complete");
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error saving skills:", err);
-      if (onNext) {
-        onNext([]);
-      }
+      setSubmitError(err.message || "Failed to save information. Please try again.");
     } finally {
       setIsSaving(false);
     }
@@ -277,7 +278,15 @@ export function SkillsStep({ onNext, onBack }: SkillsStepProps) {
 
         </div>
 
-        {/* 4. Bottom Button: Continue */}
+        {submitError && (
+          <div className="bg-red-50 border border-red-200 rounded p-4 mb-4">
+            <p className="text-sm text-red-600 font-medium">
+              {submitError}
+            </p>
+          </div>
+        )}
+
+        {/* 4. Bottom Continue Button */}
         <div className="pb-8 pt-6">
           <button
             type="button"

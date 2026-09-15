@@ -490,6 +490,7 @@ export function ComplementaryInfoStep({ onNext, onBack, onSkip }: ComplementaryI
   const [expModalError, setExpModalError] = useState<string | null>(null);
 
   const [formError, setFormError] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
   const countryDropdownRef = useRef<HTMLDivElement>(null);
@@ -684,6 +685,7 @@ export function ComplementaryInfoStep({ onNext, onBack, onSkip }: ComplementaryI
 
   const handleSaveAndProceed = async (skip = false) => {
     setFormError(null);
+    setSubmitError(null);
     if (isSaving) return;
 
     if (!skip) {
@@ -746,7 +748,7 @@ export function ComplementaryInfoStep({ onNext, onBack, onSkip }: ComplementaryI
             ...updated,
           };
 
-          await supabase.from("resumes").upsert({
+          const { error: upsertErr } = await supabase.from("resumes").upsert({
             userId: session.user.id,
             data: {
               ...resumeData,
@@ -754,6 +756,7 @@ export function ComplementaryInfoStep({ onNext, onBack, onSkip }: ComplementaryI
               work: validExperiences,
             },
           }, { onConflict: "userId" });
+          if (upsertErr) throw upsertErr;
         }
       }
 
@@ -768,11 +771,9 @@ export function ComplementaryInfoStep({ onNext, onBack, onSkip }: ComplementaryI
       } else {
         router.push("/onboarding-complete");
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error saving optional details:", err);
-      if (onNext) {
-        onNext({ location: "", city: "", country: "", languages: [], workExperience: [] });
-      }
+      setSubmitError(err.message || "Failed to save information. Please try again.");
     } finally {
       setIsSaving(false);
     }
@@ -1040,6 +1041,14 @@ export function ComplementaryInfoStep({ onNext, onBack, onSkip }: ComplementaryI
             >
               <X className="w-3.5 h-3.5" />
             </button>
+          </div>
+        )}
+
+        {submitError && (
+          <div className="bg-red-50 border border-red-200 rounded p-4 mb-4">
+            <p className="text-sm text-red-600 font-medium">
+              {submitError}
+            </p>
           </div>
         )}
 
