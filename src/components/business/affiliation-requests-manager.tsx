@@ -58,18 +58,23 @@ interface AffiliationRequestsManagerProps {
 }
 
 const formatRole = (rawRole?: string | null) => {
-  if (!rawRole) return "Operations Specialist";
+  if (!rawRole) return "Operations Officer";
+  const normalized = rawRole.toLowerCase().trim();
   const ROLE_MAP: Record<string, string> = {
     operations_officer: "Operations Officer",
+    operations_specialist: "Operations Officer",
     aircraft_mechanic: "Aircraft Mechanic",
     air_traffic_controller: "Air Traffic Controller",
     aeronautical_engineer: "Aeronautical Engineer",
-    aviation_professional: "Aviation Professional",
+    aviation_professional: "Operations Officer",
     flight_crew: "Flight Crew",
     pilot: "Pilot",
     cabin_crew: "Cabin Crew",
   };
-  if (ROLE_MAP[rawRole]) return ROLE_MAP[rawRole];
+  if (ROLE_MAP[normalized]) return ROLE_MAP[normalized];
+  if (normalized.includes("specialist") || normalized.includes("operations")) {
+    return "Operations Officer";
+  }
   return rawRole
     .replace(/[_-]/g, " ")
     .split(" ")

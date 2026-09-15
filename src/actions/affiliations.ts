@@ -557,7 +557,7 @@ export async function getPendingCompanyAffiliationRequestsAction(): Promise<{ su
         status: req.status || "pending",
         created_at: req.created_at || req.requested_at || new Date().toISOString(),
         requested_at: req.requested_at || req.created_at || new Date().toISOString(),
-        requested_role: req.requested_role || u.professionalTitleKey || u.role || u.professionalRole || null,
+        requested_role: u.professionalTitleKey || (u.role && u.role !== "aviation_professional" && u.role !== "flight_crew" ? u.role : null) || req.requested_role || "operations_officer",
         first_name: firstName,
         last_name: lastName,
         full_name: fullName,
@@ -565,7 +565,7 @@ export async function getPendingCompanyAffiliationRequestsAction(): Promise<{ su
         profile_image: u.profileImage || u.profile_image || req.profile_image || req.profileImage || null,
         email: u.email || req.email || null,
         location: u.location || req.location || null,
-        user_role: u.professionalTitleKey || u.role || u.professionalRole || req.requested_role || null,
+        user_role: u.professionalTitleKey || (u.role && u.role !== "aviation_professional" && u.role !== "flight_crew" ? u.role : null) || req.requested_role || "operations_officer",
         user: {
           id: uId,
           first_name: firstName,
