@@ -586,6 +586,31 @@ export function UserProfileProvider({
         }
       }
 
+      // If affiliation data is STILL missing (due to RLS or caching), build it from local state and fetch company logo/location
+      if (!resolvedAffiliation) {
+        const localCompId = crewData?.personal?.companyId || localPersonal?.companyId;
+        const localCompName = crewData?.personal?.companyName || localPersonal?.companyName;
+        const localCompStatus = crewData?.personal?.companyStatus || localPersonal?.companyStatus || "pending";
+        
+        if (localCompId || localCompName) {
+          resolvedAffiliation = {
+            name: localCompName || "Company Name",
+            id: localCompId || null,
+            status: localCompStatus,
+          };
+          
+          if (localCompId) {
+            const { data: fallbackCompany } = await supabase.from("companies").select("name, logo_url, location").eq("id", localCompId).maybeSingle();
+            if (fallbackCompany) {
+              resolvedAffiliation.name = fallbackCompany.name || resolvedAffiliation.name;
+              resolvedAffiliation.logo = fallbackCompany.logo_url;
+              resolvedAffiliation.location = fallbackCompany.location;
+            }
+          }
+          setAffiliationInfo(resolvedAffiliation);
+        }
+      }
+
       // 11. Resolve Business Company Info if applicable
       let companyLogo: string | null = null;
       if (businessFlag && companies && companies.length > 0) {
