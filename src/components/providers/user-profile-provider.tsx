@@ -205,8 +205,8 @@ export function UserProfileProvider({
         localStorage.setItem("current_user_id", userId);
       }
 
-      // 1. Unified parallel fetch for canonical get_my_profile() RPC, users, resumes, user_profiles, companies
-      const [myProfileRes, userRes, resumeRes, userProfileRes, companyRes] =
+      // 1. Unified parallel fetch for canonical get_my_profile() RPC, users, resumes, user_profiles, companies, and affiliations
+      const [myProfileRes, userRes, resumeRes, userProfileRes, companyRes, affiliationsRes] =
         await Promise.allSettled([
           supabase.rpc("get_my_profile"),
           supabase.from("users").select("*").eq("id", userId).maybeSingle(),
@@ -220,6 +220,13 @@ export function UserProfileProvider({
             .eq("owner_user_id", userId)
             .order("created_at", { ascending: false })
             .limit(1),
+          supabase
+            .from("company_affiliations")
+            .select("*, companies(name, logo_url, location)")
+            .eq("user_id", userId)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle(),
         ]);
 
 
@@ -237,6 +244,10 @@ export function UserProfileProvider({
       const companies =
         companyRes.status === "fulfilled"
           ? (companyRes.value as any)?.data
+          : null;
+      const explicitAffiliationData =
+        affiliationsRes.status === "fulfilled"
+          ? (affiliationsRes.value as any)?.data
           : null;
 
 
@@ -516,7 +527,21 @@ export function UserProfileProvider({
 
       // 10. Resolve affiliation info (E01-HU11)
       let resolvedAffiliation: AffiliationInfo | null = null;
-      if (myProfileData) {
+      if (explicitAffiliationData) {
+        // Handle case where companies might be an array or object
+        const companyData = Array.isArray(explicitAffiliationData.companies) 
+          ? explicitAffiliationData.companies[0] 
+          : explicitAffiliationData.companies;
+          
+        resolvedAffiliation = {
+          name: companyData?.name || explicitAffiliationData.company_name_snapshot || "Company",
+          id: explicitAffiliationData.company_id,
+          status: explicitAffiliationData.status,
+          logo: companyData?.logo_url || null,
+          location: companyData?.location || null
+        };
+        setAffiliationInfo(resolvedAffiliation);
+      } else if (myProfileData) {
         const aff =
           myProfileData.affiliation ||
           myProfileData.company_affiliation ||
@@ -541,8 +566,11 @@ export function UserProfileProvider({
         const affStatus =
           aff?.status ||
           aff?.affiliation_status ||
+          aff?.affiliationStatus ||
           myProfileData.affiliation_status ||
+          myProfileData.affiliationStatus ||
           myProfileData.company_link_status ||
+          myProfileData.companyLinkStatus ||
           (compId ? "pending" : "active");
 
         if (compName) {
