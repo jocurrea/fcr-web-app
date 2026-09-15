@@ -360,7 +360,8 @@ export default function OnboardingPage() {
           contactEmail: personalData?.email || session.user.email,
           contactPhone: personalData?.phone || null,
           locationCity: personalData?.city || personalData?.location || "Not specified",
-          locationCountry: personalData?.country || "Not specified",
+          locationCountry: personalData?.country || "United States",
+          locationCountryCode: "US",
           ...(isAviationPro && validProfessionalTitleKey ? {
             professionalCredentials: personalData?.professionalCredentials || [],
             bio: personalData?.summary || null,
