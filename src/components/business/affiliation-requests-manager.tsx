@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Building2,
   Check,
@@ -56,11 +57,55 @@ interface AffiliationRequestsManagerProps {
   hideHeader?: boolean;
 }
 
+const formatRole = (rawRole?: string | null) => {
+  if (!rawRole) return "Operations Specialist";
+  const ROLE_MAP: Record<string, string> = {
+    operations_officer: "Operations Officer",
+    aircraft_mechanic: "Aircraft Mechanic",
+    air_traffic_controller: "Air Traffic Controller",
+    aeronautical_engineer: "Aeronautical Engineer",
+    aviation_professional: "Aviation Professional",
+    flight_crew: "Flight Crew",
+    pilot: "Pilot",
+    cabin_crew: "Cabin Crew",
+  };
+  if (ROLE_MAP[rawRole]) return ROLE_MAP[rawRole];
+  return rawRole
+    .replace(/[_-]/g, " ")
+    .split(" ")
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
+};
+
+const formatRequestDate = (dateStr?: string | null) => {
+  if (!dateStr) return "Recently";
+  try {
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+    if (diffInSeconds < 3600) return "Recently";
+    const diffInHours = Math.floor(diffInSeconds / 3600);
+    if (diffInHours === 1) return "1 hour ago";
+    if (diffInHours < 24) return `${diffInHours} hours ago`;
+    const diffInDays = Math.floor(diffInHours / 24);
+    if (diffInDays === 1) return "Yesterday";
+    if (diffInDays < 7) return `${diffInDays} days ago`;
+    return date.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  } catch {
+    return "Recently";
+  }
+};
+
 export function AffiliationRequestsManager({
   className = "",
   onCountChange,
   hideHeader = false,
 }: AffiliationRequestsManagerProps) {
+  const router = useRouter();
   const supabase = createClient();
   const [requests, setRequests] = useState<AffiliationRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -332,7 +377,7 @@ export function AffiliationRequestsManager({
 
       {/* Requests List */}
       {!isLoading && requests.length > 0 && (
-        <div className="space-y-3">
+        <div className="space-y-4">
           {requests.map((item) => {
             const requestId = item.id || item.affiliation_id;
             const userId = item.user_id || item.professional_id;
@@ -341,127 +386,89 @@ export function AffiliationRequestsManager({
               [item.first_name, item.last_name].filter(Boolean).join(" ") ||
               item.username ||
               "Aviation Professional";
-            const role =
+            const role = formatRole(
               item.requested_role ||
               item.role ||
+              item.user_role ||
               item.position ||
-              item.professional_role ||
-              "Operations Specialist";
+              item.professional_role
+            );
             const avatar = item.profile_image || item.profileImage || item.avatar_url;
-            const requestDate = item.created_at || item.requested_at;
-            const formattedDate = requestDate
-              ? new Date(requestDate).toLocaleDateString("en-US", {
-                  month: "short",
-                  day: "numeric",
-                  year: "numeric",
-                })
-              : "Recently";
+            const companyName = item.company_name || item.company_name_snapshot || "Company";
+            const formattedDate = formatRequestDate(item.created_at || item.requested_at);
 
             const isThisItemProcessing = processingId === requestId;
 
             return (
               <div
                 key={requestId}
-                className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-5 border border-gray-100 shadow-xs hover:shadow-sm transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
+                className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm flex flex-col gap-4"
               >
-                {/* Left Side: Avatar + Details */}
-                <div className="flex items-center gap-3.5 min-w-0 flex-1">
-                  <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl overflow-hidden bg-gray-100 border border-gray-200 shrink-0 flex items-center justify-center shadow-2xs">
-                    {avatar ? (
-                      <img src={avatar} alt={fullName} className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full bg-[#1d4ed8] text-white font-extrabold flex items-center justify-center text-lg sm:text-xl">
-                        {fullName[0]?.toUpperCase() || "A"}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="flex flex-col min-w-0 flex-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h4 className="text-sm sm:text-base font-extrabold text-gray-900 truncate">
-                        {fullName}
-                      </h4>
-                      {userId && (
-                        <Link
-                          href={`/profile/${userId}`}
-                          target="_blank"
-                          className="text-gray-400 hover:text-blue-600 transition-colors p-0.5"
-                          title="View public profile"
-                        >
-                          <ExternalLink className="w-3.5 h-3.5" />
-                        </Link>
-                      )}
+                {/* Cabecera del Usuario (Fila superior) */}
+                <div className="flex items-center gap-4">
+                  {avatar ? (
+                    <img
+                      src={avatar}
+                      alt={fullName}
+                      className="w-14 h-14 rounded-full object-cover shrink-0"
+                    />
+                  ) : (
+                    <div className="w-14 h-14 rounded-full bg-[#1d4ed8] text-white font-bold flex items-center justify-center text-xl shrink-0">
+                      {fullName[0]?.toUpperCase() || "A"}
                     </div>
+                  )}
 
-                    <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-[#eff6ff] text-[#1d4ed8]">
-                        {role}
-                      </span>
-                      <span className="inline-flex items-center gap-1 text-[11px] text-gray-400 font-medium">
-                        <Clock className="w-3 h-3" />
-                        <span>Requested {formattedDate}</span>
-                      </span>
-                    </div>
-
-                    {item.email && (
-                      <span className="text-xs text-gray-500 truncate mt-1">
-                        {item.email}
-                      </span>
-                    )}
+                  <div className="flex flex-col min-w-0">
+                    <h4 className="text-lg font-bold text-gray-900 truncate">
+                      {fullName}
+                    </h4>
+                    <p className="text-sm font-medium text-blue-600 truncate">
+                      {role}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      {companyName} · Requested {formattedDate}
+                    </p>
                   </div>
                 </div>
 
-                {/* Right Side: Action Buttons */}
-                <div className="flex items-center gap-2 w-full sm:w-auto justify-end pt-2 sm:pt-0 border-t sm:border-t-0 border-gray-100">
+                {/* Enlace de Perfil */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (userId) {
+                      router.push(`/profile/${userId}`);
+                    }
+                  }}
+                  className="text-sm font-semibold text-blue-600 hover:text-blue-700 w-fit cursor-pointer"
+                >
+                  View profile
+                </button>
+
+                {/* Botones de Acción (Fila inferior) */}
+                <div className="grid grid-cols-2 gap-4 mt-2">
                   <button
                     type="button"
-                    onClick={() => handleApprove(item)}
+                    onClick={() => openRejectModal(item)}
                     disabled={isThisItemProcessing}
-                    className={cn(
-                      "flex-1 sm:flex-initial py-2.5 px-4 rounded-xl font-bold text-xs sm:text-sm text-white transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer",
-                      isThisItemProcessing && processingAction === "approved"
-                        ? "bg-emerald-600/80 cursor-wait"
-                        : isThisItemProcessing
-                        ? "bg-gray-300 cursor-not-allowed"
-                        : "bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98]"
-                    )}
+                    className="w-full py-3 px-6 rounded-full border border-red-500 text-red-600 font-semibold text-base hover:bg-red-50 transition-colors flex items-center justify-center cursor-pointer disabled:opacity-50"
                   >
-                    {isThisItemProcessing && processingAction === "approved" ? (
-                      <>
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        <span>Approving...</span>
-                      </>
+                    {isThisItemProcessing && processingAction === "rejected" ? (
+                      <Loader2 className="w-5 h-5 animate-spin" />
                     ) : (
-                      <>
-                        <Check className="w-3.5 h-3.5 stroke-[2.5]" />
-                        <span>Approve</span>
-                      </>
+                      "Reject"
                     )}
                   </button>
 
                   <button
                     type="button"
-                    onClick={() => openRejectModal(item)}
+                    onClick={() => handleApprove(item)}
                     disabled={isThisItemProcessing}
-                    className={cn(
-                      "flex-1 sm:flex-initial py-2.5 px-4 rounded-xl font-bold text-xs sm:text-sm text-gray-700 hover:text-red-700 bg-gray-50 hover:bg-red-50/80 border border-gray-200 transition-colors flex items-center justify-center gap-1.5 cursor-pointer",
-                      isThisItemProcessing && processingAction === "rejected"
-                        ? "bg-red-50 text-red-600 cursor-wait"
-                        : isThisItemProcessing
-                        ? "opacity-50 cursor-not-allowed"
-                        : ""
-                    )}
+                    className="w-full py-3 px-6 rounded-full bg-blue-600 text-white font-semibold text-base hover:bg-blue-700 transition-colors flex items-center justify-center shadow-sm cursor-pointer disabled:opacity-50"
                   >
-                    {isThisItemProcessing && processingAction === "rejected" ? (
-                      <>
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        <span>Declining...</span>
-                      </>
+                    {isThisItemProcessing && processingAction === "approved" ? (
+                      <Loader2 className="w-5 h-5 animate-spin" />
                     ) : (
-                      <>
-                        <X className="w-3.5 h-3.5" />
-                        <span>Decline</span>
-                      </>
+                      "Approve"
                     )}
                   </button>
                 </div>
@@ -482,7 +489,7 @@ export function AffiliationRequestsManager({
                 </div>
                 <div>
                   <h3 className="text-base font-extrabold text-gray-900">
-                    Decline Affiliation Request
+                    Reject Affiliation Request
                   </h3>
                   <p className="text-xs text-gray-500">
                     {rejectingItem.full_name ||
@@ -508,7 +515,7 @@ export function AffiliationRequestsManager({
                   htmlFor="reject-reason"
                   className="text-xs font-bold text-gray-700 block"
                 >
-                  Reason for declining (Optional)
+                  Reason for rejection (Optional)
                 </label>
                 <textarea
                   id="reject-reason"
@@ -548,10 +555,10 @@ export function AffiliationRequestsManager({
                   {processingId ? (
                     <>
                       <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      <span>Declining...</span>
+                      <span>Rejecting...</span>
                     </>
                   ) : (
-                    <span>Confirm Decline</span>
+                    <span>Confirm Reject</span>
                   )}
                 </button>
               </div>

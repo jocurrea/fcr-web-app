@@ -484,11 +484,12 @@ export async function getPendingCompanyAffiliationRequestsAction(): Promise<{ su
     // 1. Get the company owned by this user
     const { data: companies } = await supabase
       .from("companies")
-      .select("id")
+      .select("id, name")
       .eq("owner_user_id", user.id)
       .limit(1);
 
-    const companyId = companies?.[0]?.id;
+    const activeCompany = companies?.[0];
+    const companyId = activeCompany?.id;
     if (!companyId) {
       return { success: true, data: [] };
     }
@@ -503,10 +504,11 @@ export async function getPendingCompanyAffiliationRequestsAction(): Promise<{ su
           user_id,
           professional_id,
           company_id,
+          company_name_snapshot,
           status,
           created_at,
           requested_role,
-          user:users(firstName, lastName, username, profileImage, email, location)
+          user:users(firstName, lastName, username, profileImage, email, location, role, professionalRole, professionalTitleKey)
         `)
         .eq("company_id", companyId)
         .eq("status", "pending")
@@ -522,6 +524,7 @@ export async function getPendingCompanyAffiliationRequestsAction(): Promise<{ su
         user_id: req.user_id,
         professional_id: req.professional_id,
         company_id: req.company_id,
+        company_name: req.company_name_snapshot || activeCompany?.name || "Company",
         status: req.status,
         created_at: req.created_at,
         requested_role: req.requested_role,
@@ -532,6 +535,7 @@ export async function getPendingCompanyAffiliationRequestsAction(): Promise<{ su
         profile_image: req.user?.profileImage || null,
         email: req.user?.email || null,
         location: req.user?.location || null,
+        user_role: req.user?.professionalTitleKey || req.user?.role || req.user?.professionalRole || null,
       }));
 
       return { success: true, data: mappedData };
