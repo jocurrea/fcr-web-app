@@ -359,9 +359,9 @@ export default function ProfilePage() {
     : [];
 
   const affiliationName = affiliationInfo?.name || personal?.companyName || personal?.linkedCompany || null;
-  const hasAffiliationId = Boolean(affiliationInfo?.id);
-  const isAffiliationVerified = hasAffiliationId && (affiliationInfo?.status === "active" || affiliationInfo?.status === "approved");
-  const isAffiliationPending = hasAffiliationId && affiliationInfo?.status === "pending";
+  const derivedStatus = affiliationInfo?.status || personal?.companyStatus || (affiliationName ? "pending" : null);
+  const isAffiliationVerified = derivedStatus === "active" || derivedStatus === "approved" || derivedStatus === "verified";
+  const isAffiliationPending = derivedStatus === "pending" || derivedStatus === "unverified";
 
   const completionPercentage = profileProgress;
 
