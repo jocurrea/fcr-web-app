@@ -637,35 +637,40 @@ export async function reviewCompanyAffiliationRequestAction(
     }
 
     // 1. First, attempt to call the official RPC review_company_affiliation_request
+    // Note: PostgREST schema cache expects (affiliation_id, decision, rejection_reason)
     const rpcAttempts = [
-      { id: requestId, decision, rejection_reason: rejectionReason || null },
-      { request_id: requestId, decision, rejection_reason: rejectionReason || null },
       { affiliation_id: requestId, decision, rejection_reason: rejectionReason || null },
+      { affiliation_id: requestId, decision },
+      { id: requestId, decision, rejection_reason: rejectionReason || null },
+      { id: requestId, decision },
+      { request_id: requestId, decision, rejection_reason: rejectionReason || null },
+      { request_id: requestId, decision },
+      { p_affiliation_id: requestId, p_decision: decision, p_rejection_reason: rejectionReason || null },
+      { p_affiliation_id: requestId, p_decision: decision },
       { p_id: requestId, p_decision: decision, p_rejection_reason: rejectionReason || null },
       { p_request_id: requestId, p_decision: decision, p_rejection_reason: rejectionReason || null },
-      { p_affiliation_id: requestId, p_decision: decision, p_rejection_reason: rejectionReason || null },
       { p_affiliation_id: requestId, p_status: decision, p_reason: rejectionReason || null },
       { affiliation_id: requestId, status: decision, reason: rejectionReason || null },
       { affiliation_id: requestId, status: decision === "approved" ? "verified" : "rejected", reason: rejectionReason || null },
       { p_affiliation_id: requestId, p_status: decision === "approved" ? "verified" : "rejected", p_reason: rejectionReason || null },
-      { id: requestId, decision },
-      { request_id: requestId, decision },
-      { affiliation_id: requestId, decision },
-      { p_id: requestId, p_decision: decision },
-      { p_affiliation_id: requestId, p_decision: decision },
-      { p_affiliation_id: requestId, p_status: decision },
-      { affiliation_id: requestId, status: decision },
     ];
 
     let rpcSucceeded = false;
+    let lastRpcError: any = null;
+
     for (const params of rpcAttempts) {
       try {
         const { error } = await supabase.rpc("review_company_affiliation_request", params);
         if (!error) {
           rpcSucceeded = true;
           break;
+        } else {
+          lastRpcError = error;
+          console.warn("[review_company_affiliation_request RPC attempt notice]:", params, error.message);
         }
-      } catch {}
+      } catch (err: any) {
+        lastRpcError = err;
+      }
 
       if (!rpcSucceeded && process.env.SUPABASE_SERVICE_ROLE_KEY) {
         try {
