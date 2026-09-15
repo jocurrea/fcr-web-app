@@ -821,9 +821,20 @@ export default function ProfilePage() {
           </h1>
 
           {/* Role in blue */}
-          <p className="text-sm sm:text-base font-bold text-[#1d4ed8] mt-1 capitalize">
-            {roleLabel}
-          </p>
+          <div className="flex items-center justify-center gap-2 mt-1">
+            <p className="text-sm sm:text-base font-bold text-[#1d4ed8] capitalize">
+              {roleLabel}
+            </p>
+            {isAviationProfessional && (
+              <Link
+                href="/onboarding?edit=true&step=1"
+                className="text-[#1d4ed8] hover:text-[#1e40af] transition-colors p-1"
+                title="Edit Professional Type"
+              >
+                <Pencil className="w-3.5 h-3.5" />
+              </Link>
+            )}
+          </div>
 
 
 
