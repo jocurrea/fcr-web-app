@@ -630,36 +630,43 @@ export async function reviewCompanyAffiliationRequestAction(
 
     const p_status = decision === "approved" ? "verified" : "rejected";
     const rpcAttempts = [
-      // Combinations from the architecture doc
+      // 3-arity
       { id: requestId, decision: decision, rejection_reason: rejectionReason || null },
       { id: requestId, status: p_status, rejection_reason: rejectionReason || null },
       { id: requestId, status: p_status, reason: rejectionReason || null },
-      
-      // Combinations with affiliation_id
       { affiliation_id: requestId, decision: decision, rejection_reason: rejectionReason || null },
       { affiliation_id: requestId, status: p_status, rejection_reason: rejectionReason || null },
       { affiliation_id: requestId, status: p_status, reason: rejectionReason || null },
       { affiliation_id: requestId, decision: decision, reason: rejectionReason || null },
-      
-      // Combinations with request_id
       { request_id: requestId, decision: decision, rejection_reason: rejectionReason || null },
       { request_id: requestId, status: p_status, rejection_reason: rejectionReason || null },
       { request_id: requestId, status: p_status, reason: rejectionReason || null },
-
-      // Combinations with p_ prefix (what we created in the SQL script)
       { p_affiliation_id: requestId, p_status: p_status, p_reason: rejectionReason || null },
       { p_id: requestId, p_decision: decision, p_rejection_reason: rejectionReason || null },
+      
+      // 2-arity (in case reason is omitted completely)
+      { id: requestId, decision: decision },
+      { id: requestId, status: p_status },
+      { affiliation_id: requestId, decision: decision },
+      { affiliation_id: requestId, status: p_status },
+      { request_id: requestId, decision: decision },
+      { request_id: requestId, status: p_status },
+      { p_affiliation_id: requestId, p_status: p_status },
+      { p_id: requestId, p_decision: decision }
     ];
 
     let rpcSucceeded = false;
     let lastRpcError: any = null;
 
     for (const params of rpcAttempts) {
+      // Remove null keys to prevent strict arity mismatch in PostgREST
+      const cleanParams = Object.fromEntries(Object.entries(params).filter(([_, v]) => v !== null));
+      
       try {
-        const { error } = await supabase.rpc("review_company_affiliation_request", params);
+        const { error } = await supabase.rpc("review_company_affiliation_request", cleanParams);
         if (!error) {
           rpcSucceeded = true;
-          console.log("SUCCESSFULLY FOUND RPC SIGNATURE:", Object.keys(params));
+          console.log("SUCCESSFULLY FOUND RPC SIGNATURE:", Object.keys(cleanParams));
           break;
         } else {
           lastRpcError = error;
@@ -670,20 +677,26 @@ export async function reviewCompanyAffiliationRequestAction(
     }
 
     if (!rpcSucceeded && process.env.SUPABASE_SERVICE_ROLE_KEY) {
-      for (const params of rpcAttempts) {
-        try {
-          const adminClient = createAdminClient();
-          const { error: adminError } = await adminClient.rpc("review_company_affiliation_request", params);
-          if (!adminError) {
-            rpcSucceeded = true;
-            console.log("SUCCESSFULLY FOUND RPC SIGNATURE (ADMIN):", Object.keys(params));
-            break;
-          } else {
-            lastRpcError = adminError;
-          }
-        } catch (err: any) {
-          lastRpcError = err;
+      try {
+        const adminClient = createAdminClient();
+        const { error: directError } = await adminClient
+          .from("company_affiliations")
+          .update({ 
+            status: p_status, 
+            rejection_reason: rejectionReason || null,
+            reviewed_at: new Date().toISOString(),
+            reviewed_by_user_id: user.id
+          })
+          .eq("id", requestId);
+          
+        if (!directError) {
+          rpcSucceeded = true;
+          console.log("SUCCESSFULLY UPDATED VIA ADMIN CLIENT DIRECT MUTATION");
+        } else {
+          lastRpcError = directError;
         }
+      } catch (err: any) {
+        lastRpcError = err;
       }
     }
 
