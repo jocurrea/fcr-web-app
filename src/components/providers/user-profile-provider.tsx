@@ -222,12 +222,19 @@ export function UserProfileProvider({
             .limit(1),
           supabase
             .from("company_affiliations")
-            .select("id, status, company_id, company_name_snapshot, company:companies(name, logo_url, location)")
+            .select("*, companies(*)")
             .eq("user_id", userId)
             .order("created_at", { ascending: false })
             .limit(1)
             .maybeSingle(),
         ]);
+        
+      if (affiliationsRes.status === "rejected") {
+        console.error("Affiliation Join Query Rejected:", affiliationsRes.reason);
+      } else if (affiliationsRes.status === "fulfilled" && (affiliationsRes.value as any)?.error) {
+        console.error("Affiliation Join Error from Supabase:", (affiliationsRes.value as any).error);
+      }
+
 
       const myProfileData =
         myProfileRes.status === "fulfilled" ? myProfileRes.value?.data : null;
@@ -526,10 +533,10 @@ export function UserProfileProvider({
       // 10. Resolve affiliation info (E01-HU11)
       let resolvedAffiliation: AffiliationInfo | null = null;
       if (explicitAffiliationData) {
-        // Handle case where company might be an array or object
-        const companyData = Array.isArray(explicitAffiliationData.company) 
-          ? explicitAffiliationData.company[0] 
-          : explicitAffiliationData.company;
+        // Handle case where companies might be an array or object
+        const companyData = Array.isArray(explicitAffiliationData.companies) 
+          ? explicitAffiliationData.companies[0] 
+          : explicitAffiliationData.companies;
           
         resolvedAffiliation = {
           name: companyData?.name || explicitAffiliationData.company_name_snapshot || "Company Name",
