@@ -1,0 +1,98 @@
+{
+  "userId": "02eeab7b-c332-44cb-82ab-53a2bc8bbd6f",
+  "getMyProfileData": {
+    "skills": [],
+    "account": {
+      "id": "02eeab7b-c332-44cb-82ab-53a2bc8bbd6f",
+      "email": "aviation2026@gmail.com",
+      "created": "2026-09-15T19:07:21.243029+00:00",
+      "isBanned": 0,
+      "lastName": "Peña",
+      "username": null,
+      "firstName": "Antoniooo",
+      "onboarded": 1,
+      "middleName": null,
+      "accountType": "flight_crew",
+      "platformRole": "user",
+      "profileImage": "https://nkimdpkoiviqdccweuoo.supabase.co/storage/v1/object/public/uploads/avatars/02eeab7b-c332-44cb-82ab-53a2bc8bbd6f/1789499264331-v4u68vd.png",
+      "faceIdEnabled": true,
+      "acceptedTermsAt": "2026-09-15T20:17:31.155+00:00",
+      "professionalRole": "aviation_professional"
+    },
+    "ratings": [],
+    "licenses": [],
+    "education": [],
+    "languages": [
+      {
+        "id": "d7f40b9e-3722-4f6a-a0df-318f8eecef52",
+        "name": "Spanish",
+        "userId": "02eeab7b-c332-44cb-82ab-53a2bc8bbd6f",
+        "sortOrder": 0,
+        "created_at": "2026-09-15T19:43:33.754459+00:00",
+        "updated_at": "2026-09-15T19:43:33.754459+00:00",
+        "proficiency": null
+      }
+    ],
+    "affiliations": [
+      {
+        "id": "34658604-6aa5-4d7b-85a1-aff17036d142",
+        "source": "self_request",
+        "status": "verified",
+        "companyId": "9f758820-ee1d-4369-bf1a-e16795f10250",
+        "isPrimary": true,
+        "reviewedAt": "2026-09-15T20:14:49.456259+00:00",
+        "companyLogo": "https://nkimdpkoiviqdccweuoo.supabase.co/storage/v1/object/public/uploads/companies/1789398761816_1rce1qj.png",
+        "companyName": "Ferrari",
+        "requestedAt": "2026-09-15T19:20:29.360823+00:00",
+        "companyLocation": "Miami",
+        "rejectionReason": null
+      }
+    ],
+    "sharedProfile": {
+      "id": "c0b17fb4-4424-49f2-bb27-9da3360e02ad",
+      "bio": null,
+      "awards": [],
+      "userId": "02eeab7b-c332-44cb-82ab-53a2bc8bbd6f",
+      "websites": [],
+      "created_at": "2026-09-15T19:07:30.494895+00:00",
+      "updated_at": "2026-09-15T19:43:33.754459+00:00",
+      "contactEmail": "aviation2026@gmail.com",
+      "contactPhone": "1111111111112",
+      "locationCity": "Caracas",
+      "contactAddress": null,
+      "locationCountry": "Venezuela",
+      "nationalityCountry": null,
+      "locationCountryCode": "US",
+      "nationalityCountryCode": null
+    },
+    "workExperiences": [],
+    "flightCrewProfile": null,
+    "aviationProfessionalProfile": {
+      "userId": "02eeab7b-c332-44cb-82ab-53a2bc8bbd6f",
+      "created_at": "2026-09-15T19:07:30.494895+00:00",
+      "updated_at": "2026-09-15T19:43:34.487033+00:00",
+      "professionalTitle": {
+        "key": "operations_officer",
+        "label": "Operations Officer",
+        "is_active": true,
+        "created_at": "2026-08-14T14:00:41.114182+00:00",
+        "sort_order": 10,
+        "updated_at": "2026-08-14T14:00:41.114182+00:00",
+        "professional_role": "aviation_professional",
+        "allows_custom_text": false
+      },
+      "professionalTitleKey": "operations_officer",
+      "professionalTitleOther": null,
+      "workAvailabilityStatus": "available_for_work",
+      "professionalCredentials": []
+    }
+  },
+  "getMyProfileError": null,
+  "directAffiliationData": null,
+  "directAffiliationError": {
+    "code": "42501",
+    "details": null,
+    "hint": "Grant the required privileges to the current role with: GRANT SELECT ON public.company_affiliations TO authenticated;",
+    "message": "permission denied for table company_affiliations"
+  }
+}

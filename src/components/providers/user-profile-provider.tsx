@@ -546,20 +546,24 @@ export function UserProfileProvider({
           myProfileData.affiliation ||
           myProfileData.company_affiliation ||
           (Array.isArray(myProfileData.affiliations) ? myProfileData.affiliations[0] : null) ||
-          (myProfileData.company_name || myProfileData.company ? myProfileData : null);
+          (myProfileData.company_name || myProfileData.companyName || myProfileData.company ? myProfileData : null);
 
         const compName =
+          aff?.companyName ||
           aff?.company_name ||
           aff?.company?.name ||
           aff?.name ||
+          myProfileData.companyName ||
           myProfileData.company_name ||
           myProfileData.company?.name ||
           null;
 
         const compId =
+          aff?.companyId ||
           aff?.company_id ||
           aff?.company?.id ||
           aff?.id ||
+          myProfileData.companyId ||
           myProfileData.company_id ||
           null;
 
@@ -578,7 +582,8 @@ export function UserProfileProvider({
             name: compName,
             id: compId,
             status: affStatus,
-            logo: aff?.logo_url || aff?.company?.logo_url || null,
+            logo: aff?.companyLogo || aff?.logo_url || aff?.company?.logo_url || null,
+            location: aff?.companyLocation || aff?.location || aff?.company?.location || null,
           };
           setAffiliationInfo(resolvedAffiliation);
         }
