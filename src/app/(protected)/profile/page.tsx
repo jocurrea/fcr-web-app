@@ -1059,22 +1059,34 @@ export default function ProfilePage() {
             onClick={() => router.push("/business/affiliate")}
             className="bg-white rounded-[20px] p-4 flex items-center gap-4 shadow-sm border border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors"
           >
-            <div className="w-10 h-10 rounded-full bg-[#F0F4FF] flex items-center justify-center flex-shrink-0">
-              <BuildingOfficeIcon className="w-5 h-5 text-blue-500" />
+            <div className="w-12 h-12 rounded-xl overflow-hidden bg-gray-50 border border-gray-100 flex items-center justify-center flex-shrink-0">
+              {(isAffiliationVerified || isAffiliationPending) && affiliationInfo?.logo ? (
+                <img src={affiliationInfo.logo} alt="Company Logo" className="w-full h-full object-cover" />
+              ) : (
+                <BuildingOfficeIcon className="w-6 h-6 text-gray-400" />
+              )}
             </div>
-            <div className="flex-1">
-              <h4 className="text-[15px] font-bold text-gray-900">
+            <div className="flex-1 min-w-0">
+              <h4 className="text-[15px] font-bold text-gray-900 truncate">
                 {affiliationName || "Link your employer"}
               </h4>
-              <p className="text-[13px] text-gray-500 leading-tight mt-0.5">
-                {affiliationName
-                  ? isAffiliationPending
-                    ? "Pending Verification"
-                    : isAffiliationVerified
-                    ? "Verified Company"
-                    : "Search registered companies and request verification."
-                  : "Search registered companies and request verification."}
-              </p>
+              <div className="mt-1 flex items-center">
+                {isAffiliationPending ? (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-amber-100 text-amber-800">
+                    <Clock className="w-3 h-3 mr-1" />
+                    Pending Verification
+                  </span>
+                ) : isAffiliationVerified ? (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-green-100 text-green-800">
+                    <CheckCircle2 className="w-3 h-3 mr-1" />
+                    Verified Company
+                  </span>
+                ) : (
+                  <span className="text-[13px] text-gray-500">
+                    {affiliationName ? "Unverified Employer" : "Request company verification."}
+                  </span>
+                )}
+              </div>
             </div>
             <ChevronRightIcon className="w-5 h-5 text-gray-400 flex-shrink-0" />
           </div>

@@ -212,6 +212,7 @@ export default function BusinessAffiliatePage() {
       }
 
       // Smooth redirection back to profile only after success
+      router.refresh();
       setTimeout(() => {
         router.push("/profile");
       }, 1200);
