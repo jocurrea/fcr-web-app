@@ -494,60 +494,102 @@ export async function getPendingCompanyAffiliationRequestsAction(): Promise<{ su
       return { success: true, data: [] };
     }
 
-    // 2. Fetch the pending requests via admin client to bypass RLS issues and RPC issues
-    if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
-      const adminClient = createAdminClient();
-      const { data, error } = await adminClient
-        .from("company_affiliations")
-        .select(`
-          id,
-          user_id,
-          professional_id,
-          company_id,
-          company_name_snapshot,
-          status,
-          created_at,
-          requested_role,
-          user:users(firstName, lastName, username, profileImage, email, location, role, professionalRole, professionalTitleKey)
-        `)
-        .eq("company_id", companyId)
-        .eq("status", "pending")
-        .order("created_at", { ascending: false });
+    const companyName = activeCompany?.name || "Company";
 
-      if (error) {
-        throw error;
+    // 2. Fetch pending requests: try direct query or RPC
+    let rawRequests: any[] = [];
+
+    // Try direct query first
+    const { data: directData, error: directError } = await supabase
+      .from("company_affiliations")
+      .select("id, user_id, professional_id, company_id, company_name_snapshot, status, created_at, requested_at, requested_role")
+      .eq("company_id", companyId)
+      .eq("status", "pending")
+      .order("created_at", { ascending: false });
+
+    if (!directError && Array.isArray(directData) && directData.length > 0) {
+      rawRequests = directData;
+    } else {
+      // Try official RPC
+      const { data: rpcData, error: rpcError } = await supabase.rpc("get_pending_company_affiliation_requests");
+      if (!rpcError && Array.isArray(rpcData)) {
+        rawRequests = rpcData;
+      } else if (directData) {
+        rawRequests = directData;
       }
+    }
 
-      // Map the output to match what the UI expects (AffiliationRequest interface)
-      const mappedData = (data || []).map((req: any) => ({
+    // 3. Fetch user profiles for all applicant user_ids so we have real names and photos
+    const userIds = Array.from(
+      new Set(rawRequests.map((r: any) => r.user_id || r.professional_id || r.userId).filter(Boolean))
+    );
+
+    let usersMap: Record<string, any> = {};
+    if (userIds.length > 0) {
+      const { data: userRows } = await supabase
+        .from("users")
+        .select("id, firstName, lastName, username, profileImage, email, location, role, professionalRole, professionalTitleKey")
+        .in("id", userIds);
+
+      if (userRows) {
+        for (const u of userRows) {
+          usersMap[u.id] = u;
+        }
+      }
+    }
+
+    // 4. Map the output to match what the UI expects (AffiliationRequest interface)
+    const mappedData = rawRequests.map((req: any) => {
+      const uId = req.user_id || req.professional_id || req.userId;
+      const u = (uId ? usersMap[uId] : null) || req.user || {};
+      const firstName = u.firstName || u.first_name || req.first_name || req.firstName || "";
+      const lastName = u.lastName || u.last_name || req.last_name || req.lastName || "";
+      const fullName = [firstName, lastName].filter(Boolean).join(" ") || u.name || req.full_name || req.fullName || u.username || req.username || "Aviation Professional";
+      const reqCompanyName = req.company?.name || req.company_name || req.company_name_snapshot || companyName;
+
+      return {
         id: req.id,
-        user_id: req.user_id,
-        professional_id: req.professional_id,
-        company_id: req.company_id,
-        company_name: req.company_name_snapshot || activeCompany?.name || "Company",
-        status: req.status,
-        created_at: req.created_at,
-        requested_role: req.requested_role,
-        first_name: req.user?.firstName || null,
-        last_name: req.user?.lastName || null,
-        full_name: [req.user?.firstName, req.user?.lastName].filter(Boolean).join(" ") || null,
-        username: req.user?.username || null,
-        profile_image: req.user?.profileImage || null,
-        email: req.user?.email || null,
-        location: req.user?.location || null,
-        user_role: req.user?.professionalTitleKey || req.user?.role || req.user?.professionalRole || null,
-      }));
+        affiliation_id: req.id,
+        user_id: uId,
+        professional_id: uId,
+        company_id: req.company_id || companyId,
+        company_name: reqCompanyName,
+        status: req.status || "pending",
+        created_at: req.created_at || req.requested_at || new Date().toISOString(),
+        requested_at: req.requested_at || req.created_at || new Date().toISOString(),
+        requested_role: req.requested_role || u.professionalTitleKey || u.role || u.professionalRole || null,
+        first_name: firstName,
+        last_name: lastName,
+        full_name: fullName,
+        username: u.username || req.username || null,
+        profile_image: u.profileImage || u.profile_image || req.profile_image || req.profileImage || null,
+        email: u.email || req.email || null,
+        location: u.location || req.location || null,
+        user_role: u.professionalTitleKey || u.role || u.professionalRole || req.requested_role || null,
+        user: {
+          id: uId,
+          first_name: firstName,
+          last_name: lastName,
+          firstName: firstName,
+          lastName: lastName,
+          name: fullName,
+          fullName: fullName,
+          username: u.username || req.username || null,
+          profile_image: u.profileImage || u.profile_image || null,
+          profileImage: u.profileImage || u.profile_image || null,
+          email: u.email || req.email || null,
+          role: u.role || null,
+          professionalRole: u.professionalRole || null,
+          professionalTitleKey: u.professionalTitleKey || null,
+        },
+        company: {
+          id: req.company_id || companyId,
+          name: reqCompanyName,
+        },
+      };
+    });
 
-      return { success: true, data: mappedData };
-    }
-
-    // If no service key, fallback to standard RPC
-    const { data: rpcData, error: rpcError } = await supabase.rpc("get_pending_company_affiliation_requests");
-    if (!rpcError && rpcData) {
-      return { success: true, data: rpcData };
-    }
-    
-    return { success: false, error: rpcError?.message || "Failed to fetch pending requests." };
+    return { success: true, data: mappedData };
   } catch (err: any) {
     console.error("getPendingCompanyAffiliationRequestsAction exception:", err);
     return { success: false, error: err?.message || "An unexpected error occurred." };

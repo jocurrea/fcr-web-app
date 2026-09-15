@@ -77,26 +77,18 @@ const formatRole = (rawRole?: string | null) => {
     .join(" ");
 };
 
-const formatRequestDate = (dateStr?: string | null) => {
-  if (!dateStr) return "Recently";
+const formatSpanishDate = (dateStr?: string | null) => {
+  if (!dateStr) return "recientemente";
   try {
     const date = new Date(dateStr);
-    const now = new Date();
-    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
-    if (diffInSeconds < 3600) return "Recently";
-    const diffInHours = Math.floor(diffInSeconds / 3600);
-    if (diffInHours === 1) return "1 hour ago";
-    if (diffInHours < 24) return `${diffInHours} hours ago`;
-    const diffInDays = Math.floor(diffInHours / 24);
-    if (diffInDays === 1) return "Yesterday";
-    if (diffInDays < 7) return `${diffInDays} days ago`;
-    return date.toLocaleDateString("en-US", {
-      month: "short",
+    if (isNaN(date.getTime())) return "recientemente";
+    return new Intl.DateTimeFormat("es-ES", {
       day: "numeric",
+      month: "short",
       year: "numeric",
-    });
+    }).format(date);
   } catch {
-    return "Recently";
+    return "recientemente";
   }
 };
 
@@ -380,22 +372,56 @@ export function AffiliationRequestsManager({
         <div className="space-y-4">
           {requests.map((item) => {
             const requestId = item.id || item.affiliation_id;
-            const userId = item.user_id || item.professional_id;
+            const targetUserId = item.user_id || item.user?.id || item.professional_id;
+
+            const userObj = item.user || {};
+            const firstName =
+              userObj.first_name ||
+              userObj.firstName ||
+              item.first_name ||
+              item.firstName ||
+              "";
+            const lastName =
+              userObj.last_name ||
+              userObj.lastName ||
+              item.last_name ||
+              item.lastName ||
+              "";
             const fullName =
+              [firstName, lastName].filter(Boolean).join(" ") ||
               item.full_name ||
-              [item.first_name, item.last_name].filter(Boolean).join(" ") ||
+              item.fullName ||
+              userObj.name ||
+              userObj.fullName ||
+              userObj.username ||
               item.username ||
               "Aviation Professional";
+
             const role = formatRole(
+              userObj.professionalTitleKey ||
+              userObj.role ||
+              userObj.professionalRole ||
               item.requested_role ||
               item.role ||
               item.user_role ||
               item.position ||
               item.professional_role
             );
-            const avatar = item.profile_image || item.profileImage || item.avatar_url;
-            const companyName = item.company_name || item.company_name_snapshot || "Company";
-            const formattedDate = formatRequestDate(item.created_at || item.requested_at);
+
+            const avatar =
+              userObj.profile_image ||
+              userObj.profileImage ||
+              item.profile_image ||
+              item.profileImage ||
+              item.avatar_url;
+
+            const companyName =
+              item.company?.name ||
+              item.company_name ||
+              item.company_name_snapshot ||
+              "Company";
+
+            const formattedDate = formatSpanishDate(item.created_at || item.requested_at);
 
             const isThisItemProcessing = processingId === requestId;
 
@@ -432,17 +458,12 @@ export function AffiliationRequestsManager({
                 </div>
 
                 {/* Enlace de Perfil */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (userId) {
-                      router.push(`/profile/${userId}`);
-                    }
-                  }}
-                  className="text-sm font-semibold text-blue-600 hover:text-blue-700 w-fit cursor-pointer"
+                <Link
+                  href={targetUserId ? `/profile/${targetUserId}` : "#"}
+                  className="text-sm font-semibold text-blue-600 hover:text-blue-700 w-fit"
                 >
                   View profile
-                </button>
+                </Link>
 
                 {/* Botones de Acción (Fila inferior) */}
                 <div className="grid grid-cols-2 gap-4 mt-2">
