@@ -65,52 +65,44 @@ export default function AffiliatedProfessionalsPage() {
           return;
         }
 
-        // 2. Query approved affiliations for this company
-        const { data: affiliations, error } = await supabase
-          .from("company_affiliations")
-          .select("id, user_id, role, position, created_at, status")
-          .eq("company_id", company.id)
-          .in("status", ["active", "approved"])
-          .order("created_at", { ascending: false });
+        // 2. Get approved affiliations via RPC (direct table access is blocked by RLS)
+        const { data: rpcData, error: rpcError } = await supabase.rpc(
+          "get_company_affiliated_professionals",
+          { target_company_id: company.id }
+        );
 
-        if (error || !affiliations || affiliations.length === 0) {
+        if (rpcError) {
+          console.error("[Professionals] RPC error:", rpcError.message);
           setProfessionals([]);
           return;
         }
 
-        const userIds = affiliations.map((a) => a.user_id).filter(Boolean);
-        if (userIds.length === 0) {
+        const affiliations = Array.isArray(rpcData) ? rpcData : [];
+
+        if (affiliations.length === 0) {
           setProfessionals([]);
           return;
         }
 
-        // 3. Fetch user details for these affiliated users
-        const { data: usersData } = await supabase
-          .from("users")
-          .select("id, firstName, lastName, username, profileImage, location, email, accountType")
-          .in("id", userIds);
-
-        const usersMap = new Map((usersData || []).map((u) => [u.id, u]));
-
-        const formatted: AffiliatedProfessional[] = affiliations.map((aff) => {
-          const usr = usersMap.get(aff.user_id) as any;
+        const formatted: AffiliatedProfessional[] = affiliations.map((item: any) => {
           const fullName =
-            [usr?.firstName, usr?.lastName].filter(Boolean).join(" ").trim() ||
-            usr?.username ||
+            [item.first_name, item.last_name].filter(Boolean).join(" ").trim() ||
+            item.username ||
+            item.full_name ||
             "Aviation Professional";
 
           return {
-            id: aff.user_id,
-            user_id: aff.user_id,
-            firstName: usr?.firstName,
-            lastName: usr?.lastName,
+            id: item.user_id || item.id,
+            user_id: item.user_id,
+            firstName: item.first_name,
+            lastName: item.last_name,
             fullName,
-            username: usr?.username,
-            role: aff.role || aff.position || "Aviation Specialist",
-            profileImage: usr?.profileImage || null,
-            location: usr?.location || null,
-            email: usr?.email || null,
-            affiliatedSince: aff.created_at,
+            username: item.username,
+            role: item.role || item.position || "Aviation Specialist",
+            profileImage: item.profile_image || item.profileImage || null,
+            location: item.location || null,
+            email: item.email || null,
+            affiliatedSince: item.created_at,
           };
         });
 
