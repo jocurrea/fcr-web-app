@@ -423,7 +423,32 @@ export async function getCompanyInvitationsAction(
       return { success: false, error: "Unauthorized." };
     }
 
-    // 1. Try RPC get_company_affiliation_invitations (canonical authorized RPC)
+    // 1. Primary: Direct query from company_invitations for complete history (pending, revoked, accepted, etc.)
+    const { data, error } = await supabase
+      .from("company_invitations")
+      .select("id, company_id, invited_email, status, expires_at, created_at")
+      .eq("company_id", companyId)
+      .order("created_at", { ascending: false });
+
+    if (!error && data && data.length > 0) {
+      return { success: true, data };
+    }
+
+    // 2. Admin client fallback if RLS prevents reading all statuses
+    if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      const adminClient = createAdminClient();
+      const { data: adminData, error: adminErr } = await adminClient
+        .from("company_invitations")
+        .select("id, company_id, invited_email, status, expires_at, created_at")
+        .eq("company_id", companyId)
+        .order("created_at", { ascending: false });
+
+      if (!adminErr && adminData && adminData.length > 0) {
+        return { success: true, data: adminData };
+      }
+    }
+
+    // 3. Try RPC get_company_affiliation_invitations as fallback
     const { data: rpcData, error: rpcError } = await supabase.rpc(
       "get_company_affiliation_invitations"
     );
@@ -431,29 +456,8 @@ export async function getCompanyInvitationsAction(
       return { success: true, data: rpcData };
     }
 
-    // 2. Try caller session select from company_invitations
-    const { data, error } = await supabase
-      .from("company_invitations")
-      .select("id, company_id, invited_email, status, expires_at, created_at")
-      .eq("company_id", companyId)
-      .order("created_at", { ascending: false });
-
     if (!error && data) {
       return { success: true, data };
-    }
-
-    // 3. Fallback admin client
-    if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
-      const adminClient = createAdminClient();
-      const { data: adminData } = await adminClient
-        .from("company_invitations")
-        .select("id, company_id, invited_email, status, expires_at, created_at")
-        .eq("company_id", companyId)
-        .order("created_at", { ascending: false });
-
-      if (adminData) {
-        return { success: true, data: adminData };
-      }
     }
 
     return { success: false, error: "Failed to fetch company invitations." };

@@ -58,44 +58,26 @@ function parseValidDate(val: any): Date | null {
   }
   if (typeof val === "string") {
     const trimmed = val.trim();
-    if (!trimmed || trimmed === "Invalid Date") return null;
-
-    // Convert SQL timestamp string 'YYYY-MM-DD HH:mm:ss' to ISO format
-    const normalized =
-      trimmed.includes(" ") && !trimmed.includes("T")
-        ? trimmed.replace(" ", "T")
-        : trimmed;
-
-    const d = new Date(normalized);
-    if (!isNaN(d.getTime())) return d;
-
-    const dRaw = new Date(trimmed);
-    if (!isNaN(dRaw.getTime())) return dRaw;
-
-    const num = Number(trimmed);
-    if (!isNaN(num) && num > 0) {
-      const dNum = new Date(num);
-      if (!isNaN(dNum.getTime())) return dNum;
-    }
+    if (!trimmed) return null;
+    const isoClean = trimmed.includes("T") ? trimmed : trimmed.replace(" ", "T");
+    const parsed = new Date(isoClean);
+    if (!isNaN(parsed.getTime())) return parsed;
+    const direct = new Date(trimmed);
+    if (!isNaN(direct.getTime())) return direct;
   }
   return null;
 }
 
 /**
- * Formats a date into the required localized format: '11 de sep. de 2026'
+ * Robust date formatter that produces '11 de sep. de 2026' in Spanish.
  */
-function formatDateDisplay(val: any, fallbackDate?: any): string {
-  let date = parseValidDate(val);
-  if (!date && fallbackDate) {
-    date = parseValidDate(fallbackDate);
-  }
-  if (!date) {
-    date = new Date();
-  }
+function formatDateDisplay(val: any, fallbackTimestamp?: number): string {
+  const d = parseValidDate(val) || (fallbackTimestamp ? new Date(fallbackTimestamp) : null);
+  if (!d) return "Pending";
 
-  const day = date.getDate();
-  const month = MONTHS_ES[date.getMonth()];
-  const year = date.getFullYear();
+  const day = d.getDate();
+  const month = MONTHS_ES[d.getMonth()] || "";
+  const year = d.getFullYear();
 
   return `${day} de ${month} de ${year}`;
 }
@@ -119,31 +101,39 @@ export default function BusinessInvitationsPage() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // Load invitations strictly using authorized get_company_affiliation_invitations() RPC
+  // Load invitations - Complete history (pending, revoked, accepted, declined)
   const loadInvitations = useCallback(async (targetCompanyId?: string) => {
     try {
       let invRecords: any[] = [];
 
-      // 1. Primary architecture requirement: authorized get_company_affiliation_invitations() RPC
-      const { data: rpcData, error: rpcErr } = await supabase.rpc(
-        "get_company_affiliation_invitations"
-      );
+      // 1. Direct query from company_invitations for complete history
+      if (targetCompanyId) {
+        const { data: directData, error: directErr } = await supabase
+          .from("company_invitations")
+          .select("id, company_id, invited_email, status, expires_at, created_at, role")
+          .eq("company_id", targetCompanyId)
+          .order("created_at", { ascending: false });
 
-      if (!rpcErr && Array.isArray(rpcData)) {
-        invRecords = rpcData;
-      } else {
-        if (rpcErr) {
-          console.warn(
-            "[loadInvitations] get_company_affiliation_invitations RPC notice:",
-            rpcErr.message || rpcErr
-          );
+        if (!directErr && directData && directData.length > 0) {
+          invRecords = directData;
         }
-        // Fallback to Server Action if needed
-        if (targetCompanyId) {
-          const serverRes = await getCompanyInvitationsAction(targetCompanyId);
-          if (serverRes.success && Array.isArray(serverRes.data)) {
-            invRecords = serverRes.data;
-          }
+      }
+
+      // 2. Server Action fallback for complete history (uses service role if RLS restricts)
+      if (invRecords.length === 0 && targetCompanyId) {
+        const serverRes = await getCompanyInvitationsAction(targetCompanyId);
+        if (serverRes.success && Array.isArray(serverRes.data) && serverRes.data.length > 0) {
+          invRecords = serverRes.data;
+        }
+      }
+
+      // 3. Fallback to get_company_affiliation_invitations RPC
+      if (invRecords.length === 0) {
+        const { data: rpcData, error: rpcErr } = await supabase.rpc(
+          "get_company_affiliation_invitations"
+        );
+        if (!rpcErr && Array.isArray(rpcData) && rpcData.length > 0) {
+          invRecords = rpcData;
         }
       }
 
@@ -153,26 +143,15 @@ export default function BusinessInvitationsPage() {
           .map((inv: any) => ({
             id: String(inv.id),
             email: String(inv.invited_email || inv.email).trim().toLowerCase(),
-            status: inv.status || "pending",
+            status: (inv.status || "pending") as SentInvitation["status"],
             created_at: inv.created_at || new Date().toISOString(),
             expires_at: inv.expires_at || null,
             role: inv.role,
           }));
 
-        setInvitations((prev) => {
-          // Merge dynamic DB records while ensuring any just-sent pending invitation is not wiped out
-          const dbIds = new Set(mappedRecords.map((r) => r.id));
-          const dbEmails = new Set(mappedRecords.map((r) => r.email.toLowerCase()));
-          const pendingUncommitted = prev.filter(
-            (p) =>
-              p.status === "pending" &&
-              !dbIds.has(p.id) &&
-              !dbEmails.has(p.email.toLowerCase())
-          );
-          return [...pendingUncommitted, ...mappedRecords];
-        });
+        setInvitations(mappedRecords);
       } else {
-        setInvitations((prev) => prev.filter((p) => p.status === "pending"));
+        setInvitations([]);
       }
     } catch (e) {
       console.warn("Failed to load invitations:", e);
@@ -632,14 +611,14 @@ export default function BusinessInvitationsPage() {
         </form>
       </div>
 
-      {/* 2. Invitations List Card (Tabs removed, restored 'X pending' in orange) */}
+      {/* 2. Invitations List Card */}
       <div className="bg-white rounded-3xl p-6 sm:p-7 border border-gray-100 shadow-xs flex flex-col gap-4">
         <div className="flex items-center justify-between">
           <h2 className="font-extrabold text-base sm:text-lg text-gray-900">
             Invitations
           </h2>
           <span className="text-xs sm:text-sm font-semibold text-orange-500">
-            {pendingInvitations.length} pending
+            {invitations.filter((i) => i.status === "pending").length} pending
           </span>
         </div>
 
@@ -648,7 +627,7 @@ export default function BusinessInvitationsPage() {
             <Loader2 className="w-6 h-6 animate-spin text-[#1d4ed8]" />
             <p className="text-xs text-gray-400">Loading invitations...</p>
           </div>
-        ) : pendingInvitations.length === 0 ? (
+        ) : invitations.length === 0 ? (
           /* Empty State */
           <div className="py-8 flex flex-col items-center justify-center text-center gap-3">
             <div className="w-16 h-16 rounded-full bg-blue-50 border border-blue-100/80 flex items-center justify-center text-[#1d4ed8] shadow-2xs mb-1">
@@ -664,9 +643,9 @@ export default function BusinessInvitationsPage() {
             </div>
           </div>
         ) : (
-          /* Populated List */
+          /* Populated List showing all invitations (pending, revoked, accepted, etc.) */
           <div className="space-y-3">
-            {pendingInvitations.map((inv) => (
+            {invitations.map((inv) => (
               <div
                 key={inv.id}
                 className="p-4 rounded-2xl bg-gray-50/70 border border-gray-100 flex items-center justify-between gap-3"
@@ -676,34 +655,63 @@ export default function BusinessInvitationsPage() {
                     <p className="text-xs sm:text-sm font-bold text-gray-900 truncate">
                       {inv.email}
                     </p>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider bg-amber-100 text-amber-800">
-                      {inv.status}
-                    </span>
+                    {inv.status === "pending" && (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider bg-amber-100 text-amber-800 border border-amber-200/60">
+                        Pending
+                      </span>
+                    )}
+                    {inv.status === "revoked" && (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider bg-red-50 text-red-700 border border-red-200/60">
+                        Revoked
+                      </span>
+                    )}
+                    {inv.status === "accepted" && (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider bg-emerald-50 text-emerald-800 border border-emerald-200/60">
+                        Accepted
+                      </span>
+                    )}
+                    {inv.status === "declined" && (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider bg-gray-100 text-gray-700 border border-gray-200/60">
+                        Declined
+                      </span>
+                    )}
+                    {inv.status !== "pending" &&
+                      inv.status !== "revoked" &&
+                      inv.status !== "accepted" &&
+                      inv.status !== "declined" && (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider bg-gray-100 text-gray-700 border border-gray-200/60">
+                          {inv.status}
+                        </span>
+                      )}
                   </div>
-                  {/* Sent on date with robust parsing */}
+                  {/* Sent on date */}
                   <p className="text-[11px] text-gray-400 mt-0.5">
                     Sent on {formatDateDisplay(inv.created_at)}
                   </p>
-                  {/* Expiration Date: new line below 'Sent on' formatted like '11 de sep. de 2026' */}
-                  <p className="text-[11px] text-gray-400 mt-0.5">
-                    Expires{" "}
-                    {formatDateDisplay(
-                      inv.expires_at,
-                      (parseValidDate(inv.created_at)?.getTime() ??
-                        Date.now()) +
-                        7 * 24 * 60 * 60 * 1000
-                    )}
-                  </p>
+                  {/* Expiration or Status Date */}
+                  {inv.status === "pending" ? (
+                    <p className="text-[11px] text-gray-400 mt-0.5">
+                      Expires{" "}
+                      {formatDateDisplay(
+                        inv.expires_at,
+                        (parseValidDate(inv.created_at)?.getTime() ??
+                          Date.now()) +
+                          7 * 24 * 60 * 60 * 1000
+                      )}
+                    </p>
+                  ) : null}
                 </div>
 
-                {/* Red 'Revoke' text button to the right side of each pending invitation card */}
-                <button
-                  type="button"
-                  onClick={() => handleOpenRevokeModal(inv)}
-                  className="text-xs sm:text-sm font-semibold text-red-600 hover:text-red-700 hover:underline transition-colors cursor-pointer px-2 py-1 shrink-0"
-                >
-                  Revoke
-                </button>
+                {/* Revoke button only visible if status is pending */}
+                {inv.status === "pending" ? (
+                  <button
+                    type="button"
+                    onClick={() => handleOpenRevokeModal(inv)}
+                    className="text-xs sm:text-sm font-semibold text-red-600 hover:text-red-700 hover:underline transition-colors cursor-pointer px-2 py-1 shrink-0"
+                  >
+                    Revoke
+                  </button>
+                ) : null}
               </div>
             ))}
           </div>
