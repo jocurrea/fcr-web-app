@@ -355,30 +355,57 @@ export default function OnboardingPage() {
       }
 
       // ─────────────────────────────────────────────────────────────────
-      // PASO 2: Guardar workAvailabilityStatus en user_profiles
+      // PASO 2: Guardar en user_profiles (con campos específicos por rol)
       // ─────────────────────────────────────────────────────────────────
-      const { error: userProfilesError } = await supabase.from("user_profiles").upsert(
-        {
-          userId,
-          // Strict: only 'active' or 'available_for_work' are accepted by the DB check constraint
-          workAvailabilityStatus: finalAvailabilityStatus,
-          contactEmail: personalData?.email || session.user.email,
-          contactPhone: personalData?.phone || null,
-          locationCity: personalData?.city || personalData?.location || "Miami",
-          locationCountry: personalData?.country || "United States",
-          locationCountryCode: personalData?.countryCode || "US",
-          ...(isAviationPro && validProfessionalTitleKey ? {
-            professionalCredentials: personalData?.professionalCredentials || [],
-            bio: personalData?.summary || null,
-            spokenLanguages: personalData?.languages || [],
-            professionalWorkExperiences: personalData?.workExperiences || [],
-          } : {}),
-        },
-        { onConflict: "userId" }
-      );
+      const isPilot = validProfessionalRole === "pilot";
+      const isCrewRole = validProfessionalRole === "crew";
+
+      const userProfilePayload: any = {
+        userId,
+        // Strict: only 'active' or 'available_for_work' are accepted by the DB check constraint
+        workAvailabilityStatus: finalAvailabilityStatus,
+        contactEmail: personalData?.email || session.user.email,
+        contactPhone: personalData?.phone || null,
+        locationCity: personalData?.city || personalData?.location || "Miami",
+        locationCountry: personalData?.country || "United States",
+        locationCountryCode: personalData?.countryCode || "US",
+        workCountry: personalData?.selectedCountry || personalData?.country || personalData?.workCountry || "United States",
+        workCountryCode: personalData?.countryCode || personalData?.workCountryCode || "US",
+        employer: personalData?.currentEmployer || personalData?.employer || null,
+        employmentStatus: personalData?.employmentStatus || null,
+        bio: personalData?.description || personalData?.bio || null,
+        hasCrossedOcean: personalData?.hasCrossedOcean ? 1 : 0,
+        hasAdminExp: personalData?.hasAdminExp ? 1 : 0,
+        adminRole: personalData?.adminRole || null,
+        adminRoleDescription: personalData?.adminRoleDescription || null,
+      };
+
+      if (isPilot) {
+        userProfilePayload.medicalCert = personalData?.medicalCert || null;
+        userProfilePayload.flightHours = personalData?.totalFlightHours
+          ? Number(personalData.totalFlightHours)
+          : personalData?.flightHours
+          ? Number(personalData.flightHours)
+          : null;
+        userProfilePayload.pilotStripe = personalData?.pilotStripe || null;
+      } else if (isCrewRole) {
+        userProfilePayload.industryYears = personalData?.industryYears
+          ? Number(personalData.industryYears)
+          : null;
+        userProfilePayload.flightAttendantStripe = personalData?.flightAttendantStripe || null;
+      } else if (isAviationPro && validProfessionalTitleKey) {
+        userProfilePayload.professionalCredentials = personalData?.professionalCredentials || [];
+        userProfilePayload.spokenLanguages = personalData?.languages || [];
+        userProfilePayload.professionalWorkExperiences = personalData?.workExperiences || [];
+      }
+
+      const { error: userProfilesError } = await supabase
+        .from("user_profiles")
+        .upsert(userProfilePayload, { onConflict: "userId" });
+
       if (userProfilesError) {
-        console.error("[Onboarding] STEP 2 – user_profiles workAvailabilityStatus upsert FAILED:", userProfilesError);
-        throw new Error(`Failed to save availability status: ${userProfilesError.message}`);
+        console.error("[Onboarding] STEP 2 – user_profiles upsert FAILED:", userProfilesError);
+        throw new Error(`Failed to save profile details: ${userProfilesError.message}`);
       }
 
       // 2.5 Save skills
@@ -402,16 +429,37 @@ export default function OnboardingPage() {
       // ─────────────────────────────────────────────────────────────────
 
       // 3a. Resto de campos de users (nombre, foto, email, etc.)
-      const { error: usersProfileError } = await supabase.from("users").upsert(
-        {
-          id: userId,
-          firstName: finalFirstName,
-          lastName: finalLastName,
-          ...(finalProfileImage ? { profileImage: finalProfileImage } : {}),
-          email: personalData?.email || session.user.email,
-        },
-        { onConflict: "id" }
-      );
+      const userUpdatePayload: any = {
+        id: userId,
+        firstName: finalFirstName,
+        lastName: finalLastName,
+        ...(finalProfileImage ? { profileImage: finalProfileImage } : {}),
+        email: personalData?.email || session.user.email,
+        nationalityCountry: personalData?.selectedCountry || personalData?.country || "United States",
+        nationalityCountryCode: personalData?.countryCode || "US",
+        workCountry: personalData?.selectedCountry || personalData?.country || "United States",
+        workCountryCode: personalData?.countryCode || "US",
+        employer: personalData?.currentEmployer || personalData?.employer || null,
+        bio: personalData?.description || personalData?.bio || null,
+      };
+
+      if (isPilot) {
+        userUpdatePayload.flightHours = personalData?.totalFlightHours
+          ? String(personalData.totalFlightHours)
+          : null;
+        userUpdatePayload.medicalCert = personalData?.medicalCert || null;
+        userUpdatePayload.pilotStripe = personalData?.pilotStripe || null;
+      } else if (isCrewRole) {
+        userUpdatePayload.industryYears = personalData?.industryYears
+          ? String(personalData.industryYears)
+          : null;
+        userUpdatePayload.flightAttendantStripe = personalData?.flightAttendantStripe || null;
+      }
+
+      const { error: usersProfileError } = await supabase
+        .from("users")
+        .upsert(userUpdatePayload, { onConflict: "id" });
+
       if (usersProfileError) {
         console.error("[Onboarding] STEP 3a – users profile info upsert FAILED:", usersProfileError);
         throw new Error(`Failed to save personal profile: ${usersProfileError.message}`);
@@ -465,6 +513,46 @@ export default function OnboardingPage() {
           );
         } catch (legacyErr) {
           console.warn("[Onboarding] Legacy aviation_professionals sync notice:", legacyErr);
+        }
+      }
+
+      // 3d. Flight Crew (Pilot & Cabin Crew) canonical extension row (if applicable)
+      if (isPilot || isCrewRole) {
+        const flightCrewPayload: any = {
+          userId,
+          workCountry: personalData?.selectedCountry || personalData?.country || personalData?.workCountry || "United States",
+          workCountryCode: personalData?.countryCode || personalData?.workCountryCode || "US",
+          employer: personalData?.currentEmployer || personalData?.employer || null,
+          employmentStatus: personalData?.employmentStatus || null,
+          hasCrossedOcean: Boolean(personalData?.hasCrossedOcean),
+          hasAdminExp: Boolean(personalData?.hasAdminExp),
+          adminRole: personalData?.adminRole || null,
+          adminRoleDescription: personalData?.adminRoleDescription || null,
+          englishProficiency: personalData?.englishProficiency || null,
+        };
+
+        if (isPilot) {
+          flightCrewPayload.medicalCert = personalData?.medicalCert || null;
+          flightCrewPayload.flightHours = personalData?.totalFlightHours
+            ? Number(personalData.totalFlightHours)
+            : personalData?.flightHours
+            ? Number(personalData.flightHours)
+            : null;
+          flightCrewPayload.pilotStripe = personalData?.pilotStripe || null;
+        } else if (isCrewRole) {
+          flightCrewPayload.industryYears = personalData?.industryYears
+            ? Number(personalData.industryYears)
+            : null;
+          flightCrewPayload.flightAttendantStripe = personalData?.flightAttendantStripe || null;
+        }
+
+        const { error: flightCrewError } = await supabase
+          .from("flight_crew_profiles")
+          .upsert(flightCrewPayload, { onConflict: "userId" });
+
+        if (flightCrewError) {
+          console.error("[Onboarding] STEP 3d – flight_crew_profiles upsert FAILED:", flightCrewError);
+          throw new Error(`Failed to save flight crew profile: ${flightCrewError.message}`);
         }
       }
 
