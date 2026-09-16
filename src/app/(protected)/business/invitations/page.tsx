@@ -303,11 +303,33 @@ export default function BusinessInvitationsPage() {
         return;
       }
 
-      // 2. Strictly invoke the official Supabase Edge Function as defined in the system architecture
+      // 2. Strictly invoke the official Supabase Edge Function with explicit bearer auth and dual param names
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      };
+      if (session?.access_token) {
+        headers["Authorization"] = `Bearer ${session.access_token}`;
+      }
+
+      console.log("[handleSendInvitation] Invoking send-company-invitation Edge Function with:", {
+        companyId: activeCompanyId,
+        email: email.trim().toLowerCase(),
+      });
+
       const { data, error } = await supabase.functions.invoke(
         "send-company-invitation",
-        { body: { companyId: activeCompanyId, email: email.trim().toLowerCase() } },
+        {
+          headers,
+          body: {
+            companyId: activeCompanyId,
+            company_id: activeCompanyId,
+            email: email.trim().toLowerCase(),
+            invited_email: email.trim().toLowerCase(),
+          },
+        }
       );
+
+      console.log("[handleSendInvitation] Edge Function response:", { data, error });
 
       // 3. Error Handling: Properly capture error returned by the Edge Function
       if (error) {
@@ -331,7 +353,19 @@ export default function BusinessInvitationsPage() {
         return;
       }
 
-      // 4. Success Handling: Clear the input, show clean English success message, and immediately refresh
+      // 4. Success / Delivery status verification
+      const deliveryStatus = data?.deliveryStatus || data?.delivery_status;
+      if (deliveryStatus === "failed") {
+        setErrorMessage(
+          `Invitation was created in the database, but email delivery failed. Reason: ${
+            data?.errorMessage || data?.error_message || "Email provider error"
+          }`
+        );
+        setIsSending(false);
+        return;
+      }
+
+      // 5. Success Handling: Clear the input, show clean English success message, and immediately refresh
       setInviteEmail("");
       setSuccessMessage(`Invitation sent successfully to ${email}.`);
 
