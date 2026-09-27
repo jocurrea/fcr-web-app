@@ -4,11 +4,9 @@ import { useState, useEffect } from "react";
 import { ChevronLeft, AlertCircle, Plus, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { requestCompanyAffiliationFallbackAction } from "@/actions/affiliations";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import { CompanySearchAutocomplete, type CompanySelection } from "@/components/profile/company-search-autocomplete";
 
 interface ContactCredentialsStepProps {
   onNext?: (data: { email: string; phone: string; licenseCertification: string; licenses?: string[] }) => void;
@@ -26,7 +24,6 @@ export function ContactCredentialsStep({ onNext, onBack }: ContactCredentialsSte
   const [email, setEmail] = useState("");
   const [currentLicenseInput, setCurrentLicenseInput] = useState("");
   const [licensesList, setLicensesList] = useState<string[]>([]);
-  const [companySelection, setCompanySelection] = useState<CompanySelection | null>(null);
   const [touched, setTouched] = useState({ email: false, phone: false, license: false });
   const [isSaving, setIsSaving] = useState(false);
 
@@ -53,15 +50,7 @@ export function ContactCredentialsStep({ onNext, onBack }: ContactCredentialsSte
             setLicensesList([parsed.licenseCertification]);
           }
 
-          // Local draft fallback for company selection
-          if (parsed.linkedCompany || parsed.companyName) {
-            setCompanySelection({
-              id: parsed.linkedCompanyId || null,
-              name: parsed.linkedCompany || parsed.companyName || "",
-              status: parsed.companyLinkStatus || (parsed.linkedCompanyId ? "pending" : "active"),
-              logo_url: parsed.linkedCompanyLogo || null,
-            });
-          }
+
         }
 
         const { data: { session } } = await supabase.auth.getSession();
@@ -92,51 +81,7 @@ export function ContactCredentialsStep({ onNext, onBack }: ContactCredentialsSte
           setEmail(session.user.email);
         }
 
-        // Load company affiliation from get_my_profile RPC
-        if (session?.user) {
-          try {
-            const { data: profileRpc } = await supabase.rpc("get_my_profile");
-            if (profileRpc) {
-              const aff =
-                profileRpc.affiliation ||
-                profileRpc.company_affiliation ||
-                (Array.isArray(profileRpc.affiliations) ? profileRpc.affiliations[0] : null) ||
-                (profileRpc.company_name || profileRpc.company ? profileRpc : null);
 
-              const compName =
-                aff?.company_name ||
-                aff?.company?.name ||
-                aff?.name ||
-                profileRpc.company_name ||
-                profileRpc.company?.name;
-
-              const compId =
-                aff?.company_id ||
-                aff?.company?.id ||
-                aff?.id ||
-                profileRpc.company_id ||
-                null;
-
-              const affStatus =
-                aff?.status ||
-                aff?.affiliation_status ||
-                profileRpc.affiliation_status ||
-                profileRpc.company_link_status ||
-                (compId ? "pending" : "active");
-
-              if (compName) {
-                setCompanySelection({
-                  id: compId,
-                  name: compName,
-                  status: affStatus === "pending" ? "pending" : "active",
-                  logo_url: aff?.logo_url || aff?.company?.logo_url || null,
-                });
-              }
-            }
-          } catch (rpcErr) {
-            console.warn("Could not load affiliation from get_my_profile:", rpcErr);
-          }
-        }
       } catch (e) {
         console.error("Error reading saved contact data:", e);
       }
@@ -283,54 +228,7 @@ export function ContactCredentialsStep({ onNext, onBack }: ContactCredentialsSte
         // Invalidate Next.js cache to ensure profile reflects changes immediately
         router.refresh();
 
-        // 3. E01-HU11: Company Affiliation via RPCs
-        if (companySelection?.name?.trim()) {
-          if (companySelection.id) {
-            // Registered company (UUID) -> strictly call request_company_affiliation(uuid)
-            let { error: rpcError } = await supabase.rpc("request_company_affiliation", {
-              target_company_id: companySelection.id,
-            });
-            if (rpcError) {
-              const res2 = await supabase.rpc("request_company_affiliation", {
-                company_id: companySelection.id,
-              });
-              if (!res2.error) {
-                rpcError = null;
-              } else {
-                const res3 = await supabase.rpc("request_company_affiliation", {
-                  p_company_id: companySelection.id,
-                });
-                if (!res3.error) rpcError = null;
-              }
-            }
 
-            if (rpcError) {
-              console.warn("Notice calling request_company_affiliation RPC:", rpcError.message, "— Invoking secure Server Action fallback...");
-              await requestCompanyAffiliationFallbackAction({
-                companyId: companySelection.id,
-                companyName: companySelection.name,
-              });
-            }
-          } else {
-            // E01-HU12: Unregistered / free-text company -> create unregistered affiliation (AC 2 & AC 3)
-            const res1 = await supabase.rpc("create_unregistered_company_affiliation", {
-              company_name: companySelection.name.trim(),
-            });
-            if (res1.error) {
-              const res2 = await supabase.rpc("create_unregistered_company_affiliation", {
-                text: companySelection.name.trim(),
-              });
-              if (res2.error) {
-                const res3 = await supabase.rpc("create_unregistered_company_affiliation", {
-                  name: companySelection.name.trim(),
-                });
-                if (res3.error) {
-                  console.error("Error calling create_unregistered_company_affiliation:", res1.error);
-                }
-              }
-            }
-          }
-        }
       }
 
       if (onNext) {
@@ -561,18 +459,7 @@ export function ContactCredentialsStep({ onNext, onBack }: ContactCredentialsSte
             )}
           </div>
 
-          {/* Field 4: Company / Current Employer Autocomplete (AC 1) */}
-          <div className="space-y-1.5">
-            <CompanySearchAutocomplete
-              value={companySelection?.name || ""}
-              selectedCompanyId={companySelection?.id || null}
-              onSelectCompany={(selection) => setCompanySelection(selection)}
-              onAffiliationSaved={(selection) => setCompanySelection(selection)}
-              label="Company / Current Employer"
-              placeholder="Search business or airline..."
-              required={false}
-            />
-          </div>
+
 
         </div>
 
