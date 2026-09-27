@@ -23,9 +23,21 @@ export default function OnboardingCompletePage() {
       console.error("Storage error in onboarding-complete:", e);
     }
     
-    // Invalidate server cache and navigate to /home
+    // Invalidate server cache and navigate to destination
     router.refresh();
-    router.replace("/home");
+
+    let destination = "/home";
+    if (typeof window !== "undefined") {
+      const pendingInvite = sessionStorage.getItem("fcr_invitation_token") || sessionStorage.getItem("pending_invite_token");
+      const redirectUrl = sessionStorage.getItem("auth_redirect_url");
+      if (pendingInvite || redirectUrl === "/invitations/accept") {
+        destination = "/invitations/accept";
+      } else if (redirectUrl && redirectUrl.startsWith("/")) {
+        sessionStorage.removeItem("auth_redirect_url");
+        destination = redirectUrl;
+      }
+    }
+    router.replace(destination);
   }, [router]);
 
   return (

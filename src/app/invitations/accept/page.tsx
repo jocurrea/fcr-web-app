@@ -59,6 +59,7 @@ function useHashToken(): { token: string; tokenError: string | null } {
     if (extracted) {
       try {
         sessionStorage.setItem(SESSION_STORAGE_KEY, extracted);
+        sessionStorage.setItem("pending_invite_token", extracted);
       } catch {}
 
       if (typeof window !== "undefined") {
@@ -70,7 +71,11 @@ function useHashToken(): { token: string; tokenError: string | null } {
     } else {
       // 3. Fallback to token previously saved in sessionStorage (e.g. across auth login/register redirect)
       try {
-        extracted = (sessionStorage.getItem(SESSION_STORAGE_KEY) || "").trim();
+        extracted = (
+          sessionStorage.getItem(SESSION_STORAGE_KEY) ||
+          sessionStorage.getItem("pending_invite_token") ||
+          ""
+        ).trim();
       } catch {}
     }
 
@@ -615,6 +620,15 @@ function AcceptInvitationContent() {
           <div className="w-full flex flex-col gap-3">
             <Link
               href={`/login?redirect=${encodeURIComponent(currentRedirectUrl)}`}
+              onClick={() => {
+                if (typeof window !== "undefined") {
+                  sessionStorage.setItem("auth_redirect_url", currentRedirectUrl);
+                  if (token) {
+                    sessionStorage.setItem(SESSION_STORAGE_KEY, token);
+                    sessionStorage.setItem("pending_invite_token", token);
+                  }
+                }
+              }}
               className="w-full py-4 px-6 rounded-2xl bg-[#1d4ed8] hover:bg-[#1e40af] text-white text-sm font-bold transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
             >
               <LogIn className="w-4 h-4" />
@@ -622,7 +636,16 @@ function AcceptInvitationContent() {
             </Link>
 
             <Link
-              href={`/role-selection?redirect=${encodeURIComponent(currentRedirectUrl)}`}
+              href={`/register?redirect=${encodeURIComponent(currentRedirectUrl)}${targetEmail ? `&email=${encodeURIComponent(targetEmail)}` : ""}`}
+              onClick={() => {
+                if (typeof window !== "undefined") {
+                  sessionStorage.setItem("auth_redirect_url", currentRedirectUrl);
+                  if (token) {
+                    sessionStorage.setItem(SESSION_STORAGE_KEY, token);
+                    sessionStorage.setItem("pending_invite_token", token);
+                  }
+                }
+              }}
               className="w-full py-3.5 px-6 rounded-2xl bg-white hover:bg-gray-50 text-gray-800 text-sm font-bold transition-colors border border-gray-200 flex items-center justify-center gap-2 cursor-pointer shadow-2xs"
             >
               <UserPlus className="w-4 h-4 text-gray-500" />

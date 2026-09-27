@@ -47,9 +47,17 @@ async function clearStaleSessionCache() {
 
     try {
       const pendingInvite = sessionStorage.getItem("pending_invite_token");
+      const fcrInvite = sessionStorage.getItem("fcr_invitation_token");
+      const redirectUrl = sessionStorage.getItem("auth_redirect_url");
       sessionStorage.clear();
       if (pendingInvite) {
         sessionStorage.setItem("pending_invite_token", pendingInvite);
+      }
+      if (fcrInvite) {
+        sessionStorage.setItem("fcr_invitation_token", fcrInvite);
+      }
+      if (redirectUrl) {
+        sessionStorage.setItem("auth_redirect_url", redirectUrl);
       }
     } catch (e) {
       console.warn("sessionStorage cleanup warning:", e);
@@ -83,14 +91,16 @@ function RegisterForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const inviteToken = searchParams.get("invite") || searchParams.get("code");
+  const inviteToken = searchParams.get("invite") || searchParams.get("code") || searchParams.get("token");
   const companyParam = searchParams.get("company");
   const verifyEmailQuery = searchParams.get("verifyEmail");
+  const emailQuery = searchParams.get("email");
+  const redirectQuery = searchParams.get("redirect");
 
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(emailQuery || "");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [termsAccepted, setTermsAccepted] = useState(false);
@@ -115,6 +125,13 @@ function RegisterForm() {
       if (tokenParam) {
         sessionStorage.setItem("pending_invite_token", tokenParam);
       }
+      if (redirectQuery) {
+        sessionStorage.setItem("auth_redirect_url", redirectQuery);
+      }
+    }
+
+    if (emailQuery && !email) {
+      setEmail(emailQuery);
     }
 
     async function checkInvite() {
@@ -301,8 +318,13 @@ function RegisterForm() {
         window.dispatchEvent(new CustomEvent("profile-updated"));
       }
 
-      // Navigate with Next.js router to role-selection
-      router.replace("/role-selection");
+      // Navigate with Next.js router to role-selection, preserving redirect
+      const redirectTarget = redirectQuery || (typeof window !== "undefined" ? sessionStorage.getItem("auth_redirect_url") : null);
+      if (redirectTarget && redirectTarget.startsWith("/")) {
+        router.replace(`/role-selection?redirect=${encodeURIComponent(redirectTarget)}`);
+      } else {
+        router.replace("/role-selection");
+      }
     } catch (err: any) {
       setError(err.message || "An error occurred during registration");
     } finally {
@@ -327,7 +349,7 @@ function RegisterForm() {
         </p>
         <div className="w-full space-y-3">
           <Link
-            href="/login"
+            href={`/login${redirectQuery ? `?redirect=${encodeURIComponent(redirectQuery)}` : ""}`}
             className="w-full py-3.5 px-4 rounded-xl bg-[#1d4ed8] hover:bg-[#1e40af] text-white font-semibold text-sm transition-colors block text-center shadow-sm"
           >
             Go to Login
@@ -534,7 +556,10 @@ function RegisterForm() {
 
         <div className="text-center mt-2">
           <span className="text-xs text-gray-500">Already have an account? </span>
-          <Link href="/login" className="text-xs text-[#0f172a] font-bold hover:underline">
+          <Link
+            href={`/login${redirectQuery ? `?redirect=${encodeURIComponent(redirectQuery)}` : ""}`}
+            className="text-xs text-[#0f172a] font-bold hover:underline"
+          >
             Log in
           </Link>
         </div>

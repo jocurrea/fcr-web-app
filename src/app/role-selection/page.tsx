@@ -89,6 +89,14 @@ export default function RoleSelectionPage() {
           sessionStorage.setItem("flightcrew_onboarded", "true");
           localStorage.setItem("flightcrew_onboarded", "true");
         } catch (e) {}
+
+        const redirectParam = params.get("redirect") || (typeof window !== "undefined" ? sessionStorage.getItem("auth_redirect_url") : null);
+        if (redirectParam && redirectParam.startsWith("/")) {
+          if (typeof window !== "undefined") sessionStorage.removeItem("auth_redirect_url");
+          router.replace(redirectParam);
+          return;
+        }
+
         router.replace("/home");
         return;
       }
@@ -316,7 +324,8 @@ export default function RoleSelectionPage() {
     } catch (e) {}
 
     setIsContinuing(false);
-    router.push(`/onboarding?category=${selectedType}`);
+    const redirectParam = typeof window !== "undefined" ? (new URLSearchParams(window.location.search).get("redirect") || sessionStorage.getItem("auth_redirect_url")) : null;
+    router.push(`/onboarding?category=${selectedType}${redirectParam ? `&redirect=${encodeURIComponent(redirectParam)}` : ""}`);
   };
 
   const handleLogout = async () => {

@@ -137,14 +137,23 @@ export default function LoginPage() {
         }
       }
 
+      const urlParams = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
+      const redirectTarget = urlParams?.get("redirect") || (typeof window !== "undefined" ? sessionStorage.getItem("auth_redirect_url") : null);
+
       // 2. Ruta Correcta: Si el usuario ya tiene su cuenta configurada y rol asignado,
-      // fuerza la redirección directamente hacia el panel principal (/home)
+      // respeta redirectTarget (p.ej. /invitations/accept) o navega hacia /home
       if (isOnboarded && hasRole) {
         try {
           document.cookie = "flightcrew_onboarded=true; path=/; max-age=31536000";
           sessionStorage.setItem("flightcrew_onboarded", "true");
           localStorage.setItem("flightcrew_onboarded", "true");
         } catch (e) {}
+
+        if (redirectTarget && redirectTarget.startsWith("/")) {
+          if (typeof window !== "undefined") sessionStorage.removeItem("auth_redirect_url");
+          router.replace(redirectTarget);
+          return;
+        }
 
         router.replace("/home");
         return;
@@ -153,11 +162,11 @@ export default function LoginPage() {
       // 3. Ruta de Nuevos Usuarios: La redirección hacia /role-selection debe ser estrictamente
       // exclusiva para usuarios nuevos cuyo registro indique onboarded === false o nulo
       if (effectiveRole === "business") {
-        router.replace("/onboarding-business");
+        router.replace(redirectTarget ? `/onboarding-business?redirect=${encodeURIComponent(redirectTarget)}` : "/onboarding-business");
         return;
       }
 
-      router.replace("/role-selection");
+      router.replace(redirectTarget ? `/role-selection?redirect=${encodeURIComponent(redirectTarget)}` : "/role-selection");
     } catch (redirectErr) {
       console.error("[Login] Redirect error:", redirectErr);
       router.replace("/home");
@@ -165,12 +174,16 @@ export default function LoginPage() {
   }, [cleanResidualParams, router]);
 
   useEffect(() => {
-    // Capture invitation token if present in URL
+    // Capture invitation token and redirect if present in URL
     if (typeof window !== "undefined") {
       const urlParams = new URLSearchParams(window.location.search);
       const tokenParam = urlParams.get("invite_id") || urlParams.get("token") || urlParams.get("invite");
       if (tokenParam) {
         sessionStorage.setItem("pending_invite_token", tokenParam);
+      }
+      const redirectParam = urlParams.get("redirect");
+      if (redirectParam) {
+        sessionStorage.setItem("auth_redirect_url", redirectParam);
       }
     }
 
@@ -374,8 +387,15 @@ export default function LoginPage() {
         </div>
 
         <div className="text-center mt-2">
-          <span className="text-xs text-gray-500">Don&apos;t have an account! </span>
-          <Link href="/register" className="text-xs text-[#0f172a] font-bold hover:underline">
+          <span className="text-xs text-gray-500">Don&apos;t have an account? </span>
+          <Link
+            href={
+              typeof window !== "undefined" && window.location.search
+                ? `/register${window.location.search}`
+                : "/register"
+            }
+            className="text-xs text-[#0f172a] font-bold hover:underline"
+          >
             Signup
           </Link>
         </div>
