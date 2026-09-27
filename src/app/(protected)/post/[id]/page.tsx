@@ -83,7 +83,7 @@ function PostDetailContent() {
 
   const handleAddComment = async () => {
     if (isCompanyPending) {
-      alert("Comentar está deshabilitado mientras su empresa está pendiente de aprobación. (Commenting disabled while pending approval)");
+      alert("Commenting is disabled while your company is pending approval.");
       return;
     }
     if (!commentText.trim() || !post) return;
@@ -100,8 +100,8 @@ function PostDetailContent() {
         alert("Error adding comment");
       }
     } catch (error) {
-      console.error("Error al crear comentario:", error);
-      alert("Error de conexión al guardar el comentario.");
+      console.error("Error creating comment:", error);
+      alert("Connection error while saving the comment.");
     }
   };
 
@@ -169,7 +169,7 @@ function PostDetailContent() {
       }
     } catch (error) {
       console.error("Delete post error:", error);
-      alert("Error de conexión.");
+      alert("Connection error.");
       setShowDeletePostModal(false);
     }
   };

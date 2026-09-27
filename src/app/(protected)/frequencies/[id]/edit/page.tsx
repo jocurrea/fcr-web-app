@@ -64,7 +64,7 @@ export default function EditFrequencyPage() {
     const file = e.target.files?.[0];
     if (file) {
       if (file.size > 1.9 * 1024 * 1024) {
-        alert("El archivo excede el límite de 2MB. (File exceeds 2MB limit)");
+        alert("File exceeds 2MB limit.");
         e.target.value = "";
         return;
       }

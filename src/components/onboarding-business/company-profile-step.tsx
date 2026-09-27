@@ -133,7 +133,7 @@ export function CompanyProfileStep({ onNext }: CompanyProfileStepProps) {
     const file = e.target.files?.[0];
     if (file) {
       if (file.size > 1.9 * 1024 * 1024) {
-        setErrorMessage("El archivo excede el límite de 2MB. (File exceeds 2MB limit)");
+        setErrorMessage("File exceeds 2MB limit.");
         setShowErrorModal(true);
         return;
       }
@@ -151,7 +151,7 @@ export function CompanyProfileStep({ onNext }: CompanyProfileStepProps) {
           }
         } catch (e) {}
       } catch (err: any) {
-        setErrorMessage(err?.message || "Error al subir el logo");
+        setErrorMessage(err?.message || "Error uploading logo.");
         setShowErrorModal(true);
       } finally {
         setIsUploadingLogo(false);
