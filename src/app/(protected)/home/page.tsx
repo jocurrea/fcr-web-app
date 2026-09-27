@@ -56,6 +56,17 @@ function HomeContent() {
     // Ensure the page always starts at the top, fixing Next.js scroll restoration bugs
     window.scrollTo(0, 0);
 
+    // If the user arrived with a pending invitation in session, redirect them to /invitations/accept
+    if (typeof window !== "undefined") {
+      const pendingInviteToken =
+        sessionStorage.getItem("fcr_invitation_token") ||
+        sessionStorage.getItem("pending_invite_token");
+      if (pendingInviteToken) {
+        router.replace("/invitations/accept");
+        return;
+      }
+    }
+
     async function loadData() {
       try {
         const { data: { session } } = await supabase.auth.getSession();

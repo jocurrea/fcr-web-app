@@ -126,19 +126,14 @@ export default function LoginPage() {
         }
       }
 
-      // Check for pending invite before redirecting
-      const pendingToken = sessionStorage.getItem("pending_invite_token");
-      if (pendingToken) {
-        try {
-          await supabase.rpc("accept_company_affiliation_invitation", { token: pendingToken });
-          sessionStorage.removeItem("pending_invite_token");
-        } catch (e) {
-          console.error("[Login] Error accepting invite:", e);
-        }
-      }
-
       const urlParams = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
-      const redirectTarget = urlParams?.get("redirect") || (typeof window !== "undefined" ? sessionStorage.getItem("auth_redirect_url") : null);
+      const pendingInviteToken = typeof window !== "undefined" ? (sessionStorage.getItem("fcr_invitation_token") || sessionStorage.getItem("pending_invite_token")) : null;
+      let redirectTarget = urlParams?.get("redirect") || (typeof window !== "undefined" ? sessionStorage.getItem("auth_redirect_url") : null);
+
+      // If there is an active invitation token in the session, ensure we return to accept page
+      if (!redirectTarget && pendingInviteToken) {
+        redirectTarget = "/invitations/accept";
+      }
 
       // 2. Ruta Correcta: Si el usuario ya tiene su cuenta configurada y rol asignado,
       // respeta redirectTarget (p.ej. /invitations/accept) o navega hacia /home
