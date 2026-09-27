@@ -82,18 +82,18 @@ const formatRole = (rawRole?: string | null) => {
     .join(" ");
 };
 
-const formatSpanishDate = (dateStr?: string | null) => {
-  if (!dateStr) return "recientemente";
+const formatDate = (dateStr?: string | null) => {
+  if (!dateStr) return "recently";
   try {
     const date = new Date(dateStr);
-    if (isNaN(date.getTime())) return "recientemente";
-    return new Intl.DateTimeFormat("es-ES", {
-      day: "numeric",
+    if (isNaN(date.getTime())) return "recently";
+    return new Intl.DateTimeFormat("en-US", {
       month: "short",
+      day: "numeric",
       year: "numeric",
     }).format(date);
   } catch {
-    return "recientemente";
+    return "recently";
   }
 };
 
@@ -408,7 +408,7 @@ export function AffiliationRequestsManager({
               item.company_name_snapshot ||
               "Company";
 
-            const formattedDate = formatSpanishDate(item.created_at || item.requested_at);
+            const formattedDate = formatDate(item.created_at || item.requested_at);
 
             const isThisItemProcessing = processingId === requestId;
 

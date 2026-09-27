@@ -29,19 +29,19 @@ interface SentInvitation {
   role?: string;
 }
 
-const MONTHS_ES = [
-  "ene.",
-  "feb.",
-  "mar.",
-  "abr.",
-  "may.",
-  "jun.",
-  "jul.",
-  "ago.",
-  "sep.",
-  "oct.",
-  "nov.",
-  "dic.",
+const MONTHS_EN = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
 ];
 
 /**
@@ -69,17 +69,17 @@ function parseValidDate(val: any): Date | null {
 }
 
 /**
- * Robust date formatter that produces '11 de sep. de 2026' in Spanish.
+ * Robust date formatter that produces 'Sep 27, 2026' in English.
  */
 function formatDateDisplay(val: any, fallbackTimestamp?: number): string {
   const d = parseValidDate(val) || (fallbackTimestamp ? new Date(fallbackTimestamp) : null);
   if (!d) return "Pending";
 
   const day = d.getDate();
-  const month = MONTHS_ES[d.getMonth()] || "";
+  const month = MONTHS_EN[d.getMonth()] || "";
   const year = d.getFullYear();
 
-  return `${day} de ${month} de ${year}`;
+  return `${month} ${day}, ${year}`;
 }
 
 export default function BusinessInvitationsPage() {
@@ -149,9 +149,47 @@ export default function BusinessInvitationsPage() {
             role: inv.role,
           }));
 
-        setInvitations(mappedRecords);
+        setInvitations((prev) => {
+          const dbIds = new Set(mappedRecords.map((r) => r.id));
+          const dbEmails = new Set(mappedRecords.map((r) => r.email.toLowerCase()));
+
+          // Retain local pending items not yet reflected in DB
+          const localPending = prev.filter(
+            (p) =>
+              p.status === "pending" &&
+              !dbIds.has(p.id) &&
+              !dbEmails.has(p.email.toLowerCase())
+          );
+
+          const merged = [...localPending, ...mappedRecords];
+          if (typeof window !== "undefined" && targetCompanyId) {
+            try {
+              localStorage.setItem(
+                `company_invitations_${targetCompanyId}`,
+                JSON.stringify(merged)
+              );
+            } catch {}
+          }
+          return merged;
+        });
       } else {
-        setInvitations([]);
+        // If DB query returned 0 rows (e.g. RLS restrictions or network delay),
+        // preserve current pending invitations from state or localStorage rather than wiping out!
+        setInvitations((prev) => {
+          if (prev.length > 0) {
+            return prev;
+          }
+          if (typeof window !== "undefined" && targetCompanyId) {
+            try {
+              const cached = localStorage.getItem(`company_invitations_${targetCompanyId}`);
+              if (cached) {
+                const parsed = JSON.parse(cached);
+                if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+              }
+            } catch {}
+          }
+          return [];
+        });
       }
     } catch (e) {
       console.warn("Failed to load invitations:", e);
@@ -160,17 +198,6 @@ export default function BusinessInvitationsPage() {
 
   useEffect(() => {
     window.scrollTo(0, 0);
-
-    // Purge any legacy localStorage mock keys
-    if (typeof window !== "undefined") {
-      try {
-        Object.keys(localStorage).forEach((k) => {
-          if (k.startsWith("company_invitations_")) {
-            localStorage.removeItem(k);
-          }
-        });
-      } catch {}
-    }
 
     async function loadCompanyAndInvitations() {
       setIsLoading(true);
@@ -193,10 +220,24 @@ export default function BusinessInvitationsPage() {
           .limit(1);
 
         if (companies && companies.length > 0) {
+          const activeId = companies[0].id;
           setCompanyName(companies[0].name || "Company");
-          setCompanyId(companies[0].id);
+          setCompanyId(activeId);
 
-          await loadInvitations(companies[0].id);
+          // Fast load from localStorage cache first so pending invitations show immediately
+          if (typeof window !== "undefined") {
+            try {
+              const cached = localStorage.getItem(`company_invitations_${activeId}`);
+              if (cached) {
+                const parsed = JSON.parse(cached);
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                  setInvitations(parsed);
+                }
+              }
+            } catch {}
+          }
+
+          await loadInvitations(activeId);
         }
       } catch (err) {
         console.error("Error loading company invitations:", err);
@@ -362,12 +403,23 @@ export default function BusinessInvitationsPage() {
         expires_at: defaultExpiresAt,
       };
 
-      setInvitations((prev) => [
-        newInvitation,
-        ...prev.filter(
-          (i) => i.id !== newInvitation.id && i.email.toLowerCase() !== email
-        ),
-      ]);
+      setInvitations((prev) => {
+        const next = [
+          newInvitation,
+          ...prev.filter(
+            (i) => i.id !== newInvitation.id && i.email.toLowerCase() !== email
+          ),
+        ];
+        if (typeof window !== "undefined" && activeCompanyId) {
+          try {
+            localStorage.setItem(
+              `company_invitations_${activeCompanyId}`,
+              JSON.stringify(next)
+            );
+          } catch {}
+        }
+        return next;
+      });
 
       // Immediately refresh the pending invitations list using get_company_affiliation_invitations() RPC
       await loadInvitations(activeCompanyId);
@@ -461,11 +513,22 @@ export default function BusinessInvitationsPage() {
       setSelectedInvitation(null);
 
       // 4. Update UI immediately so the revoked invitation disappears from the 'Pending' view
-      setInvitations((prev) =>
-        prev.map((item) =>
-          item.id === targetId ? { ...item, status: "revoked" as const } : item
-        )
-      );
+      setInvitations((prev) => {
+        const next = prev.map((item) =>
+          item.id === targetId || item.email.toLowerCase() === targetEmail.toLowerCase()
+            ? { ...item, status: "revoked" as const }
+            : item
+        );
+        if (typeof window !== "undefined" && companyId) {
+          try {
+            localStorage.setItem(
+              `company_invitations_${companyId}`,
+              JSON.stringify(next)
+            );
+          } catch {}
+        }
+        return next;
+      });
 
       setSuccessMessage(`Invitation to ${targetEmail} has been revoked.`);
 
