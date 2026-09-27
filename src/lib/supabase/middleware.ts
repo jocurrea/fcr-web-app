@@ -61,8 +61,9 @@ export async function updateSession(request: NextRequest) {
     pathname === "/register" ||
     pathname === "/welcome" ||
     pathname === "/forgotPassword" ||
-    pathname === "/reset" ||
-    pathname.startsWith("/invitations");
+    pathname === "/reset";
+
+  const isInvitationRoute = pathname.startsWith("/invitations");
 
   const isPublicStaticRoute =
     pathname === "/privacyPolicy" ||
@@ -95,7 +96,7 @@ export async function updateSession(request: NextRequest) {
   // Case A: Unauthenticated user
   // -------------------------------------------------------------
   if (!user) {
-    if (isPublicAuthRoute || isPublicStaticRoute) {
+    if (isPublicAuthRoute || isPublicStaticRoute || isInvitationRoute) {
       return response;
     }
     if (isRoot) {
@@ -188,8 +189,8 @@ export async function updateSession(request: NextRequest) {
       return makeRedirect("/role-selection");
     }
 
-    // Allow public auth routes (e.g. register), static legal pages, and onboarding flow
-    if (isPublicAuthRoute || isPublicStaticRoute || isOnboardingRoute) {
+    // Allow public auth routes (e.g. register), static legal pages, onboarding flow, and invitations
+    if (isPublicAuthRoute || isPublicStaticRoute || isOnboardingRoute || isInvitationRoute) {
       return response;
     }
 
@@ -199,6 +200,11 @@ export async function updateSession(request: NextRequest) {
 
   // 2. User IS fully onboarded and has a role
   if (isOnboarded && hasRole) {
+    // Explicitly allow invitation acceptance page
+    if (isInvitationRoute) {
+      return response;
+    }
+
     // If trying to access registration, allow fresh registration without bouncing to /home
     if (pathname === "/register") {
       response.cookies.set("flightcrew_onboarded", "false", { path: "/", maxAge: 0 });

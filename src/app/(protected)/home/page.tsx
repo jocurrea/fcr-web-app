@@ -62,7 +62,7 @@ function HomeContent() {
         sessionStorage.getItem("fcr_invitation_token") ||
         sessionStorage.getItem("pending_invite_token");
       if (pendingInviteToken) {
-        router.replace("/invitations/accept");
+        window.location.replace("/invitations/accept");
         return;
       }
     }
@@ -86,9 +86,14 @@ function HomeContent() {
         console.error("Error fetching company status:", err);
       }
 
-      const data = await fetchPosts();
-      setPosts(data);
-      setLoading(false);
+      try {
+        const data = await fetchPosts();
+        setPosts(data);
+      } catch (err) {
+        console.error("Error fetching posts:", err);
+      } finally {
+        setLoading(false);
+      }
     }
     loadData();
 
