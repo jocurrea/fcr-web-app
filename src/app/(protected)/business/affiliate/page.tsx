@@ -106,9 +106,19 @@ export default function BusinessAffiliatePage() {
   const handleAffiliationSaved = (selection: CompanySelection) => {
     setSelectedCompany(selection);
     setSuccessMessage(`Unregistered company "${selection.name}" added successfully.`);
+    try {
+      localStorage.setItem("cached_affiliation", JSON.stringify({
+        name: selection.name.trim(),
+        id: null,
+        status: "unverified",
+        logo: null,
+        location: null,
+      }));
+      window.dispatchEvent(new CustomEvent("profile-updated"));
+    } catch {}
     setTimeout(() => {
       router.push("/profile");
-    }, 1200);
+    }, 400);
   };
 
   const handleButtonClick = () => {
@@ -206,7 +216,19 @@ export default function BusinessAffiliatePage() {
         parsed.companyName = selectedCompany.name.trim();
         parsed.companyId = selectedCompany.id;
         parsed.companyStatus = selectedCompany.id ? "pending" : "unverified";
+        if (selectedCompany.logo_url) parsed.companyLogo = selectedCompany.logo_url;
+        if ((selectedCompany as any).location) parsed.companyLocation = (selectedCompany as any).location;
         localStorage.setItem("onboarding_personal", JSON.stringify(parsed));
+
+        const cached = {
+          name: selectedCompany.name.trim(),
+          id: selectedCompany.id || null,
+          status: selectedCompany.id ? "pending" : "unverified",
+          logo: selectedCompany.logo_url || null,
+          location: (selectedCompany as any).location || null,
+        };
+        localStorage.setItem("cached_affiliation", JSON.stringify(cached));
+        window.dispatchEvent(new CustomEvent("profile-updated"));
       } catch (e) {
         console.warn("Local storage cache update error:", e);
       }
@@ -215,7 +237,7 @@ export default function BusinessAffiliatePage() {
       router.refresh();
       setTimeout(() => {
         router.push("/profile");
-      }, 1200);
+      }, 500);
     } catch (err: any) {
       console.error("Affiliation submission exception:", err);
       setErrorMessage(err?.message || "An unexpected error occurred. Please try again.");

@@ -274,6 +274,15 @@ export function CompanySearchAutocomplete({
         parsed.companyId = null;
         parsed.companyStatus = "unverified";
         localStorage.setItem("onboarding_personal", JSON.stringify(parsed));
+
+        localStorage.setItem("cached_affiliation", JSON.stringify({
+          name: trimmed,
+          id: null,
+          status: "unverified",
+          logo: null,
+          location: null,
+        }));
+        window.dispatchEvent(new CustomEvent("profile-updated"));
       } catch (e) {
         console.warn("Error updating local storage cache:", e);
       }

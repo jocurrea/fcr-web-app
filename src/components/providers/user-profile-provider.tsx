@@ -110,7 +110,30 @@ export function UserProfileProvider({
   const [skills, setSkills] = useState<string[]>([]);
   const [resume, setResume] = useState<any | null>(null);
   const [companyInfo, setCompanyInfo] = useState<CompanyInfo | null>(null);
-  const [affiliationInfo, setAffiliationInfo] = useState<AffiliationInfo | null>(null);
+  const [affiliationInfo, setAffiliationInfo] = useState<AffiliationInfo | null>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const savedAff = localStorage.getItem("cached_affiliation");
+        if (savedAff) return JSON.parse(savedAff);
+
+        const savedPers = localStorage.getItem("onboarding_personal");
+        if (savedPers) {
+          const parsed = JSON.parse(savedPers);
+          const name = parsed.companyName || parsed.linkedCompany || parsed.company;
+          if (name) {
+            return {
+              name,
+              id: parsed.companyId || parsed.linkedCompanyId || null,
+              status: parsed.companyStatus || (parsed.companyId ? "pending" : "unverified"),
+              logo: parsed.companyLogo || parsed.linkedCompanyLogo || null,
+              location: parsed.companyLocation || null,
+            };
+          }
+        }
+      } catch {}
+    }
+    return null;
+  });
   const [companyStatus, setCompanyStatus] = useState<string>("pending");
   const [userStatus, setUserStatus] = useState<string>("active");
   const [onboarded, setOnboarded] = useState<boolean>(false);
@@ -614,6 +637,12 @@ export function UserProfileProvider({
         }
       }
 
+      if (resolvedAffiliation && typeof window !== "undefined") {
+        try {
+          localStorage.setItem("cached_affiliation", JSON.stringify(resolvedAffiliation));
+        } catch {}
+      }
+
       // 11. Resolve Business Company Info if applicable
       let companyLogo: string | null = null;
       if (businessFlag && companies && companies.length > 0) {
@@ -787,6 +816,18 @@ export function UserProfileProvider({
     }
 
     function handleProfileMutation() {
+      if (typeof window !== "undefined") {
+        try {
+          const savedAff = localStorage.getItem("cached_affiliation");
+          if (savedAff) {
+            setAffiliationInfo(JSON.parse(savedAff));
+          }
+          const savedPers = localStorage.getItem("onboarding_personal");
+          if (savedPers) {
+            setPersonal((prev: any) => ({ ...(prev || {}), ...JSON.parse(savedPers) }));
+          }
+        } catch {}
+      }
       refetchProfile();
     }
 
