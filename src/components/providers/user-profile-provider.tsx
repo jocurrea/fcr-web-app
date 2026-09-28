@@ -729,7 +729,17 @@ export function UserProfileProvider({
           qualifications: (Array.isArray(mergedPersonal?.qualifications) && mergedPersonal.qualifications) || null,
           flightHours: mergedPersonal?.totalFlightHours || mergedPersonal?.flightHours || null,
           summary: mergedPersonal?.description || mergedPersonal?.aboutMe || mergedPersonal?.summary || resolvedResume?.summary || null,
-          role: mergedPersonal?.professionalRole || mergedPersonal?.role || null,
+          role: mergedPersonal?.professionalRole || mergedPersonal?.role || accountType || null,
+          accountType: accountType,
+          availabilityStatus:
+            myProfileData?.aviationProfessionalProfile?.workAvailabilityStatus ||
+            mergedPersonal?.availabilityStatus ||
+            mergedPersonal?.availability_status ||
+            null,
+          credentials:
+            myProfileData?.aviationProfessionalProfile?.professionalCredentials ||
+            (Array.isArray(mergedPersonal?.professionalCredentials) && mergedPersonal.professionalCredentials) ||
+            null,
           work: resolvedWork,
           languages: resolvedLanguages,
           skills: resolvedSkills,

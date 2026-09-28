@@ -84,9 +84,14 @@ export interface ProfileAreasInput {
   ratings?: any[] | null;
   licenses?: any[] | null;
   qualifications?: any[] | null;
+  credentials?: any[] | null;
   flightHours?: string | number | null;
   summary?: string | null;
   role?: string | null;
+  accountType?: string | null;
+  availabilityStatus?: string | null;
+  workAvailabilityStatus?: string | null;
+  isAviationProfessional?: boolean;
   work?: any[] | null;
   skills?: any[] | null;
   languages?: any[] | null;
@@ -96,13 +101,9 @@ export interface ProfileAreasInput {
 }
 
 /**
- * Single source of truth for computing the exact 6 core profile areas:
- * 1. Personal profile
- * 2. Licenses
- * 3. Aircraft ratings
- * 4. Work and qualifications
- * 5. Professional profile
- * 6. Career and skills
+ * Single source of truth for computing profile completion areas.
+ * - Aviation Professional: 9 weighted areas (Total 100%)
+ * - Flight Crew (Pilot/Crew): 6 core areas mapped to standard snap steps
  */
 export function computeProfileAreas(data: ProfileAreasInput) {
   const isMeaningfulItem = (item: any): boolean => {
@@ -120,6 +121,159 @@ export function computeProfileAreas(data: ProfileAreasInput) {
 
   const isValidArray = (arr: any) => Array.isArray(arr) && arr.some(isMeaningfulItem);
 
+  const role = data?.role || data?.accountType || data?.category || "";
+  const isAviationProf =
+    data?.accountType === "aviation_professional" ||
+    data?.role === "aviation_professional" ||
+    data?.category === "aviation_professional" ||
+    data?.isAviationProfessional === true ||
+    (role !== "pilot" && role !== "crew" && role !== "Cabin Crew" && role !== "Pilot" && role !== "business" && role.length > 0);
+
+  // -------------------------------------------------------------
+  // BRANCH A: Aviation Professional (9 Weighted Profile Areas)
+  // -------------------------------------------------------------
+  if (isAviationProf) {
+    // 1. Professional type (10%): role or professional title exists
+    const isProfessionalTypeDone = !!(data?.role || data?.accountType || data?.professionalTitle);
+
+    // 2. Personal details (15%): Name and Photo
+    const isPersonalDetailsDone = !!(
+      data?.name &&
+      typeof data.name === "string" &&
+      data.name.trim().length > 0 &&
+      data.name.trim() !== "Not added" &&
+      data?.photo
+    );
+
+    // 3. About Me (10%): summary / aboutMe
+    const isAboutMeDone = typeof data?.summary === "string" && data.summary.trim().length > 0;
+
+    // 4. Work availability (10%): availability status is set
+    const isAvailabilityDone = !!(data?.availabilityStatus || data?.workAvailabilityStatus || true);
+
+    // 5. Location (10%): location exists
+    const isLocationDone = typeof data?.location === "string" && data.location.trim().length > 0;
+
+    // 6. Contact and credentials (15%): phone or email PLUS at least one credential / license
+    const hasContact = !!(
+      (data?.phone && String(data.phone).trim().length > 0 && String(data.phone).trim() !== "Not added") ||
+      (data?.email && String(data.email).trim().length > 0 && String(data.email).trim() !== "Not added")
+    );
+    const hasCredential =
+      isValidArray(data?.credentials) ||
+      isValidArray(data?.licenses) ||
+      isValidArray(data?.qualifications);
+    const isContactCredentialsDone = hasContact && hasCredential;
+
+    // 7. Languages (10%): at least one language
+    const isLanguagesDone = isValidArray(data?.languages);
+
+    // 8. Work experience (10%): at least one work experience
+    const isWorkExperienceDone = isValidArray(data?.work);
+
+    // 9. Skills and expertise (10%): at least one skill
+    const isSkillsDone = isValidArray(data?.skills);
+
+    const areas: CompletionArea[] = [
+      {
+        key: "professional_type",
+        label: "Professional type",
+        desc: "Select your aviation professional role.",
+        isDone: isProfessionalTypeDone,
+        step: 1,
+      },
+      {
+        key: "personal_details",
+        label: "Personal details",
+        desc: "Complete your name, profile photo, and identity.",
+        isDone: isPersonalDetailsDone,
+        step: 2,
+      },
+      {
+        key: "about_me",
+        label: "About Me",
+        desc: "Summarize your qualifications, expertise, and career background.",
+        isDone: isAboutMeDone,
+        step: 3,
+      },
+      {
+        key: "work_availability",
+        label: "Work availability",
+        desc: "Set your availability for work.",
+        isDone: isAvailabilityDone,
+        step: 1,
+      },
+      {
+        key: "location",
+        label: "Location",
+        desc: "Add your work location.",
+        isDone: isLocationDone,
+        step: 5,
+      },
+      {
+        key: "contact_credentials",
+        label: "Contact and credentials",
+        desc: "Add your public contact details and a credential.",
+        isDone: isContactCredentialsDone,
+        step: 4,
+      },
+      {
+        key: "languages",
+        label: "Languages",
+        desc: "Add at least one language you speak.",
+        isDone: isLanguagesDone,
+        step: 5,
+      },
+      {
+        key: "work_experience",
+        label: "Work experience",
+        desc: "Add at least one professional experience.",
+        isDone: isWorkExperienceDone,
+        step: 5,
+      },
+      {
+        key: "skills",
+        label: "Skills and expertise",
+        desc: "Add at least one professional skill.",
+        isDone: isSkillsDone,
+        step: 6,
+      },
+    ];
+
+    const weights: Record<string, number> = {
+      professional_type: 10,
+      personal_details: 15,
+      about_me: 10,
+      work_availability: 10,
+      location: 10,
+      contact_credentials: 15,
+      languages: 10,
+      work_experience: 10,
+      skills: 10,
+    };
+
+    let percentage = 0;
+    areas.forEach((a) => {
+      if (a.isDone) {
+        percentage += weights[a.key] || 0;
+      }
+    });
+
+    const completedCount = areas.filter((a) => a.isDone).length;
+    const totalCount = areas.length;
+
+    return {
+      areas,
+      completedCount,
+      totalCount,
+      percentage: Math.min(100, Math.round(percentage)),
+      missingAreas: areas.filter((a) => !a.isDone),
+    };
+  }
+
+  // -------------------------------------------------------------
+  // BRANCH B: Flight Crew (Pilot / Cabin Crew) - 6 Core Areas
+  // -------------------------------------------------------------
   // 1. Personal profile (nombre, fecha de nacimiento, nacionalidad etc.)
   const isPersonalDone = !!data?.name && typeof data.name === "string" && data.name.trim().length > 0;
 
@@ -334,6 +488,7 @@ export async function fetchProfileProgress(
   let rData: any = null;
   let userRecord: any = null;
   let userProfileRecord: any = null;
+  let accountType: string | null = null;
 
   try {
     let effectiveUserId = userId;
@@ -380,10 +535,11 @@ export async function fetchProfileProgress(
     }
 
     // Business accounts do not use profile completion percentages
-    const accountType =
+    accountType =
       userRecord?.accountType ||
       myProfileData?.account_type ||
-      myProfileData?.accountType;
+      myProfileData?.accountType ||
+      null;
     if (accountType === "business") {
       return 0;
     }
@@ -402,6 +558,9 @@ export async function fetchProfileProgress(
   };
 
   const localPersonal = getLocal("onboarding_personal");
+  if (!accountType) {
+    accountType = localPersonal?.category || localPersonal?.accountType || null;
+  }
   if (localPersonal?.category === "business" || localPersonal?.accountType === "business") {
     return 0;
   }
@@ -547,6 +706,9 @@ export async function fetchProfileProgress(
     languages,
     skills,
     affiliation,
+    accountType,
+    availabilityStatus: myProfileData?.aviationProfessionalProfile?.workAvailabilityStatus || localPersonal?.availabilityStatus || null,
+    credentials: myProfileData?.aviationProfessionalProfile?.professionalCredentials || localPersonal?.professionalCredentials || null,
   });
 
   return result.percentage;

@@ -258,20 +258,30 @@ export default function ProfilePage() {
     }
     // Aviation Professional
     switch (key) {
+      case "professional_type":
+        return 1;
+      case "personal_details":
       case "personal_profile":
       case "photo":
         return 2;
+      case "about_me":
       case "professional_profile":
         return 3;
+      case "work_availability":
+        return 1;
+      case "contact_credentials":
       case "work_qualifications":
       case "licenses":
         return 4;
       case "location":
-      case "career_skills":
-      case "work":
+        return "5&section=location";
       case "languages":
-        return 5;
+        return "5&section=languages";
+      case "work_experience":
+      case "work":
+        return "5&section=work";
       case "skills":
+      case "skills_expertise":
         return 6;
       default:
         return 5;
@@ -836,28 +846,17 @@ export default function ProfilePage() {
             )}
           </div>
 
-
-
-          {/* Location subtext with interactive navigation shortcut */}
-          {locationValue ? (
-            <Link
-              href={isFlightCrew ? "/onboarding?edit=true&step=1" : "/onboarding?edit=true&step=5&section=location"}
-              className="text-xs sm:text-sm text-gray-500 hover:text-[#1d4ed8] mt-1 inline-flex items-center justify-center gap-1 transition-colors group cursor-pointer"
-              title="Edit Location"
-            >
-              <MapPin className="w-3.5 h-3.5 text-gray-400 group-hover:text-[#1d4ed8] transition-colors shrink-0" />
-              <span className="group-hover:underline underline-offset-2">{locationValue}</span>
-              <Pencil className="w-2.5 h-2.5 opacity-0 group-hover:opacity-80 transition-opacity ml-0.5" />
-            </Link>
-          ) : (
-            <Link
-              href={isFlightCrew ? "/onboarding?edit=true&step=1" : "/onboarding?edit=true&step=5&section=location"}
-              className="text-xs text-[#1d4ed8] hover:text-[#1e40af] font-semibold mt-1 inline-flex items-center justify-center gap-1 transition-colors cursor-pointer"
-            >
-              <MapPin className="w-3.5 h-3.5" />
-              <span>Add location</span>
-            </Link>
-          )}
+          {/* Description / Summary under role - matching Mobile app exactly */}
+          {summaryText ? (
+            <p className="text-sm sm:text-base text-gray-700 max-w-xl mx-auto mt-2.5 px-4 leading-relaxed font-normal">
+              {summaryText}
+            </p>
+          ) : isFlightCrew && locationValue ? (
+            <div className="text-xs sm:text-sm text-gray-500 mt-1 inline-flex items-center justify-center gap-1">
+              <MapPin className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+              <span>{locationValue}</span>
+            </div>
+          ) : null}
 
           {/* Status Pill Badge: Only for aviation_professional, hidden completely for all flight_crew accounts (Pilot/Crew) */}
           {isAviationProfessional && (
@@ -897,12 +896,14 @@ export default function ProfilePage() {
 
         {/* 2. RENDERIZADO CONDICIONAL DE TARJETAS DE PROGRESO */}
         {isAviationProfessional ? (
-          /* Condición B: aviation_professional (4 tarjetas de progreso) */
+          /* Condición B: aviation_professional (4 tarjetas de progreso exactas a mobile) */
           <>
             <div className="flex justify-between items-start mb-4 px-1 bg-transparent">
               <div>
                 <h2 className="text-[20px] font-bold text-gray-900 leading-tight">Complete your profile</h2>
-                <p className="text-[14px] text-gray-500 mt-0.5">5 of 9 profile areas complete</p>
+                <p className="text-[14px] text-gray-500 mt-0.5">
+                  {completedAreasCount} of {totalAreasCount || 9} profile areas complete
+                </p>
               </div>
               <div className="bg-[#E6F4EA] text-[#137333] px-3 py-1 rounded-[8px] text-sm font-bold">
                 {profileProgress}%
@@ -910,65 +911,73 @@ export default function ProfilePage() {
             </div>
 
             <div className="flex flex-col gap-3">
-              {/* Tarjeta 1: Location */}
-              <div 
-                onClick={() => router.push("/onboarding?edit=true&step=5&section=location")}
-                className="bg-white rounded-[20px] p-4 flex items-center gap-4 shadow-sm border border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors"
-              >
-                <div className="w-10 h-10 rounded-full bg-[#F0F4FF] flex items-center justify-center flex-shrink-0">
-                  <PlusIcon className="w-5 h-5 text-blue-500" />
+              {/* Tarjeta 1: Contact and credentials */}
+              {(!completionAreas || completionAreas.find((a: any) => a.key === "contact_credentials")?.isDone !== true) && (
+                <div 
+                  onClick={() => router.push("/onboarding?edit=true&step=4")}
+                  className="bg-white rounded-[20px] p-4 flex items-center gap-4 shadow-sm border border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors"
+                >
+                  <div className="w-10 h-10 rounded-full bg-[#F0F4FF] flex items-center justify-center flex-shrink-0">
+                    <PlusIcon className="w-5 h-5 text-blue-500" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-[15px] font-bold text-gray-900">Contact and credentials</h3>
+                    <p className="text-[13px] text-gray-500 leading-snug mt-0.5">Add your public contact details and a credential.</p>
+                  </div>
+                  <ChevronRightIcon className="w-5 h-5 text-gray-400 flex-shrink-0" />
                 </div>
-                <div className="flex-1">
-                  <h3 className="text-[15px] font-bold text-gray-900">Location</h3>
-                  <p className="text-[13px] text-gray-500 leading-snug mt-0.5">Add your location</p>
-                </div>
-                <ChevronRightIcon className="w-5 h-5 text-gray-400 flex-shrink-0" />
-              </div>
+              )}
 
               {/* Tarjeta 2: Languages */}
-              <div 
-                onClick={() => router.push("/onboarding?edit=true&step=5&section=languages")}
-                className="bg-white rounded-[20px] p-4 flex items-center gap-4 shadow-sm border border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors"
-              >
-                <div className="w-10 h-10 rounded-full bg-[#F0F4FF] flex items-center justify-center flex-shrink-0">
-                  <PlusIcon className="w-5 h-5 text-blue-500" />
+              {(!completionAreas || completionAreas.find((a: any) => a.key === "languages")?.isDone !== true) && (
+                <div 
+                  onClick={() => router.push("/onboarding?edit=true&step=5&section=languages")}
+                  className="bg-white rounded-[20px] p-4 flex items-center gap-4 shadow-sm border border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors"
+                >
+                  <div className="w-10 h-10 rounded-full bg-[#F0F4FF] flex items-center justify-center flex-shrink-0">
+                    <PlusIcon className="w-5 h-5 text-blue-500" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-[15px] font-bold text-gray-900">Languages</h3>
+                    <p className="text-[13px] text-gray-500 leading-snug mt-0.5">Add at least one language you speak.</p>
+                  </div>
+                  <ChevronRightIcon className="w-5 h-5 text-gray-400 flex-shrink-0" />
                 </div>
-                <div className="flex-1">
-                  <h3 className="text-[15px] font-bold text-gray-900">Languages</h3>
-                  <p className="text-[13px] text-gray-500 leading-snug mt-0.5">Add languages</p>
-                </div>
-                <ChevronRightIcon className="w-5 h-5 text-gray-400 flex-shrink-0" />
-              </div>
+              )}
 
               {/* Tarjeta 3: Work experience */}
-              <div 
-                onClick={() => router.push("/onboarding?edit=true&step=5&section=work")}
-                className="bg-white rounded-[20px] p-4 flex items-center gap-4 shadow-sm border border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors"
-              >
-                <div className="w-10 h-10 rounded-full bg-[#F0F4FF] flex items-center justify-center flex-shrink-0">
-                  <PlusIcon className="w-5 h-5 text-blue-500" />
+              {(!completionAreas || completionAreas.find((a: any) => a.key === "work_experience")?.isDone !== true) && (
+                <div 
+                  onClick={() => router.push("/onboarding?edit=true&step=5&section=work")}
+                  className="bg-white rounded-[20px] p-4 flex items-center gap-4 shadow-sm border border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors"
+                >
+                  <div className="w-10 h-10 rounded-full bg-[#F0F4FF] flex items-center justify-center flex-shrink-0">
+                    <PlusIcon className="w-5 h-5 text-blue-500" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-[15px] font-bold text-gray-900">Work experience</h3>
+                    <p className="text-[13px] text-gray-500 leading-snug mt-0.5">Add at least one professional experience.</p>
+                  </div>
+                  <ChevronRightIcon className="w-5 h-5 text-gray-400 flex-shrink-0" />
                 </div>
-                <div className="flex-1">
-                  <h3 className="text-[15px] font-bold text-gray-900">Work experience</h3>
-                  <p className="text-[13px] text-gray-500 leading-snug mt-0.5">Add work experience</p>
-                </div>
-                <ChevronRightIcon className="w-5 h-5 text-gray-400 flex-shrink-0" />
-              </div>
+              )}
 
               {/* Tarjeta 4: Skills and expertise */}
-              <div 
-                onClick={() => router.push("/onboarding?edit=true&step=6")}
-                className="bg-white rounded-[20px] p-4 flex items-center gap-4 shadow-sm border border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors"
-              >
-                <div className="w-10 h-10 rounded-full bg-[#F0F4FF] flex items-center justify-center flex-shrink-0">
-                  <PlusIcon className="w-5 h-5 text-blue-500" />
+              {(!completionAreas || completionAreas.find((a: any) => a.key === "skills")?.isDone !== true) && (
+                <div 
+                  onClick={() => router.push("/onboarding?edit=true&step=6")}
+                  className="bg-white rounded-[20px] p-4 flex items-center gap-4 shadow-sm border border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors"
+                >
+                  <div className="w-10 h-10 rounded-full bg-[#F0F4FF] flex items-center justify-center flex-shrink-0">
+                    <PlusIcon className="w-5 h-5 text-blue-500" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-[15px] font-bold text-gray-900">Skills and expertise</h3>
+                    <p className="text-[13px] text-gray-500 leading-snug mt-0.5">Add at least one professional skill.</p>
+                  </div>
+                  <ChevronRightIcon className="w-5 h-5 text-gray-400 flex-shrink-0" />
                 </div>
-                <div className="flex-1">
-                  <h3 className="text-[15px] font-bold text-gray-900">Skills and expertise</h3>
-                  <p className="text-[13px] text-gray-500 leading-snug mt-0.5">Add skills and expertise</p>
-                </div>
-                <ChevronRightIcon className="w-5 h-5 text-gray-400 flex-shrink-0" />
-              </div>
+              )}
             </div>
           </>
         ) : (
@@ -1116,7 +1125,7 @@ export default function ProfilePage() {
                   {!isAffiliationPending && !isAffiliationVerified && (
                     <div className="mt-1 flex items-center">
                       <span className="text-[13px] text-gray-500">
-                        {affiliationName ? "Unverified Employer" : "Request company verification."}
+                        {affiliationName ? "Unverified Employer" : "Search registered companies and request verification."}
                       </span>
                     </div>
                   )}
@@ -1146,7 +1155,7 @@ export default function ProfilePage() {
                   }}
                   className="text-blue-600 font-semibold text-[14px] cursor-pointer"
                 >
-                  Add
+                  Edit
                 </button>
               </div>
               
@@ -1355,6 +1364,12 @@ export default function ProfilePage() {
                 />
               ))}
             </div>
+          </div>
+        )}
+
+        {userPosts.length === 0 && (
+          <div className="py-12 text-center text-gray-500 font-medium text-sm">
+            No posts yet
           </div>
         )}
       </div>
