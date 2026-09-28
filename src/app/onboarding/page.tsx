@@ -35,8 +35,14 @@ function OnboardingContent() {
   const parsedInitialStep = urlStep && !isNaN(parseInt(urlStep, 10)) && parseInt(urlStep, 10) >= 1 ? parseInt(urlStep, 10) : 1;
   const initialEditMode = urlEdit === "true" || !!urlStep;
 
+  const initialCategory: "flight_crew" | "aviation_professional" =
+    urlCat === "aviation_professional" ||
+    (typeof window !== "undefined" && localStorage.getItem("account_type") === "aviation_professional")
+      ? "aviation_professional"
+      : "flight_crew";
+
   const [step, setStep] = useState(parsedInitialStep);
-  const [category, setCategory] = useState<"flight_crew" | "aviation_professional">("flight_crew");
+  const [category, setCategory] = useState<"flight_crew" | "aviation_professional">(initialCategory);
   const [isCheckingAccess, setIsCheckingAccess] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isEditMode, setIsEditMode] = useState(initialEditMode);
@@ -69,16 +75,21 @@ function OnboardingContent() {
           }
         }
         
-        // Fetch User and Resume records from database
-        const [{ data: userRecord }, { data: resumeRecord }] = await Promise.all([
+        // Fetch User, Resume, and UserProfile records from database (only querying columns that exist)
+        const [{ data: userRecord }, { data: resumeRecord }, { data: userProfileRecord }] = await Promise.all([
           supabase
             .from("users")
-            .select("id, onboarded, accountType, role, professionalRole, professionalTitleKey, firstName, lastName, profileImage, email, phone, location, availability_status")
+            .select("id, onboarded, accountType, role, professionalRole, professionalTitleKey, firstName, lastName, profileImage, email")
             .eq("id", session.user.id)
             .maybeSingle(),
           supabase
             .from("resumes")
             .select("data")
+            .eq("userId", session.user.id)
+            .maybeSingle(),
+          supabase
+            .from("user_profiles")
+            .select("contactPhone, contactEmail, locationCity, locationCountry, workAvailabilityStatus")
             .eq("userId", session.user.id)
             .maybeSingle(),
         ]);
@@ -98,25 +109,14 @@ function OnboardingContent() {
           metaAccountType === "aviation_professional" ||
           localCat === "aviation_professional" ||
           userRecord?.professionalRole === "aviation_professional" ||
+          userRecord?.accountType === "aviation_professional" ||
           userRecord?.role === "aviation_professional" ||
-          !!userRecord?.professionalTitleKey
+          !!userRecord?.professionalTitleKey ||
+          (typeof window !== "undefined" && localStorage.getItem("account_type") === "aviation_professional")
         ) {
           currentCategory = "aviation_professional";
         } else if (accountType === "flight_crew" || accountType === "aviation_professional") {
           currentCategory = accountType;
-        }
-
-        const hasRole = Boolean(
-          accountType &&
-          accountType !== "individual" &&
-          accountType !== "corporate_member" &&
-          accountType !== "null"
-        );
-
-        // If completed with role and not editing or accessing a specific step, go to home
-        if (onboarded && hasRole && !editMode && !urlStep) {
-          router.replace("/home");
-          return;
         }
 
         // Pre-populate localStorage for all steps
@@ -131,13 +131,13 @@ function OnboardingContent() {
           firstName: localPersonal.firstName || crewData.personal?.firstName || userRecord?.firstName || "",
           lastName: localPersonal.lastName || crewData.personal?.lastName || userRecord?.lastName || "",
           email: localPersonal.email || crewData.personal?.email || userRecord?.email || session.user.email || "",
-          phone: localPersonal.phone || crewData.personal?.phone || userRecord?.phone || "",
-          location: localPersonal.location || crewData.personal?.location || userRecord?.location || "",
+          phone: localPersonal.phone || crewData.personal?.phone || userProfileRecord?.contactPhone || "",
+          location: localPersonal.location || crewData.personal?.location || ([userProfileRecord?.locationCity, userProfileRecord?.locationCountry].filter(Boolean).join(", ")) || "",
           availabilityStatus:
             localPersonal.availabilityStatus ||
             localPersonal.workAvailabilityStatus ||
             crewData.personal?.availabilityStatus ||
-            userRecord?.availability_status ||
+            userProfileRecord?.workAvailabilityStatus ||
             "active",
         };
 

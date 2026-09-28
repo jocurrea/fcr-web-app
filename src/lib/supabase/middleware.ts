@@ -226,11 +226,6 @@ export async function updateSession(request: NextRequest) {
       }
     }
 
-    // If trying to access /onboarding without edit flag
-    if (pathname === "/onboarding" && !url.searchParams.has("edit")) {
-      return makeRedirect("/home");
-    }
-
     return response;
   }
 

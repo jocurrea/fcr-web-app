@@ -938,7 +938,7 @@ export default function ProfilePage() {
               {/* Tarjeta 1: Contact and credentials */}
               {(!completionAreas || completionAreas.find((a: any) => a.key === "contact_credentials")?.isDone !== true) && (
                 <div 
-                  onClick={() => router.push("/onboarding?edit=true&step=4")}
+                  onClick={() => router.push("/onboarding?edit=true&step=4&category=aviation_professional")}
                   className="bg-white rounded-[20px] p-4 flex items-center gap-4 shadow-sm border border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors"
                 >
                   <div className="w-10 h-10 rounded-full bg-[#F0F4FF] flex items-center justify-center flex-shrink-0">
@@ -955,7 +955,7 @@ export default function ProfilePage() {
               {/* Tarjeta 2: Languages */}
               {(!completionAreas || completionAreas.find((a: any) => a.key === "languages")?.isDone !== true) && (
                 <div 
-                  onClick={() => router.push("/onboarding?edit=true&step=5&section=languages")}
+                  onClick={() => router.push("/onboarding?edit=true&step=5&section=languages&category=aviation_professional")}
                   className="bg-white rounded-[20px] p-4 flex items-center gap-4 shadow-sm border border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors"
                 >
                   <div className="w-10 h-10 rounded-full bg-[#F0F4FF] flex items-center justify-center flex-shrink-0">
@@ -972,7 +972,7 @@ export default function ProfilePage() {
               {/* Tarjeta 3: Work experience */}
               {(!completionAreas || completionAreas.find((a: any) => a.key === "work_experience")?.isDone !== true) && (
                 <div 
-                  onClick={() => router.push("/onboarding?edit=true&step=5&section=work")}
+                  onClick={() => router.push("/onboarding?edit=true&step=5&section=work&category=aviation_professional")}
                   className="bg-white rounded-[20px] p-4 flex items-center gap-4 shadow-sm border border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors"
                 >
                   <div className="w-10 h-10 rounded-full bg-[#F0F4FF] flex items-center justify-center flex-shrink-0">
@@ -989,7 +989,7 @@ export default function ProfilePage() {
               {/* Tarjeta 4: Skills and expertise */}
               {(!completionAreas || completionAreas.find((a: any) => a.key === "skills")?.isDone !== true) && (
                 <div 
-                  onClick={() => router.push("/onboarding?edit=true&step=6")}
+                  onClick={() => router.push("/onboarding?edit=true&step=6&category=aviation_professional")}
                   className="bg-white rounded-[20px] p-4 flex items-center gap-4 shadow-sm border border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors"
                 >
                   <div className="w-10 h-10 rounded-full bg-[#F0F4FF] flex items-center justify-center flex-shrink-0">
@@ -1175,7 +1175,7 @@ export default function ProfilePage() {
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    router.push("/onboarding?edit=true&step=5");
+                    router.push("/onboarding?edit=true&step=5&category=aviation_professional");
                   }}
                   className="text-blue-600 font-semibold text-[14px] cursor-pointer"
                 >
@@ -1188,7 +1188,7 @@ export default function ProfilePage() {
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    router.push("/onboarding?edit=true&step=5&section=location");
+                    router.push("/onboarding?edit=true&step=5&section=location&category=aviation_professional");
                   }}
                   className="cursor-pointer"
                 >
@@ -1204,7 +1204,7 @@ export default function ProfilePage() {
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    router.push("/onboarding?edit=true&step=5&section=work");
+                    router.push("/onboarding?edit=true&step=5&section=work&category=aviation_professional");
                   }}
                   className="cursor-pointer"
                 >
@@ -1222,7 +1222,7 @@ export default function ProfilePage() {
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    router.push("/onboarding?edit=true&step=5&section=languages");
+                    router.push("/onboarding?edit=true&step=5&section=languages&category=aviation_professional");
                   }}
                   className="cursor-pointer"
                 >
@@ -1243,7 +1243,7 @@ export default function ProfilePage() {
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    router.push("/onboarding?edit=true&step=6");
+                    router.push("/onboarding?edit=true&step=6&category=aviation_professional");
                   }}
                   className="text-blue-600 font-semibold text-[14px] cursor-pointer"
                 >
@@ -1266,7 +1266,7 @@ export default function ProfilePage() {
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    router.push("/onboarding?edit=true&step=4");
+                    router.push("/onboarding?edit=true&step=4&category=aviation_professional");
                   }}
                   className="text-blue-600 font-semibold text-[14px] cursor-pointer"
                 >
