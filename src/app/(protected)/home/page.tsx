@@ -62,6 +62,11 @@ function HomeContent() {
         sessionStorage.getItem("fcr_invitation_token") ||
         sessionStorage.getItem("pending_invite_token");
       if (pendingInviteToken) {
+        // Clear immediately so it only redirects once upon arrival and never gets stuck
+        try {
+          sessionStorage.removeItem("fcr_invitation_token");
+          sessionStorage.removeItem("pending_invite_token");
+        } catch {}
         window.location.replace("/invitations/accept");
         return;
       }

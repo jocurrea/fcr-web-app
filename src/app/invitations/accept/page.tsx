@@ -206,8 +206,16 @@ function AcceptInvitationContent() {
         // Check if invitation already has a final status
         const status = (data.status || "").toLowerCase();
         if (status === "accepted") {
+          try {
+            sessionStorage.removeItem(SESSION_STORAGE_KEY);
+            sessionStorage.removeItem("pending_invite_token");
+          } catch {}
           setActionState("already_accepted");
         } else if (status === "declined") {
+          try {
+            sessionStorage.removeItem(SESSION_STORAGE_KEY);
+            sessionStorage.removeItem("pending_invite_token");
+          } catch {}
           setActionState("already_declined");
         } else if (
           status === "expired" ||
@@ -267,6 +275,8 @@ function AcceptInvitationContent() {
       // Clean up sessionStorage after successful acceptance
       try {
         sessionStorage.removeItem(SESSION_STORAGE_KEY);
+        sessionStorage.removeItem("pending_invite_token");
+        sessionStorage.removeItem("auth_redirect_url");
       } catch {}
 
       setActionState("accepted");
@@ -444,6 +454,12 @@ function AcceptInvitationContent() {
           <div className="w-full pt-2 flex flex-col gap-2.5">
             <Link
               href="/profile"
+              onClick={() => {
+                try {
+                  sessionStorage.removeItem(SESSION_STORAGE_KEY);
+                  sessionStorage.removeItem("pending_invite_token");
+                } catch {}
+              }}
               className="w-full py-4 px-6 rounded-2xl bg-[#1d4ed8] hover:bg-[#1e40af] text-white text-sm font-bold transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
             >
               <span>View My Profile</span>
@@ -451,6 +467,12 @@ function AcceptInvitationContent() {
             </Link>
             <Link
               href="/home"
+              onClick={() => {
+                try {
+                  sessionStorage.removeItem(SESSION_STORAGE_KEY);
+                  sessionStorage.removeItem("pending_invite_token");
+                } catch {}
+              }}
               className="w-full py-3.5 px-6 rounded-2xl bg-gray-50 hover:bg-gray-100 text-gray-700 text-sm font-semibold transition-colors flex items-center justify-center cursor-pointer"
             >
               <span>Go to Feed</span>

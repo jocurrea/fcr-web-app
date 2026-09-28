@@ -392,9 +392,16 @@ export default function ProfilePage() {
 
   const completionPercentage = profileProgress;
 
-  // 3. Scroll to top on mount and when loading finishes
+  // 3. Scroll to top on mount and clean up any residual invitation session tokens
   useEffect(() => {
     window.scrollTo(0, 0);
+    if (typeof window !== "undefined") {
+      try {
+        sessionStorage.removeItem("fcr_invitation_token");
+        sessionStorage.removeItem("pending_invite_token");
+        sessionStorage.removeItem("auth_redirect_url");
+      } catch {}
+    }
   }, []);
 
   useEffect(() => {
