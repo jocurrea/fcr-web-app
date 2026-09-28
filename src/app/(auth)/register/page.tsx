@@ -30,6 +30,8 @@ async function clearStaleSessionCache() {
             key.startsWith("user_posts") ||
             key.startsWith("userName") ||
             key === "current_user_id" ||
+            key === "cached_affiliation" ||
+            key.startsWith("cached_") ||
             key === "account_type" ||
             key === "accountType" ||
             key === "flightcrew_onboarded" ||

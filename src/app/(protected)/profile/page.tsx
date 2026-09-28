@@ -385,8 +385,8 @@ export default function ProfilePage() {
     ? personal.languages
     : [];
 
-  const affiliationName = affiliationInfo?.name || personal?.companyName || personal?.linkedCompany || null;
-  const derivedStatus = affiliationInfo?.status || personal?.companyStatus || (affiliationName ? "pending" : null);
+  const affiliationName = affiliationInfo?.name || null;
+  const derivedStatus = affiliationInfo?.status || null;
   const isAffiliationVerified = derivedStatus === "active" || derivedStatus === "approved" || derivedStatus === "verified";
   const isAffiliationPending = derivedStatus === "pending" || derivedStatus === "unverified";
 

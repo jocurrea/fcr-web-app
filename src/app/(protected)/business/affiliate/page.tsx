@@ -52,6 +52,12 @@ export default function BusinessAffiliatePage() {
         // Fetch user profile via RPC or direct tables
         const { data: profileData, error: profileErr } = await supabase.rpc("get_my_profile");
 
+        let foundAffiliation: {
+          companyName: string | null;
+          companyId: string | null;
+          status: "pending" | "active" | "verified" | "unverified" | null;
+        } | null = null;
+
         if (!profileErr && profileData) {
           const profile = Array.isArray(profileData) ? profileData[0] : profileData;
           if (profile?.company_name || profile?.companyName) {
@@ -63,26 +69,42 @@ export default function BusinessAffiliatePage() {
                 ? "pending"
                 : "unverified";
 
-            setCurrentAffiliation({
+            foundAffiliation = {
               companyName: profile.company_name || profile.companyName,
               companyId: profile.company_id || profile.companyId || null,
               status,
-            });
-          }
-        } else {
-          // Fallback: Check local storage
-          const savedPersonal = localStorage.getItem("onboarding_personal");
-          if (savedPersonal) {
-            const parsed = JSON.parse(savedPersonal);
-            if (parsed.companyName || parsed.company) {
-              setCurrentAffiliation({
-                companyName: parsed.companyName || parsed.company,
-                companyId: parsed.companyId || null,
-                status: parsed.companyStatus || "unverified",
-              });
-            }
+            };
           }
         }
+
+        if (!foundAffiliation) {
+          const { data: affRecord } = await supabase
+            .from("company_affiliations")
+            .select("*, companies(name)")
+            .eq("user_id", session.user.id)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (affRecord) {
+            const rawStatus = (affRecord.status || "unverified").toLowerCase();
+            const status: "pending" | "active" | "verified" | "unverified" =
+              rawStatus === "approved" || rawStatus === "active" || rawStatus === "verified"
+                ? "verified"
+                : rawStatus === "pending"
+                ? "pending"
+                : "unverified";
+
+            const companyObj = Array.isArray(affRecord.companies) ? affRecord.companies[0] : affRecord.companies;
+            foundAffiliation = {
+              companyName: companyObj?.name || affRecord.company_name_snapshot || "Company",
+              companyId: affRecord.company_id || null,
+              status,
+            };
+          }
+        }
+
+        setCurrentAffiliation(foundAffiliation);
       } catch (err) {
         console.error("Error loading affiliation details:", err);
       } finally {

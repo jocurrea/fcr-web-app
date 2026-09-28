@@ -110,30 +110,7 @@ export function UserProfileProvider({
   const [skills, setSkills] = useState<string[]>([]);
   const [resume, setResume] = useState<any | null>(null);
   const [companyInfo, setCompanyInfo] = useState<CompanyInfo | null>(null);
-  const [affiliationInfo, setAffiliationInfo] = useState<AffiliationInfo | null>(() => {
-    if (typeof window !== "undefined") {
-      try {
-        const savedAff = localStorage.getItem("cached_affiliation");
-        if (savedAff) return JSON.parse(savedAff);
-
-        const savedPers = localStorage.getItem("onboarding_personal");
-        if (savedPers) {
-          const parsed = JSON.parse(savedPers);
-          const name = parsed.companyName || parsed.linkedCompany || parsed.company;
-          if (name) {
-            return {
-              name,
-              id: parsed.companyId || parsed.linkedCompanyId || null,
-              status: parsed.companyStatus || (parsed.companyId ? "pending" : "unverified"),
-              logo: parsed.companyLogo || parsed.linkedCompanyLogo || null,
-              location: parsed.companyLocation || null,
-            };
-          }
-        }
-      } catch {}
-    }
-    return null;
-  });
+  const [affiliationInfo, setAffiliationInfo] = useState<AffiliationInfo | null>(null);
   const [companyStatus, setCompanyStatus] = useState<string>("pending");
   const [userStatus, setUserStatus] = useState<string>("active");
   const [onboarded, setOnboarded] = useState<boolean>(false);
@@ -225,6 +202,26 @@ export function UserProfileProvider({
 
       const userId = session.user.id;
       if (typeof window !== "undefined") {
+        const prevUserId = localStorage.getItem("current_user_id");
+        if (prevUserId && prevUserId !== userId) {
+          try {
+            localStorage.removeItem("cached_affiliation");
+            const keysToRemove = [];
+            for (let i = 0; i < localStorage.length; i++) {
+              const k = localStorage.key(i);
+              if (
+                k &&
+                (k.startsWith("onboarding_") ||
+                  k.startsWith("userProfile") ||
+                  k.startsWith("userCover") ||
+                  k.startsWith("cached_"))
+              ) {
+                keysToRemove.push(k);
+              }
+            }
+            keysToRemove.forEach((k) => localStorage.removeItem(k));
+          } catch {}
+        }
         localStorage.setItem("current_user_id", userId);
       }
 
@@ -652,35 +649,48 @@ export function UserProfileProvider({
         }
       }
 
-      // If affiliation data is STILL missing (due to RLS or caching), build it from local state and fetch company logo/location
+      // If affiliation data is STILL missing, only check database crewData (never unauthenticated localPersonal)
       if (!resolvedAffiliation) {
-        const localCompId = crewData?.personal?.companyId || localPersonal?.companyId;
-        const localCompName = crewData?.personal?.companyName || localPersonal?.companyName;
-        const localCompStatus = crewData?.personal?.companyStatus || localPersonal?.companyStatus || "pending";
+        const dbCompId = crewData?.personal?.companyId;
+        const dbCompName = crewData?.personal?.companyName;
+        const dbCompStatus = crewData?.personal?.companyStatus || "pending";
         
-        if (localCompId || localCompName) {
+        if (dbCompId || dbCompName) {
           resolvedAffiliation = {
-            name: localCompName || "Company Name",
-            id: localCompId || null,
-            status: localCompStatus,
+            name: dbCompName || "Company Name",
+            id: dbCompId || null,
+            status: dbCompStatus,
           };
           
-          if (localCompId) {
-            const { data: fallbackCompany } = await supabase.from("companies").select("name, logo_url, location").eq("id", localCompId).maybeSingle();
+          if (dbCompId) {
+            const { data: fallbackCompany } = await supabase
+              .from("companies")
+              .select("name, logo_url, location")
+              .eq("id", dbCompId)
+              .maybeSingle();
             if (fallbackCompany) {
               resolvedAffiliation.name = fallbackCompany.name || resolvedAffiliation.name;
               resolvedAffiliation.logo = fallbackCompany.logo_url;
               resolvedAffiliation.location = fallbackCompany.location;
             }
           }
-          setAffiliationInfo(resolvedAffiliation);
         }
       }
 
-      if (resolvedAffiliation && typeof window !== "undefined") {
-        try {
-          localStorage.setItem("cached_affiliation", JSON.stringify(resolvedAffiliation));
-        } catch {}
+      if (resolvedAffiliation) {
+        setAffiliationInfo(resolvedAffiliation);
+        if (typeof window !== "undefined") {
+          try {
+            localStorage.setItem("cached_affiliation", JSON.stringify(resolvedAffiliation));
+          } catch {}
+        }
+      } else {
+        setAffiliationInfo(null);
+        if (typeof window !== "undefined") {
+          try {
+            localStorage.removeItem("cached_affiliation");
+          } catch {}
+        }
       }
 
       // 11. Resolve Business Company Info if applicable

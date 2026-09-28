@@ -90,10 +90,33 @@ export function ProtectedHeader() {
       
       // Clear all user session tokens, role, and onboarded markers
       if (typeof window !== "undefined") {
-        localStorage.removeItem("current_user_id");
-        localStorage.removeItem("account_type");
-        localStorage.removeItem("accountType");
-        localStorage.removeItem("flightcrew_onboarded");
+        try {
+          const keysToRemove: string[] = [];
+          for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (
+              key &&
+              (key.startsWith("sb-") ||
+                key.includes("auth-token") ||
+                key.startsWith("onboarding_") ||
+                key.startsWith("userProfile") ||
+                key.startsWith("userCover") ||
+                key.startsWith("user_posts") ||
+                key.startsWith("userName") ||
+                key === "current_user_id" ||
+                key === "cached_affiliation" ||
+                key.startsWith("cached_") ||
+                key === "account_type" ||
+                key === "accountType" ||
+                key === "flightcrew_onboarded" ||
+                key === "pending_role" ||
+                key === "onboarding_step")
+            ) {
+              keysToRemove.push(key);
+            }
+          }
+          keysToRemove.forEach((k) => localStorage.removeItem(k));
+        } catch {}
         sessionStorage.clear();
         document.cookie = "flightcrew_onboarded=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT";
         window.location.replace("/welcome");

@@ -44,8 +44,33 @@ export default function LoginPage() {
   }, []);
 
   const handlePostLoginRedirect = useCallback(async (userId: string, session: Session | null) => {
-    cleanResidualParams();
-    localStorage.setItem("current_user_id", userId);
+    const prevUserId = typeof window !== "undefined" ? localStorage.getItem("current_user_id") : null;
+    if (prevUserId && prevUserId !== userId && typeof window !== "undefined") {
+      try {
+        const keysToRemove: string[] = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (
+            key &&
+            (key.startsWith("onboarding_") ||
+              key.startsWith("userProfile") ||
+              key.startsWith("userCover") ||
+              key.startsWith("user_posts") ||
+              key.startsWith("userName") ||
+              key === "cached_affiliation" ||
+              key.startsWith("cached_") ||
+              key === "account_type" ||
+              key === "accountType")
+          ) {
+            keysToRemove.push(key);
+          }
+        }
+        keysToRemove.forEach((k) => localStorage.removeItem(k));
+      } catch {}
+    }
+    if (typeof window !== "undefined") {
+      localStorage.setItem("current_user_id", userId);
+    }
 
     try {
       // 1. Validación de Estado: Consulta el perfil del usuario en la base de datos (Supabase)
