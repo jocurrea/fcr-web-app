@@ -116,15 +116,32 @@ export default function ProfilePage() {
 
   const isFlightCrew = !isBusiness && !isAviationProfessional;
 
-  const rawRole = professionalRole || personal?.roleTitle || personal?.professionalTitle;
+  const ROLE_DISPLAY_NAMES: Record<string, string> = {
+    operations_officer: "Operations Officer",
+    aircraft_mechanic: "Aircraft Mechanic",
+    air_traffic_controller: "Air Traffic Controller",
+    aeronautical_engineer: "Aeronautical Engineer",
+    other_aviation_professional: "Aviation Professional",
+    aviation_professional: "Aviation Professional",
+    pilot: "Pilot",
+    crew: "Cabin Crew",
+  };
+
+  const titleKey =
+    personal?.professionalTitleKey ||
+    personal?.roleTitle ||
+    personal?.professionalRoleKey ||
+    personal?.role;
 
   const roleLabel = isFlightCrew
-    ? (rawRole === "crew" || rawRole === "Cabin Crew"
+    ? (professionalRole === "crew" || professionalRole === "Cabin Crew"
         ? "Cabin Crew"
-        : rawRole === "pilot" || rawRole === "Pilot"
-        ? "Pilot"
-        : rawRole || "Pilot")
-    : (rawRole || "Operations Officer");
+        : "Pilot")
+    : (personal?.professionalTitle ||
+       personal?.professionalTitleOther ||
+       (titleKey && ROLE_DISPLAY_NAMES[titleKey]) ||
+       personal?.professionalRoleLabel ||
+       "Air Traffic Controller");
 
   const flightHoursValue =
     personal?.totalFlightHours ||
@@ -832,7 +849,7 @@ export default function ProfilePage() {
 
           {/* Role in blue */}
           <div className="flex items-center justify-center gap-2 mt-1">
-            <p className="text-sm sm:text-base font-bold text-[#1d4ed8] capitalize">
+            <p className="text-sm sm:text-base font-bold text-[#1d4ed8]">
               {roleLabel}
             </p>
             {isAviationProfessional && (

@@ -412,10 +412,30 @@ export function UserProfileProvider({
         professionalRole:
           userData?.professionalRole ||
           localPersonal?.professionalRole ||
-          localPersonal?.professionalRoleLabel ||
-          localPersonal?.professionalTitle ||
           crewData?.personal?.professionalRole ||
           "",
+        professionalTitleKey:
+          myProfileData?.aviationProfessionalProfile?.professionalTitleKey ||
+          myProfileData?.aviationProfessionalProfile?.professionalTitle?.key ||
+          userProfileData?.professionalTitleKey ||
+          userData?.professionalTitleKey ||
+          localPersonal?.professionalTitleKey ||
+          null,
+        professionalTitleOther:
+          myProfileData?.aviationProfessionalProfile?.professionalTitleOther ||
+          userProfileData?.professionalTitleOther ||
+          userData?.professionalTitleOther ||
+          localPersonal?.professionalTitleOther ||
+          null,
+        professionalTitle:
+          myProfileData?.aviationProfessionalProfile?.professionalTitle?.label ||
+          userProfileData?.professionalTitle?.label ||
+          myProfileData?.aviationProfessionalProfile?.professionalTitleOther ||
+          userProfileData?.professionalTitleOther ||
+          localPersonal?.professionalRoleLabel ||
+          localPersonal?.roleTitle ||
+          localPersonal?.professionalTitle ||
+          null,
         role: userData?.role || localPersonal?.role || crewData?.personal?.role || "",
         totalFlightHours:
           myProfileData?.flight_hours ||
@@ -444,32 +464,40 @@ export function UserProfileProvider({
 
       // 6. Build final licenses / credentials list
       let resolvedLicenses: any[] = [];
-      if (Array.isArray(crewData?.licenses) && crewData.licenses.length > 0) {
-        resolvedLicenses = crewData.licenses;
-      } else if (Array.isArray(localLicenses) && localLicenses.length > 0) {
-        resolvedLicenses = localLicenses;
-      } else if (
-        Array.isArray(userProfileData?.professionalCredentials) &&
-        userProfileData.professionalCredentials.length > 0
-      ) {
-        resolvedLicenses = userProfileData.professionalCredentials;
-      } else if (
-        Array.isArray(myProfileData?.professionalCredentials) &&
-        myProfileData.professionalCredentials.length > 0
-      ) {
-        resolvedLicenses = myProfileData.professionalCredentials;
-      } else if (
-        Array.isArray(myProfileData?.professional_credentials) &&
-        myProfileData.professional_credentials.length > 0
-      ) {
-        resolvedLicenses = myProfileData.professional_credentials;
-      } else if (
-        Array.isArray(mergedPersonal?.licenses) &&
-        mergedPersonal.licenses.length > 0
-      ) {
-        resolvedLicenses = mergedPersonal.licenses;
-      } else if (mergedPersonal?.licenseCertification) {
-        resolvedLicenses = [mergedPersonal.licenseCertification];
+      const isAviationProf = resolvedAccountType === "aviation_professional";
+
+      if (isAviationProf) {
+        resolvedLicenses =
+          (Array.isArray(myProfileData?.aviationProfessionalProfile?.professionalCredentials) &&
+          myProfileData.aviationProfessionalProfile.professionalCredentials.length > 0
+            ? myProfileData.aviationProfessionalProfile.professionalCredentials
+            : null) ||
+          (Array.isArray(userProfileData?.professionalCredentials) &&
+          userProfileData.professionalCredentials.length > 0
+            ? userProfileData.professionalCredentials
+            : null) ||
+          (Array.isArray(myProfileData?.professionalCredentials) &&
+          myProfileData.professionalCredentials.length > 0
+            ? myProfileData.professionalCredentials
+            : null) ||
+          (Array.isArray(myProfileData?.professional_credentials) &&
+          myProfileData.professional_credentials.length > 0
+            ? myProfileData.professional_credentials
+            : null) ||
+          [];
+      } else {
+        if (Array.isArray(crewData?.licenses) && crewData.licenses.length > 0) {
+          resolvedLicenses = crewData.licenses;
+        } else if (Array.isArray(localLicenses) && localLicenses.length > 0) {
+          resolvedLicenses = localLicenses;
+        } else if (
+          Array.isArray(mergedPersonal?.licenses) &&
+          mergedPersonal.licenses.length > 0
+        ) {
+          resolvedLicenses = mergedPersonal.licenses;
+        } else if (mergedPersonal?.licenseCertification) {
+          resolvedLicenses = [mergedPersonal.licenseCertification];
+        }
       }
       setLicenses(resolvedLicenses);
 
@@ -525,24 +553,36 @@ export function UserProfileProvider({
       );
       setLanguages(resolvedLanguages);
 
-      const rawSkills =
-        (Array.isArray(userProfileData?.userSkills) && userProfileData.userSkills.length > 0
-          ? userProfileData.userSkills
-          : null) ||
-        (Array.isArray(mergedPersonal?.skills) && mergedPersonal.skills.length > 0
-          ? mergedPersonal.skills
-          : null) ||
-        (Array.isArray(mergedPersonal?.structuredSkills) &&
-        mergedPersonal.structuredSkills.length > 0
-          ? mergedPersonal.structuredSkills.map((s: any) => s.name || s)
-          : null) ||
-        (Array.isArray(resolvedResume?.skills) && resolvedResume.skills.length > 0
-          ? resolvedResume.skills
-          : null) ||
-        (Array.isArray(localPersonal?.skills) && localPersonal.skills.length > 0
-          ? localPersonal.skills
-          : null) ||
-        [];
+      let rawSkills: any[] = [];
+      if (isAviationProf) {
+        rawSkills =
+          (Array.isArray(userProfileData?.userSkills) && userProfileData.userSkills.length > 0
+            ? userProfileData.userSkills
+            : null) ||
+          (Array.isArray(myProfileData?.skills) && myProfileData.skills.length > 0
+            ? myProfileData.skills
+            : null) ||
+          [];
+      } else {
+        rawSkills =
+          (Array.isArray(userProfileData?.userSkills) && userProfileData.userSkills.length > 0
+            ? userProfileData.userSkills
+            : null) ||
+          (Array.isArray(mergedPersonal?.skills) && mergedPersonal.skills.length > 0
+            ? mergedPersonal.skills
+            : null) ||
+          (Array.isArray(mergedPersonal?.structuredSkills) &&
+          mergedPersonal.structuredSkills.length > 0
+            ? mergedPersonal.structuredSkills.map((s: any) => s.name || s)
+            : null) ||
+          (Array.isArray(resolvedResume?.skills) && resolvedResume.skills.length > 0
+            ? resolvedResume.skills
+            : null) ||
+          (Array.isArray(localPersonal?.skills) && localPersonal.skills.length > 0
+            ? localPersonal.skills
+            : null) ||
+          [];
+      }
       const resolvedSkills = rawSkills
         .map((s: any) => (typeof s === "string" ? s : s.name || s.label))
         .filter(Boolean);
@@ -723,10 +763,10 @@ export function UserProfileProvider({
           name: [mergedPersonal?.firstName, mergedPersonal?.lastName].filter(Boolean).join(" ") || null,
           location: mergedPersonal?.location || null,
           phone: mergedPersonal?.phone || null,
-          email: mergedPersonal?.email || null,
-          ratings: resolvedRatings,
-          licenses: licensesList,
-          qualifications: (Array.isArray(mergedPersonal?.qualifications) && mergedPersonal.qualifications) || null,
+          ratings: isAviationProf ? [] : resolvedRatings,
+          licenses: isAviationProf ? [] : licensesList,
+          qualifications: isAviationProf ? null : ((Array.isArray(mergedPersonal?.qualifications) && mergedPersonal.qualifications) || null),
+          credentials: resolvedLicenses,
           flightHours: mergedPersonal?.totalFlightHours || mergedPersonal?.flightHours || null,
           summary: mergedPersonal?.description || mergedPersonal?.aboutMe || mergedPersonal?.summary || resolvedResume?.summary || null,
           role: mergedPersonal?.professionalRole || mergedPersonal?.role || accountType || null,
@@ -735,10 +775,6 @@ export function UserProfileProvider({
             myProfileData?.aviationProfessionalProfile?.workAvailabilityStatus ||
             mergedPersonal?.availabilityStatus ||
             mergedPersonal?.availability_status ||
-            null,
-          credentials:
-            myProfileData?.aviationProfessionalProfile?.professionalCredentials ||
-            (Array.isArray(mergedPersonal?.professionalCredentials) && mergedPersonal.professionalCredentials) ||
             null,
           work: resolvedWork,
           languages: resolvedLanguages,
