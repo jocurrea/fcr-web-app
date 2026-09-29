@@ -559,6 +559,19 @@ export function UserProfileProvider({
           (Array.isArray(myProfileData?.skills) && myProfileData.skills.length > 0
             ? myProfileData.skills
             : null) ||
+          (Array.isArray(mergedPersonal?.skills) && mergedPersonal.skills.length > 0
+            ? mergedPersonal.skills
+            : null) ||
+          (Array.isArray(mergedPersonal?.structuredSkills) &&
+          mergedPersonal.structuredSkills.length > 0
+            ? mergedPersonal.structuredSkills.map((s: any) => s.name || s)
+            : null) ||
+          (Array.isArray(resolvedResume?.skills) && resolvedResume.skills.length > 0
+            ? resolvedResume.skills
+            : null) ||
+          (Array.isArray(localPersonal?.skills) && localPersonal.skills.length > 0
+            ? localPersonal.skills
+            : null) ||
           [];
       } else {
         rawSkills =

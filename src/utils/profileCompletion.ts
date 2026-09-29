@@ -466,6 +466,15 @@ export function calculateCompletionPercentage(profileData?: ProfileData | null):
     flightHours,
     summary,
     role,
+    accountType: profileData.accountType || personal.accountType || null,
+    category: profileData.category || personal.category || null,
+    isAviationProfessional:
+      profileData.isAviationProfessional ||
+      personal.isAviationProfessional ||
+      profileData.accountType === "aviation_professional" ||
+      personal.accountType === "aviation_professional" ||
+      profileData.category === "aviation_professional" ||
+      personal.category === "aviation_professional",
     work,
     languages,
     skills,

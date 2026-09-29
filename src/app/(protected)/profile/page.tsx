@@ -978,7 +978,7 @@ export default function ProfilePage() {
         {isAviationProfessional ? (
           /* Condición B: aviation_professional (4 tarjetas de progreso exactas a mobile) */
           <>
-            <div className="flex justify-between items-start mb-4 px-1 bg-transparent">
+            <div className="flex justify-between items-start mb-2.5 px-1 bg-transparent">
               <div>
                 <h2 className="text-[20px] font-bold text-gray-900 leading-tight">Complete your profile</h2>
                 <p className="text-[14px] text-gray-500 mt-0.5">
@@ -988,6 +988,19 @@ export default function ProfilePage() {
               <div className="bg-[#E6F4EA] text-[#137333] px-3 py-1 rounded-[8px] text-sm font-bold">
                 {profileProgress}%
               </div>
+            </div>
+
+            {/* Real-time Progress Bar Track (E01-HU10: Scenario 1) */}
+            <div className="w-full bg-gray-100 rounded-full h-2 mb-4 overflow-hidden">
+              <div
+                role="progressbar"
+                aria-valuenow={profileProgress}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-label={`Profile completion: ${profileProgress}% Complete`}
+                className="h-full rounded-full bg-emerald-500 transition-all duration-500 ease-out"
+                style={{ width: `${Math.min(100, Math.max(0, profileProgress))}%` }}
+              />
             </div>
 
             <div className="flex flex-col gap-3">
@@ -1055,7 +1068,7 @@ export default function ProfilePage() {
         ) : (
           /* Condición A: pilot o crew (5 tarjetas de progreso) */
           <>
-            <div className="flex justify-between items-start mb-4 px-1 bg-transparent">
+            <div className="flex justify-between items-start mb-2.5 px-1 bg-transparent">
               <div>
                 <h2 className="text-[20px] font-bold text-gray-900 leading-tight">Complete your profile</h2>
                 <p className="text-[14px] text-gray-500 mt-0.5">{completedAreasCount} of 6 profile areas complete</p>
@@ -1063,6 +1076,19 @@ export default function ProfilePage() {
               <div className="bg-[#E6F4EA] text-[#137333] px-3 py-1 rounded-[8px] text-sm font-bold">
                 {profileProgress}%
               </div>
+            </div>
+
+            {/* Real-time Progress Bar Track (E01-HU10: Scenario 1) */}
+            <div className="w-full bg-gray-100 rounded-full h-2 mb-4 overflow-hidden">
+              <div
+                role="progressbar"
+                aria-valuenow={profileProgress}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-label={`Profile completion: ${profileProgress}% Complete`}
+                className="h-full rounded-full bg-emerald-500 transition-all duration-500 ease-out"
+                style={{ width: `${Math.min(100, Math.max(0, profileProgress))}%` }}
+              />
             </div>
 
             <div className="flex flex-col gap-3">
