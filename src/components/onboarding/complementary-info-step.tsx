@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { saveComplementaryInfoAction } from "@/actions/profile";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
@@ -701,23 +702,29 @@ export function ComplementaryInfoStep({ onNext, onBack, onSkip }: ComplementaryI
 
     setIsSaving(true);
     try {
-      if (!skip) {
-        const countryName = selectedCountry?.name || "";
-        const combinedLocation = [city.trim(), countryName.trim()].filter(Boolean).join(", ");
-        const validExperiences = workExperiences.filter(
-          exp => exp.companyName.trim() || exp.roleTitle.trim()
-        );
+      const countryName = skip ? "" : (selectedCountry?.name || "");
+      const cityName = skip ? "" : city.trim();
+      const combinedLocation = [cityName, countryName].filter(Boolean).join(", ");
+      const validExperiences = skip
+        ? []
+        : workExperiences.filter(
+            exp => exp.companyName.trim() || exp.roleTitle.trim()
+          );
+      const activeLanguages = skip ? [] : languages;
 
+      if (!skip) {
         const existing = localStorage.getItem("onboarding_personal");
         const parsed = existing ? JSON.parse(existing) : {};
 
         const updated = {
           ...parsed,
-          city: city.trim(),
-          selectedCountry: countryName.trim(),
-          country: countryName.trim(),
+          city: cityName,
+          selectedCountry: countryName,
+          country: countryName,
+          locationCity: cityName,
+          locationCountry: countryName,
           location: combinedLocation,
-          languages,
+          languages: activeLanguages,
           workExperiences: validExperiences,
           category: "aviation_professional",
           role: "aviation_professional",
@@ -726,16 +733,21 @@ export function ComplementaryInfoStep({ onNext, onBack, onSkip }: ComplementaryI
         localStorage.setItem("onboarding_personal", JSON.stringify(updated));
         localStorage.setItem("onboarding_work", JSON.stringify(validExperiences));
 
+        // 1. Server action persistence into user_profiles and resumes (Scenario 1 & 2)
+        const actionResult = await saveComplementaryInfoAction({
+          city: cityName,
+          country: countryName,
+          languages: activeLanguages,
+          workExperiences: validExperiences,
+        });
+
+        if (!actionResult.success) {
+          console.warn("Server action notice:", actionResult.error);
+        }
+
+        // 2. Client-side local session fallback
         const { data: { session } } = await supabase.auth.getSession();
         if (session) {
-          // Update users table
-          await supabase.from("users").upsert({
-            id: session.user.id,
-            location: combinedLocation || null,
-            accountType: "aviation_professional",
-          }, { onConflict: "id" });
-
-          // Update resumes table
           const { data: currentResume } = await supabase
             .from("resumes")
             .select("data")
@@ -748,25 +760,37 @@ export function ComplementaryInfoStep({ onNext, onBack, onSkip }: ComplementaryI
             ...updated,
           };
 
-          const { error: upsertErr } = await supabase.from("resumes").upsert({
+          const formattedWork = validExperiences.map((exp, idx) => ({
+            id: exp.id || `work-${idx + 1}`,
+            company: exp.companyName,
+            role: exp.roleTitle,
+            startDate: exp.startDate,
+            endDate: exp.endDate,
+          }));
+
+          await supabase.from("resumes").upsert({
             userId: session.user.id,
             data: {
               ...resumeData,
               personal: updatedPersonal,
-              work: validExperiences,
+              work: formattedWork,
             },
           }, { onConflict: "userId" });
-          if (upsertErr) throw upsertErr;
+
+          router.refresh();
         }
       }
 
-      if (onNext) {
+      // Scenario 3: Progress cleanly on either "Skip" or "Next"
+      if (skip && onSkip) {
+        onSkip();
+      } else if (onNext) {
         onNext({
-          location: [city.trim(), selectedCountry?.name || ""].filter(Boolean).join(", "),
-          city: city.trim(),
-          country: selectedCountry?.name || "",
-          languages,
-          workExperience: workExperiences,
+          location: combinedLocation,
+          city: cityName,
+          country: countryName,
+          languages: activeLanguages,
+          workExperience: validExperiences,
         });
       } else {
         router.push("/onboarding-complete");
@@ -839,8 +863,9 @@ export function ComplementaryInfoStep({ onNext, onBack, onSkip }: ComplementaryI
 
           {/* 1. Location: Stacked Inputs (City top, Custom Country Select bottom with flags) */}
           <div id="location-section" className="space-y-2">
-            <Label htmlFor="location-city-input" className="font-semibold text-gray-900 text-sm">
-              Location
+            <Label htmlFor="location-city-input" className="font-semibold text-gray-900 text-sm flex items-center gap-1.5">
+              <span>Location</span>
+              <span className="text-xs font-normal text-gray-400">(Optional)</span>
             </Label>
             
             <div className="flex flex-col gap-2.5">
@@ -930,8 +955,9 @@ export function ComplementaryInfoStep({ onNext, onBack, onSkip }: ComplementaryI
           {/* 2. Languages: 0 / 20 aligned right + Trigger Button launching Floating Modal */}
           <div id="languages-section" className="space-y-2">
             <div className="flex items-center justify-between px-0.5">
-              <Label className="font-semibold text-gray-900 text-sm">
-                Languages
+              <Label className="font-semibold text-gray-900 text-sm flex items-center gap-1.5">
+                <span>Languages</span>
+                <span className="text-xs font-normal text-gray-400">(Optional)</span>
               </Label>
               <span className="text-xs font-medium text-gray-400">
                 {languages.length} / {MAX_LANGUAGES}
@@ -976,8 +1002,9 @@ export function ComplementaryInfoStep({ onNext, onBack, onSkip }: ComplementaryI
           {/* 3. Work experience: Label left + small outline button "+ Add" launching Modal */}
           <div id="work-experience-section" className="space-y-3">
             <div className="flex items-center justify-between px-0.5">
-              <Label className="font-semibold text-gray-900 text-sm">
-                Work experience
+              <Label className="font-semibold text-gray-900 text-sm flex items-center gap-1.5">
+                <span>Work experience</span>
+                <span className="text-xs font-normal text-gray-400">(Optional)</span>
               </Label>
               <button
                 type="button"
@@ -1052,7 +1079,7 @@ export function ComplementaryInfoStep({ onNext, onBack, onSkip }: ComplementaryI
           </div>
         )}
 
-        {/* 4. Bottom Buttons: Skip (outline) & Continue (solid blue) */}
+        {/* 4. Bottom Buttons: Skip (outline) & Next (solid blue) */}
         <div className="pb-8 pt-6 flex items-center gap-3.5">
           <button
             type="button"
@@ -1069,7 +1096,7 @@ export function ComplementaryInfoStep({ onNext, onBack, onSkip }: ComplementaryI
             disabled={isSaving}
             className="flex-1 py-4 rounded-full font-bold text-white bg-[#1d4ed8] hover:bg-[#1e40af] transition-all shadow-md cursor-pointer text-center text-sm"
           >
-            {isSaving ? "Please wait..." : "Continue"}
+            {isSaving ? "Please wait..." : "Next"}
           </button>
         </div>
 

@@ -241,4 +241,123 @@ export async function saveContactCredentialsAction(input: SaveContactCredentials
   }
 }
 
+export interface WorkExperienceInput {
+  id?: string;
+  companyName: string;
+  roleTitle: string;
+  startDate: string;
+  endDate: string;
+}
+
+export interface SaveComplementaryInfoInput {
+  city?: string;
+  country?: string;
+  languages?: string[];
+  workExperiences?: WorkExperienceInput[];
+}
+
+/**
+ * Server Action to validate and persist Aviation Professional Complementary Info (Step 5).
+ * All fields are optional (Scenario 1 & 3).
+ * Persists location to user_profiles and resumes.
+ * Persists work experiences and languages to resumes.
+ */
+export async function saveComplementaryInfoAction(input: SaveComplementaryInfoInput) {
+  try {
+    const { city = "", country = "", languages = [], workExperiences = [] } = input;
+
+    const supabase = await createClient();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return { success: false, error: "Authentication required to update profile details." };
+    }
+
+    const trimmedCity = typeof city === "string" ? city.trim() : "";
+    const trimmedCountry = typeof country === "string" ? country.trim() : "";
+    const combinedLocation = [trimmedCity, trimmedCountry].filter(Boolean).join(", ");
+
+    // 1. Update user_profiles if location provided
+    const userProfilePayload: Record<string, any> = {};
+    if (trimmedCity) userProfilePayload.locationCity = trimmedCity;
+    if (trimmedCountry) userProfilePayload.locationCountry = trimmedCountry;
+
+    if (Object.keys(userProfilePayload).length > 0) {
+      const { data: updateData, error: upError } = await supabase
+        .from("user_profiles")
+        .update(userProfilePayload)
+        .eq("user_id", user.id)
+        .select();
+
+      if (!upError && (!updateData || updateData.length === 0)) {
+        await supabase
+          .from("user_profiles")
+          .insert({ user_id: user.id, ...userProfilePayload });
+      }
+    }
+
+    // 2. Update resumes table
+    const { data: currentResume } = await supabase
+      .from("resumes")
+      .select("data")
+      .eq("userId", user.id)
+      .maybeSingle();
+
+    const resumeData = (currentResume?.data as any) || {};
+    const validExperiences = Array.isArray(workExperiences)
+      ? workExperiences.filter(exp => exp.companyName?.trim() || exp.roleTitle?.trim())
+      : [];
+
+    const updatedPersonal = {
+      ...(resumeData.personal || {}),
+      city: trimmedCity,
+      country: trimmedCountry,
+      locationCity: trimmedCity,
+      locationCountry: trimmedCountry,
+      location: combinedLocation,
+      languages: Array.isArray(languages) ? languages : [],
+      workExperiences: validExperiences,
+      category: "aviation_professional",
+      role: "aviation_professional",
+    };
+
+    const formattedWork = validExperiences.map((exp, idx) => ({
+      id: exp.id || `work-${idx + 1}`,
+      company: exp.companyName,
+      role: exp.roleTitle,
+      startDate: exp.startDate,
+      endDate: exp.endDate,
+    }));
+
+    await supabase.from("resumes").upsert(
+      {
+        userId: user.id,
+        data: {
+          ...resumeData,
+          personal: updatedPersonal,
+          work: formattedWork,
+          languages: Array.isArray(languages) ? languages : [],
+        },
+      },
+      { onConflict: "userId" }
+    );
+
+    revalidatePath("/", "layout");
+    revalidatePath("/profile");
+    revalidatePath("/onboarding");
+
+    return { success: true };
+  } catch (err: any) {
+    console.error("[saveComplementaryInfoAction] Unexpected exception:", err);
+    return {
+      success: false,
+      error: err?.message || "An unexpected error occurred while saving optional information.",
+    };
+  }
+}
+
+
 
