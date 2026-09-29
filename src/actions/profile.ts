@@ -359,5 +359,107 @@ export async function saveComplementaryInfoAction(input: SaveComplementaryInfoIn
   }
 }
 
+export interface SaveSkillsResponse {
+  success: boolean;
+  error?: string;
+}
+
+/**
+ * [Web] E01-HU08: Skills & Expertise Selection and Management
+ * Persists technical skills conforming to the Pilot/Crew skill matrix data architecture.
+ * Updates resumes (data.skills, data.personal.skills, data.personal.structuredSkills)
+ * and standardized skills RPC if present.
+ */
+export async function saveSkillsAction(
+  skills: string[]
+): Promise<SaveSkillsResponse> {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return {
+        success: false,
+        error: "Authentication required to update skills.",
+      };
+    }
+
+    const cleanedSkills = (Array.isArray(skills) ? skills : [])
+      .map((s) => (typeof s === "string" ? s.trim() : ""))
+      .filter(Boolean);
+
+    // Limit to max 30 skills to prevent payload abuse
+    const uniqueSkills = Array.from(new Set(cleanedSkills)).slice(0, 30);
+
+    const structuredSkills = uniqueSkills.map((name, idx) => ({
+      id: `skill-${idx + 1}`,
+      name,
+    }));
+
+    // 1. Update resumes table matching Pilot/Crew architecture
+    const { data: currentResume } = await supabase
+      .from("resumes")
+      .select("data")
+      .eq("userId", user.id)
+      .maybeSingle();
+
+    const resumeData = (currentResume?.data as any) || {};
+    const updatedPersonal = {
+      ...(resumeData.personal || {}),
+      skills: uniqueSkills,
+      structuredSkills: structuredSkills,
+      category: "aviation_professional",
+      role: "aviation_professional",
+    };
+
+    const { error: upsertErr } = await supabase.from("resumes").upsert(
+      {
+        userId: user.id,
+        data: {
+          ...resumeData,
+          personal: updatedPersonal,
+          skills: uniqueSkills,
+        },
+      },
+      { onConflict: "userId" }
+    );
+
+    if (upsertErr) {
+      console.error("[saveSkillsAction] Error updating resumes table:", upsertErr);
+      return { success: false, error: upsertErr.message };
+    }
+
+    // 2. Call standardized user skills RPC (Pilot/Crew matrix compatibility)
+    try {
+      await supabase.rpc("replace_standardized_user_skills", {
+        p_skills: uniqueSkills,
+      });
+    } catch {
+      try {
+        await supabase.rpc("replace_standardized_user_skills", {
+          skills: uniqueSkills,
+        });
+      } catch {
+        // RPC might not exist in all environments, safe to ignore
+      }
+    }
+
+    revalidatePath("/", "layout");
+    revalidatePath("/profile");
+    revalidatePath("/onboarding");
+
+    return { success: true };
+  } catch (err: any) {
+    console.error("[saveSkillsAction] Unexpected exception:", err);
+    return {
+      success: false,
+      error: err?.message || "An unexpected error occurred while saving skills.",
+    };
+  }
+}
+
 
 

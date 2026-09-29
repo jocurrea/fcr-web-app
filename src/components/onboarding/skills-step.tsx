@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabase";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import { saveSkillsAction } from "@/actions/profile";
 
 export interface SkillItem {
   id: string;
@@ -52,37 +53,88 @@ export function SkillsStep({ onNext, onBack }: SkillsStepProps) {
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   useEffect(() => {
-    try {
-      const savedPersonal = localStorage.getItem("onboarding_personal");
-      if (savedPersonal) {
-        const parsed = JSON.parse(savedPersonal);
-        if (parsed.skills && Array.isArray(parsed.skills)) {
-          const list = parsed.skills.map((s: any) => (typeof s === "string" ? s : s.name));
-          setSelectedSkills(list);
+    let mounted = true;
+    const loadSkills = async () => {
+      let loadedFromLocal = false;
+      try {
+        const savedPersonal = localStorage.getItem("onboarding_personal");
+        if (savedPersonal) {
+          const parsed = JSON.parse(savedPersonal);
+          if (parsed.skills && Array.isArray(parsed.skills) && parsed.skills.length > 0) {
+            const list = parsed.skills
+              .map((s: any) => (typeof s === "string" ? s : s.name))
+              .filter(Boolean);
+            if (list.length > 0) {
+              setSelectedSkills(list);
+              loadedFromLocal = true;
+            }
+          }
         }
+      } catch (e) {
+        console.error("Error reading saved skills from localStorage:", e);
       }
-    } catch (e) {
-      console.error("Error reading saved skills:", e);
-    }
+
+      // If not found in localStorage or in edit mode, hydrate from resumes table
+      try {
+        const isEditMode = typeof window !== "undefined" && window.location.search.includes("edit=true");
+        if (!loadedFromLocal || isEditMode) {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session) {
+            const { data: resumeRow } = await supabase
+              .from("resumes")
+              .select("data")
+              .eq("userId", session.user.id)
+              .maybeSingle();
+
+            const resumeData = (resumeRow?.data as any) || {};
+            const serverSkills =
+              (Array.isArray(resumeData.skills) && resumeData.skills.length > 0 ? resumeData.skills : null) ||
+              (Array.isArray(resumeData.personal?.skills) && resumeData.personal.skills.length > 0 ? resumeData.personal.skills : null) ||
+              (Array.isArray(resumeData.personal?.structuredSkills) && resumeData.personal.structuredSkills.length > 0
+                ? resumeData.personal.structuredSkills.map((s: any) => s.name)
+                : null);
+
+            if (mounted && serverSkills && Array.isArray(serverSkills) && serverSkills.length > 0) {
+              const cleaned = serverSkills
+                .map((s: any) => (typeof s === "string" ? s : s.name))
+                .filter(Boolean);
+              if (cleaned.length > 0) {
+                setSelectedSkills(cleaned);
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.warn("Could not fetch remote skills:", err);
+      }
+    };
+
+    loadSkills();
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   const toggleSkill = (skillName: string) => {
     const trimmed = skillName.trim();
     if (!trimmed) return;
 
-    if (selectedSkills.includes(trimmed)) {
-      setSelectedSkills(prev => prev.filter(s => s !== trimmed));
+    if (selectedSkills.some((s) => s.toLowerCase() === trimmed.toLowerCase())) {
+      setSelectedSkills((prev) => prev.filter((s) => s.toLowerCase() !== trimmed.toLowerCase()));
     } else {
       if (selectedSkills.length < MAX_SKILLS) {
-        setSelectedSkills(prev => [...prev, trimmed]);
+        setSelectedSkills((prev) => [...prev, trimmed]);
       }
     }
   };
 
   const handleAddCustomSkill = () => {
     const trimmed = searchQuery.trim();
-    if (trimmed && !selectedSkills.includes(trimmed) && selectedSkills.length < MAX_SKILLS) {
-      setSelectedSkills(prev => [...prev, trimmed]);
+    if (!trimmed) return;
+
+    const exists = selectedSkills.some((s) => s.toLowerCase() === trimmed.toLowerCase());
+    if (!exists && selectedSkills.length < MAX_SKILLS) {
+      setSelectedSkills((prev) => [...prev, trimmed]);
       setSearchQuery("");
     }
   };
@@ -126,30 +178,10 @@ export function SkillsStep({ onNext, onBack }: SkillsStepProps) {
       localStorage.setItem("onboarding_personal", JSON.stringify(updated));
       localStorage.setItem("onboarding_skills", JSON.stringify(skillItems));
 
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        // Save into resumes table
-        const { data: currentResume } = await supabase
-          .from("resumes")
-          .select("data")
-          .eq("userId", session.user.id)
-          .maybeSingle();
-
-        const resumeData = (currentResume?.data as any) || {};
-        const updatedPersonal = {
-          ...(resumeData.personal || {}),
-          ...updated,
-        };
-
-        const { error: upsertErr } = await supabase.from("resumes").upsert({
-          userId: session.user.id,
-          data: {
-            ...resumeData,
-            personal: updatedPersonal,
-            skills: selectedSkills,
-          },
-        }, { onConflict: "userId" });
-        if (upsertErr) throw upsertErr;
+      // Persist to database via server action matching Pilot/Crew architecture
+      const result = await saveSkillsAction(selectedSkills);
+      if (!result.success) {
+        throw new Error(result.error || "Failed to save skills.");
       }
 
       if (onNext) {

@@ -250,6 +250,7 @@ function OnboardingContent() {
         ratings: ratingsRaw ? JSON.parse(ratingsRaw) : [],
         work: workRaw ? JSON.parse(workRaw) : personalData.workExperiences || [],
         resume: resumeRaw ? JSON.parse(resumeRaw) : {},
+        skills: personalData.skills || [],
       };
 
       // Fetch existing user to avoid overwriting previously selected roles with null

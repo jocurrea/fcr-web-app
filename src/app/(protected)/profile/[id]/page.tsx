@@ -242,9 +242,13 @@ export default function PublicProfilePage() {
   ];
   let skillsList: string[] = defaultSkills;
   if (personal.skills && Array.isArray(personal.skills) && personal.skills.length > 0) {
-    skillsList = personal.skills.map((s: any) => (typeof s === "string" ? s : s.name));
-  } else if (personal.structuredSkills && Array.isArray(personal.structuredSkills)) {
-    skillsList = personal.structuredSkills.map((s: any) => s.name);
+    skillsList = personal.skills.map((s: any) => (typeof s === "string" ? s : s.name)).filter(Boolean);
+  } else if (personal.structuredSkills && Array.isArray(personal.structuredSkills) && personal.structuredSkills.length > 0) {
+    skillsList = personal.structuredSkills.map((s: any) => s.name).filter(Boolean);
+  } else if (profileData?.skills && Array.isArray(profileData.skills) && profileData.skills.length > 0) {
+    skillsList = profileData.skills.map((s: any) => (typeof s === "string" ? s : s.name)).filter(Boolean);
+  } else if (profileData?.data?.skills && Array.isArray(profileData.data.skills) && profileData.data.skills.length > 0) {
+    skillsList = profileData.data.skills.map((s: any) => (typeof s === "string" ? s : s.name)).filter(Boolean);
   }
 
   return (

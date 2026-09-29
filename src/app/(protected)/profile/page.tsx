@@ -1236,7 +1236,7 @@ export default function ProfilePage() {
 
             {/* 2. SKILLS */}
             <div className="bg-white rounded-[20px] p-5 shadow-sm border border-gray-100">
-              <div className="flex justify-between items-center mb-2">
+              <div className="flex justify-between items-center mb-3">
                 <h3 className="text-[16px] font-bold text-gray-900">Skills</h3>
                 <button 
                   type="button"
@@ -1245,16 +1245,27 @@ export default function ProfilePage() {
                     e.stopPropagation();
                     router.push("/onboarding?edit=true&step=6&category=aviation_professional");
                   }}
-                  className="text-blue-600 font-semibold text-[14px] cursor-pointer"
+                  className="text-blue-600 font-semibold text-[14px] cursor-pointer hover:underline"
                 >
-                  Add
+                  {skillsList.length > 0 ? "Edit" : "Add"}
                 </button>
               </div>
-              <p className="text-[14px] text-gray-500">
-                {skillsList.length > 0
-                  ? skillsList.join(", ")
-                  : "Add the skills that best describe your work."}
-              </p>
+              {skillsList.length > 0 ? (
+                <div className="flex flex-wrap gap-2 pt-1">
+                  {skillsList.map((skill: string, idx: number) => (
+                    <span
+                      key={`${skill}-${idx}`}
+                      className="inline-flex items-center px-3 py-1.5 rounded-full bg-blue-50 border border-blue-100 text-[#1d4ed8] text-xs font-semibold shadow-2xs"
+                    >
+                      {skill}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-[14px] text-gray-500">
+                  Add the skills that best describe your work.
+                </p>
+              )}
             </div>
 
             {/* 3. CONTACT & CREDENTIALS */}
