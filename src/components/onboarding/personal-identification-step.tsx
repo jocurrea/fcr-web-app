@@ -10,12 +10,14 @@ import {
   X,
   RefreshCw,
   Loader2,
+  Crop,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import { ImageCropperModal } from "./image-cropper-modal";
 
 interface PersonalIdentificationStepProps {
   onNext?: (data: { firstName: string; lastName: string; photoUrl: string }) => void;
@@ -31,6 +33,10 @@ export function PersonalIdentificationStep({ onNext, onBack }: PersonalIdentific
   const [isUploading, setIsUploading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [touched, setTouched] = useState({ firstName: false, lastName: false, photo: false });
+
+  // Cropper state
+  const [cropSourceImage, setCropSourceImage] = useState<string | null>(null);
+  const [showCropper, setShowCropper] = useState(false);
 
   // Webcam state
   const [showCamera, setShowCamera] = useState(false);
@@ -132,8 +138,8 @@ export function PersonalIdentificationStep({ onNext, onBack }: PersonalIdentific
     }
   };
 
-  // Photo Selection Handler for Gallery input
-  const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Photo Selection Handler for Gallery input -> opens Cropper modal
+  const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -143,25 +149,17 @@ export function PersonalIdentificationStep({ onNext, onBack }: PersonalIdentific
       return;
     }
 
-    // Instant Base64 preview & storage
     const reader = new FileReader();
     reader.onload = (event) => {
       const dataUrl = event.target?.result as string;
       if (dataUrl) {
-        setPhotoPreview(dataUrl);
-        setTouched(prev => ({ ...prev, photo: true }));
-        try {
-          localStorage.setItem("userProfilePhoto", dataUrl);
-        } catch (err) {
-          console.warn("Local storage write error:", err);
-        }
+        setCropSourceImage(dataUrl);
+        setShowCropper(true);
       }
     };
     reader.readAsDataURL(file);
 
-    const localUrl = URL.createObjectURL(file);
     if (e.target) e.target.value = "";
-    await uploadImageBlobOrFile(file, localUrl);
   };
 
   // ── Webcam: Open Camera ──
@@ -178,7 +176,6 @@ export function PersonalIdentificationStep({ onNext, onBack }: PersonalIdentific
       streamRef.current = stream;
 
       // Wait for the video element to be mounted
-      // Use a short timeout to let React render the modal
       await new Promise(resolve => setTimeout(resolve, 100));
 
       if (videoRef.current) {
@@ -210,7 +207,7 @@ export function PersonalIdentificationStep({ onNext, onBack }: PersonalIdentific
     setCameraReady(false);
   }, []);
 
-  // ── Webcam: Take Photo ──
+  // ── Webcam: Take Photo -> opens Cropper modal ──
   const capturePhoto = useCallback(async () => {
     if (!videoRef.current || !canvasRef.current) return;
 
@@ -228,32 +225,37 @@ export function PersonalIdentificationStep({ onNext, onBack }: PersonalIdentific
     ctx.scale(-1, 1);
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-    // Convert to blob for upload
-    canvas.toBlob(
-      async (blob) => {
-        if (!blob) return;
+    const dataUrl = canvas.toDataURL("image/jpeg", 0.95);
+    closeCamera();
 
-        closeCamera();
-
-        const dataUrl = canvas.toDataURL("image/jpeg", 0.92);
-        setPhotoPreview(dataUrl);
-        setTouched(prev => ({ ...prev, photo: true }));
-        try {
-          localStorage.setItem("userProfilePhoto", dataUrl);
-        } catch (err) {
-          console.warn("Local storage write error:", err);
-        }
-
-        const localUrl = URL.createObjectURL(blob);
-        await uploadImageBlobOrFile(blob, localUrl);
-      },
-      "image/jpeg",
-      0.92
-    );
+    // Open cropper with the taken photo
+    setCropSourceImage(dataUrl);
+    setShowCropper(true);
   }, [closeCamera]);
 
-  const isFirstNameValid = firstName.trim().length >= 2;
-  const isLastNameValid = lastName.trim().length >= 2;
+  // Crop Completed handler
+  const handleCropComplete = async (croppedBlob: Blob, croppedDataUrl: string) => {
+    setShowCropper(false);
+    setCropSourceImage(null);
+    setPhotoPreview(croppedDataUrl);
+    setTouched(prev => ({ ...prev, photo: true }));
+
+    try {
+      localStorage.setItem("userProfilePhoto", croppedDataUrl);
+    } catch (err) {
+      console.warn("Local storage write error:", err);
+    }
+
+    await uploadImageBlobOrFile(croppedBlob, croppedDataUrl);
+  };
+
+  const handleCropCancel = () => {
+    setShowCropper(false);
+    setCropSourceImage(null);
+  };
+
+  const isFirstNameValid = firstName.trim().length >= 1;
+  const isLastNameValid = lastName.trim().length >= 1;
   const isPhotoValid = Boolean(photoPreview);
   const isFormValid = isFirstNameValid && isLastNameValid && isPhotoValid;
 
@@ -365,7 +367,8 @@ export function PersonalIdentificationStep({ onNext, onBack }: PersonalIdentific
               <div
                 className={cn(
                   "w-28 h-28 sm:w-32 sm:h-32 rounded-full bg-[#1e293b] flex items-center justify-center relative overflow-hidden shadow-sm transition-all",
-                  photoPreview ? "border-2 border-[#1d4ed8]" : ""
+                  photoPreview ? "border-2 border-[#1d4ed8]" : "",
+                  touched.photo && !isPhotoValid ? "border-2 border-red-500 ring-4 ring-red-100" : ""
                 )}
               >
                 {photoPreview ? (
@@ -385,6 +388,21 @@ export function PersonalIdentificationStep({ onNext, onBack }: PersonalIdentific
                   </div>
                 )}
               </div>
+
+              {/* Quick Re-crop button if an avatar is already present */}
+              {photoPreview && !isUploading && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCropSourceImage(photoPreview);
+                    setShowCropper(true);
+                  }}
+                  className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-[#1d4ed8] text-white hover:bg-[#1e40af] shadow-md flex items-center justify-center transition-transform hover:scale-110 cursor-pointer"
+                  title="Recrop Photo"
+                >
+                  <Crop className="w-3.5 h-3.5" />
+                </button>
+              )}
             </div>
 
             {/* Two Outline Buttons: Camera & Gallery */}
@@ -422,9 +440,9 @@ export function PersonalIdentificationStep({ onNext, onBack }: PersonalIdentific
             </p>
 
             {touched.photo && !isPhotoValid && (
-              <p className="text-xs text-red-600 font-medium mt-1.5 flex items-center gap-1">
-                <AlertCircle className="w-3.5 h-3.5" />
-                Profile picture is required.
+              <p className="text-xs text-red-600 font-medium mt-1.5 flex items-center gap-1 animate-in fade-in">
+                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                <span>Profile picture is required.</span>
               </p>
             )}
           </div>
@@ -436,7 +454,7 @@ export function PersonalIdentificationStep({ onNext, onBack }: PersonalIdentific
                 First name <span className="text-red-500">*</span>
               </Label>
               {touched.firstName && !isFirstNameValid && (
-                <span className="text-xs text-red-600 font-medium">First name is required</span>
+                <span className="text-xs text-red-600 font-medium animate-in fade-in">First name is required</span>
               )}
             </div>
             <Input
@@ -462,7 +480,7 @@ export function PersonalIdentificationStep({ onNext, onBack }: PersonalIdentific
                 Last name <span className="text-red-500">*</span>
               </Label>
               {touched.lastName && !isLastNameValid && (
-                <span className="text-xs text-red-600 font-medium">Last name is required</span>
+                <span className="text-xs text-red-600 font-medium animate-in fade-in">Last name is required</span>
               )}
             </div>
             <Input
@@ -484,16 +502,15 @@ export function PersonalIdentificationStep({ onNext, onBack }: PersonalIdentific
         </div>
 
         {/* 4. Bottom Next Button */}
-        {/* 4. Bottom Next Button */}
         <div className="pb-8 pt-4">
           <button
             type="button"
             onClick={handleNextClick}
-            disabled={!isFormValid || isSaving || isUploading}
-            className={`w-full py-4 rounded-full font-bold text-white transition-all shadow-md ${
-              isFormValid && !isSaving && !isUploading
-                ? "bg-[#1d4ed8] hover:bg-[#1e40af] cursor-pointer"
-                : "bg-[#85b0fa] cursor-not-allowed opacity-90"
+            disabled={isSaving || isUploading}
+            className={`w-full py-4 rounded-full font-bold text-white transition-all shadow-md cursor-pointer ${
+              isSaving || isUploading
+                ? "bg-[#85b0fa] cursor-not-allowed opacity-90"
+                : "bg-[#1d4ed8] hover:bg-[#1e40af] active:scale-[0.99]"
             }`}
           >
             {isSaving || isUploading ? "Please wait..." : "Next"}
@@ -609,6 +626,16 @@ export function PersonalIdentificationStep({ onNext, onBack }: PersonalIdentific
             </div>
           </div>
         </div>
+      )}
+
+      {/* ── Image Cropper Modal ── */}
+      {showCropper && cropSourceImage && (
+        <ImageCropperModal
+          imageSrc={cropSourceImage}
+          isOpen={showCropper}
+          onCropComplete={handleCropComplete}
+          onCancel={handleCropCancel}
+        />
       )}
     </div>
   );
