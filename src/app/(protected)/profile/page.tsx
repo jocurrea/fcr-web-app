@@ -398,6 +398,7 @@ export default function ProfilePage() {
   const derivedStatus = affiliationInfo?.status || null;
   const isAffiliationVerified = derivedStatus === "active" || derivedStatus === "approved" || derivedStatus === "verified";
   const isAffiliationPending = derivedStatus === "pending";
+  const isAffiliationUnregistered = derivedStatus === "unverified" || derivedStatus === "unregistered";
 
   const completionPercentage = profileProgress;
 
@@ -907,12 +908,15 @@ export default function ProfilePage() {
           {/* Company Display — E01-HU11 & E01-HU12 (Scenario 3) */}
           {affiliationName && (
             <div className="mt-1 flex items-center justify-center gap-1.5 max-w-full flex-wrap">
-              {isAffiliationPending || isAffiliationVerified ? (
+              {isAffiliationPending || isAffiliationVerified || isAffiliationUnregistered ? (
                 <div
-                  className="inline-flex items-center gap-1 text-blue-600 text-xs sm:text-sm font-medium max-w-full select-none"
-                  title={`${affiliationName} (${isAffiliationPending ? "Pending Verification" : "Verified"})`}
+                  className={cn(
+                    "inline-flex items-center gap-1 text-xs sm:text-sm font-medium max-w-full select-none",
+                    isAffiliationUnregistered ? "text-gray-600" : "text-blue-600"
+                  )}
+                  title={`${affiliationName} (${isAffiliationPending ? "Pending Verification" : isAffiliationUnregistered ? "Self-Reported" : "Verified"})`}
                 >
-                  <Building2 className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                  <Building2 className={cn("w-3.5 h-3.5 shrink-0", isAffiliationUnregistered ? "text-gray-400" : "text-blue-500")} />
                   <span className="truncate max-w-[200px] sm:max-w-xs">{affiliationName}</span>
                 </div>
               ) : (
@@ -932,7 +936,7 @@ export default function ProfilePage() {
               )}
               {isAffiliationVerified && (
                 <span className="bg-emerald-50 text-emerald-700 border border-emerald-200/80 text-[11px] font-semibold px-2 py-0.5 rounded-full shrink-0">
-                  Verified Company
+                  Verified Employee
                 </span>
               )}
             </div>
@@ -1253,7 +1257,7 @@ export default function ProfilePage() {
                     )}
                     {isAffiliationVerified && (
                       <span className="bg-emerald-50 text-emerald-700 border border-emerald-200/80 text-xs font-semibold px-2.5 py-0.5 rounded-full shrink-0">
-                        Verified Company
+                        Verified Employee
                       </span>
                     )}
                   </div>
@@ -1268,7 +1272,7 @@ export default function ProfilePage() {
                   {!isAffiliationPending && !isAffiliationVerified && (
                     <div className="mt-1 flex items-center">
                       <span className="text-[13px] text-gray-500">
-                        {affiliationName ? "Unverified Employer" : "Search registered companies and request verification."}
+                        {isAffiliationUnregistered ? "Unregistered Company" : affiliationName ? "Unverified Employer" : "Search registered companies and request verification."}
                       </span>
                     </div>
                   )}

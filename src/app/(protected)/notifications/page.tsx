@@ -49,6 +49,33 @@ export default function NotificationsPage() {
   // Overflow Dropdown Menu State
   const [openMenuId, setOpenMenuId] = useState<string | number | null>(null);
 
+  // Swipe to delete state
+  const [swipedNotificationId, setSwipedNotificationId] = useState<string | number | null>(null);
+  const [swipeDirection, setSwipeDirection] = useState<"left" | "right" | null>(null);
+  const touchStartX = useRef<number | null>(null);
+
+  const handleTouchStart = (e: React.TouchEvent, id: string | number) => {
+    touchStartX.current = e.touches[0].clientX;
+  };
+
+  const handleTouchMove = (e: React.TouchEvent, id: string | number) => {
+    if (touchStartX.current === null) return;
+    const currentX = e.touches[0].clientX;
+    const diff = touchStartX.current - currentX;
+
+    if (diff > 40) {
+      setSwipedNotificationId(id);
+      setSwipeDirection("left");
+    } else if (diff < -40) {
+      setSwipedNotificationId(id);
+      setSwipeDirection("right");
+    }
+  };
+
+  const handleTouchEnd = () => {
+    touchStartX.current = null;
+  };
+
   // E02-HU01: Undo Deletion State
   const [undoBanner, setUndoBanner] = useState<{
     visible: boolean;
@@ -735,17 +762,60 @@ export default function NotificationsPage() {
                 const isSelected = selectedIds.includes(notification.id);
 
                 return (
-                  <div
-                    key={notification.id}
-                    onClick={(e) => handleNotificationClick(e, notification)}
-                    className={cn(
-                      "p-4 rounded-2xl flex items-center gap-3.5 transition-all border shadow-2xs group cursor-pointer hover:bg-slate-50 relative",
-                      notification.read === 0
-                        ? "border-emerald-200 bg-emerald-50/20"
-                        : "border-gray-100 bg-white",
-                      isSelected && "ring-2 ring-blue-500 border-transparent bg-blue-50/30"
-                    )}
-                  >
+                  <div key={notification.id} className="relative overflow-hidden rounded-2xl">
+                    <div className="absolute inset-y-0 right-0 w-24 bg-red-600 rounded-2xl flex items-center justify-center z-0">
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          handleDeleteNotifications([notification.id]);
+                          setSwipedNotificationId(null);
+                        }}
+                        className="w-full h-full text-white flex flex-col items-center justify-center font-bold text-xs"
+                      >
+                        <Trash2 className="w-5 h-5 mb-1" />
+                        Delete
+                      </button>
+                    </div>
+
+                    <div className="absolute inset-y-0 left-0 w-24 bg-blue-600 rounded-2xl flex items-center justify-center z-0">
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          handleToggleArchiveNotification(notification.id, false);
+                          setSwipedNotificationId(null);
+                        }}
+                        className="w-full h-full text-white flex flex-col items-center justify-center font-bold text-xs"
+                      >
+                        <ArchiveRestore className="w-5 h-5 mb-1" />
+                        Unarchive
+                      </button>
+                    </div>
+
+                    <div
+                      onClick={(e) => {
+                        if (swipedNotificationId === notification.id) {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setSwipedNotificationId(null);
+                          return;
+                        }
+                        handleNotificationClick(e, notification);
+                      }}
+                      onTouchStart={(e) => handleTouchStart(e, notification.id)}
+                      onTouchMove={(e) => handleTouchMove(e, notification.id)}
+                      onTouchEnd={handleTouchEnd}
+                      className={cn(
+                        "p-4 rounded-2xl flex items-center gap-3.5 transition-transform duration-200 border shadow-2xs group cursor-pointer hover:bg-slate-50 relative z-10",
+                        notification.read === 0
+                          ? "border-emerald-200 bg-emerald-50/90"
+                          : "border-gray-100 bg-white",
+                        isSelected && "ring-2 ring-blue-500 border-transparent bg-blue-50/90",
+                        swipedNotificationId === notification.id && swipeDirection === "left" ? "-translate-x-24" : "",
+                        swipedNotificationId === notification.id && swipeDirection === "right" ? "translate-x-24" : ""
+                      )}
+                    >
                     {/* Selection Mode Checkbox */}
                     {isSelectionMode && (
                       <div className="shrink-0">
@@ -846,6 +916,7 @@ export default function NotificationsPage() {
                       </div>
                     )}
                   </div>
+                  </div>
                 );
               })
             )
@@ -861,17 +932,60 @@ export default function NotificationsPage() {
               const isSelected = selectedIds.includes(notification.id);
 
               return (
-                <div
-                  key={notification.id}
-                  onClick={(e) => handleNotificationClick(e, notification)}
-                  className={cn(
-                    "p-4 rounded-2xl flex items-center gap-3.5 transition-all border shadow-2xs group cursor-pointer hover:bg-slate-50 relative",
-                    notification.read === 0
-                      ? "border-emerald-200 bg-emerald-50/20"
-                      : "border-gray-100 bg-white",
-                    isSelected && "ring-2 ring-blue-500 border-transparent bg-blue-50/30"
-                  )}
-                >
+                <div key={notification.id} className="relative overflow-hidden rounded-2xl">
+                  <div className="absolute inset-y-0 right-0 w-24 bg-red-600 rounded-2xl flex items-center justify-center z-0">
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleDeleteNotifications([notification.id]);
+                        setSwipedNotificationId(null);
+                      }}
+                      className="w-full h-full text-white flex flex-col items-center justify-center font-bold text-xs cursor-pointer"
+                    >
+                      <Trash2 className="w-5 h-5 mb-1" />
+                      Delete
+                    </button>
+                  </div>
+
+                  <div className="absolute inset-y-0 left-0 w-24 bg-blue-600 rounded-2xl flex items-center justify-center z-0">
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleToggleArchiveNotification(notification.id, true);
+                        setSwipedNotificationId(null);
+                      }}
+                      className="w-full h-full text-white flex flex-col items-center justify-center font-bold text-xs cursor-pointer"
+                    >
+                      <Archive className="w-5 h-5 mb-1" />
+                      Archive
+                    </button>
+                  </div>
+
+                  <div
+                    onClick={(e) => {
+                      if (swipedNotificationId === notification.id) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setSwipedNotificationId(null);
+                        return;
+                      }
+                      handleNotificationClick(e, notification);
+                    }}
+                    onTouchStart={(e) => handleTouchStart(e, notification.id)}
+                    onTouchMove={(e) => handleTouchMove(e, notification.id)}
+                    onTouchEnd={handleTouchEnd}
+                    className={cn(
+                      "p-4 rounded-2xl flex items-center gap-3.5 transition-transform duration-200 border shadow-2xs group cursor-pointer hover:bg-slate-50 relative z-10",
+                      notification.read === 0
+                        ? "border-emerald-200 bg-emerald-50/90"
+                        : "border-gray-100 bg-white",
+                      isSelected && "ring-2 ring-blue-500 border-transparent bg-blue-50/90",
+                      swipedNotificationId === notification.id && swipeDirection === "left" ? "-translate-x-24" : "",
+                      swipedNotificationId === notification.id && swipeDirection === "right" ? "translate-x-24" : ""
+                    )}
+                  >
                   {/* Selection Mode Checkbox */}
                   {isSelectionMode && (
                     <div className="shrink-0">
@@ -971,6 +1085,7 @@ export default function NotificationsPage() {
                       )}
                     </div>
                   )}
+                </div>
                 </div>
               );
             })
