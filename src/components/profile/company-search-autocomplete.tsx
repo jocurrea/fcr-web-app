@@ -1,8 +1,9 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { Search, Building2, Check, X, Loader2, AlertCircle, Plus } from "lucide-react";
+import { Search, Building2, Check, X, Loader2, AlertCircle, Plus, ChevronDown } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { searchCompaniesAction } from "@/actions/affiliations";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 
@@ -92,98 +93,59 @@ export function CompanySearchAutocomplete({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Debounced search query function using search_companies_for_affiliation RPC with resilient direct fallback
+  // Debounced search query function using searchCompaniesAction with resilient fallbacks
   const searchCompanies = useCallback(async (searchTerm: string) => {
     const trimmed = searchTerm.trim();
-    if (!trimmed || trimmed.length < 2) {
-      setResults([]);
-      setIsLoading(false);
-      return;
-    }
-
     setIsLoading(true);
     try {
-      let rpcData: any[] | null = null;
-
-      // 1. Primary: Invoke search_companies_for_affiliation RPC with search_text & result_limit
-      const res = await supabase.rpc("search_companies_for_affiliation", {
-        search_text: trimmed,
-        result_limit: 20,
-      });
-
-      if (!res.error && res.data && Array.isArray(res.data) && res.data.length > 0) {
-        rpcData = res.data;
-      } else {
-        if (res.error) {
-          console.warn("Notice from search_companies_for_affiliation RPC:", res.error.message);
-        }
-
-        // 2. Resilient Fallback: Query active/approved companies directly from public.companies
-        const { data: directData, error: directErr } = await supabase
-          .from("companies")
-          .select("id, name, logo_url, location, owner_user_id, status")
-          .in("status", ["active", "approved"])
-          .ilike("name", `%${trimmed}%`)
-          .limit(20);
-
-        if (!directErr && directData && directData.length > 0) {
-          rpcData = directData;
-        } else if (res.data && Array.isArray(res.data)) {
-          rpcData = res.data;
-        }
+      // 1. Primary: Invoke server action which has authentication and service_role fallback
+      const actionRes = await searchCompaniesAction(trimmed);
+      if (actionRes.success && Array.isArray(actionRes.companies) && actionRes.companies.length > 0) {
+        setResults(actionRes.companies);
+        setIsLoading(false);
+        return;
       }
 
-      if (rpcData && Array.isArray(rpcData)) {
-        const mapped: CompanySearchResult[] = rpcData
-          .filter((item: any) => item && (item.id || item.company_id) && (item.name || item.company_name))
-          .map((item: any) => ({
-            id: item.id || item.company_id,
-            name: item.name || item.company_name,
-            logo_url: item.logo_url || item.logo || item.profileImage || item.avatar_url || null,
-            location:
-              item.location ||
-              (typeof item.city === "string"
-                ? [item.city, item.country].filter(Boolean).join(", ")
-                : null) ||
-              null,
-            owner_user_id: item.owner_user_id || item.owner_id || item.user_id || null,
-          }));
+      // 2. Client-side fallback: Invoke search_companies_for_affiliation RPC if term has >= 2 chars
+      if (trimmed.length >= 2) {
+        const res = await supabase.rpc("search_companies_for_affiliation", {
+          search_text: trimmed,
+          result_limit: 30,
+        });
 
-        setResults(mapped);
-      } else {
-        setResults([]);
-      }
-    } catch (err) {
-      console.error("Exception in search_companies_for_affiliation:", err);
-      // Emergency fallback on network or unexpected exception
-      try {
-        const { data: directData } = await supabase
-          .from("companies")
-          .select("id, name, logo_url, location, owner_user_id, status")
-          .in("status", ["active", "approved"])
-          .ilike("name", `%${trimmed}%`)
-          .limit(20);
-
-        if (directData && Array.isArray(directData)) {
-          setResults(
-            directData.map((item: any) => ({
-              id: item.id,
-              name: item.name,
-              logo_url: item.logo_url || null,
-              location: item.location || null,
-              owner_user_id: item.owner_user_id || null,
-            }))
-          );
+        if (!res.error && res.data && Array.isArray(res.data) && res.data.length > 0) {
+          const mapped: CompanySearchResult[] = res.data
+            .filter((item: any) => item && (item.id || item.company_id) && (item.name || item.company_name))
+            .map((item: any) => ({
+              id: item.id || item.company_id,
+              name: item.name || item.company_name,
+              logo_url: item.logo_url || item.logo || null,
+              location:
+                item.location ||
+                (typeof item.city === "string"
+                  ? [item.city, item.country].filter(Boolean).join(", ")
+                  : null) ||
+                null,
+            }));
+          setResults(mapped);
+          setIsLoading(false);
           return;
         }
-      } catch (fallbackErr) {
-        console.error("Direct fallback failed:", fallbackErr);
       }
+
+      setResults(actionRes.companies || []);
+    } catch (err) {
+      console.error("Exception in searchCompanies:", err);
       setResults([]);
     } finally {
       setIsLoading(false);
     }
   }, []);
+
+  // Preload initial registered companies on mount so the dropdown list is immediately available
+  useEffect(() => {
+    searchCompanies("");
+  }, [searchCompanies]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newText = e.target.value;
@@ -195,10 +157,10 @@ export function CompanySearchAutocomplete({
     }
 
     if (!newText.trim()) {
-      setResults([]);
       setIsLoading(false);
       setSelectedCompany(null);
       setTargetUnregisteredName("");
+      searchCompanies("");
       if (onSelectCompany) {
         onSelectCompany({ id: null, name: "", status: "active" });
       }
@@ -347,17 +309,19 @@ export function CompanySearchAutocomplete({
           value={query}
           onChange={handleInputChange}
           onFocus={() => {
-            if (query.trim().length >= 2) {
-              setIsOpen(true);
-              if (results.length === 0) searchCompanies(query);
-            }
+            setIsOpen(true);
+            if (results.length === 0) searchCompanies(query);
+          }}
+          onClick={() => {
+            setIsOpen(true);
+            if (results.length === 0) searchCompanies(query);
           }}
           placeholder={placeholder}
-          className="w-full pl-11 pr-10 py-3.5 bg-white border border-gray-200 rounded-2xl text-sm font-medium text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all shadow-2xs"
+          className="w-full pl-11 pr-16 py-3.5 bg-white border border-gray-200 rounded-2xl text-sm font-medium text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all shadow-2xs"
           autoComplete="off"
         />
 
-        <div className="absolute inset-y-0 right-0 pr-3 flex items-center gap-1.5">
+        <div className="absolute inset-y-0 right-0 pr-3 flex items-center gap-1">
           {isLoading && <Loader2 className="w-4 h-4 text-blue-600 animate-spin" />}
 
           {query && !isLoading && (
@@ -370,6 +334,18 @@ export function CompanySearchAutocomplete({
               <X className="w-4 h-4" />
             </button>
           )}
+
+          <button
+            type="button"
+            onClick={() => {
+              setIsOpen((prev) => !prev);
+              if (!isOpen && results.length === 0) searchCompanies(query);
+            }}
+            className="p-1 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100 transition-colors cursor-pointer"
+            title={isOpen ? "Hide businesses list" : "Show registered businesses"}
+          >
+            <ChevronDown className={cn("w-4 h-4 transition-transform duration-200", isOpen && "rotate-180")} />
+          </button>
         </div>
       </div>
 
@@ -382,7 +358,7 @@ export function CompanySearchAutocomplete({
       )}
 
       {/* Dropdown Results */}
-      {isOpen && (query.trim().length >= 2 || results.length > 0) && (
+      {isOpen && (
         <div className="absolute z-50 left-0 right-0 mt-1 bg-white border border-gray-200/90 rounded-2xl shadow-xl overflow-hidden max-h-60 overflow-y-auto">
           {isLoading && results.length === 0 ? (
             <div className="p-4 text-center text-xs text-gray-500 flex items-center justify-center gap-2">

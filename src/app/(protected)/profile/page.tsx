@@ -907,14 +907,24 @@ export default function ProfilePage() {
           {/* Company Display — E01-HU11 & E01-HU12 (Scenario 3) */}
           {affiliationName && (
             <div className="mt-1 flex items-center justify-center gap-1.5 max-w-full flex-wrap">
-              <Link
-                href="/business/affiliate"
-                className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-700 text-xs sm:text-sm font-medium cursor-pointer hover:underline transition-colors max-w-full"
-                title={`Manage ${affiliationName} affiliation`}
-              >
-                <Building2 className="w-3.5 h-3.5 text-blue-500 shrink-0" />
-                <span className="truncate max-w-[200px] sm:max-w-xs">{affiliationName}</span>
-              </Link>
+              {isAffiliationPending || isAffiliationVerified ? (
+                <div
+                  className="inline-flex items-center gap-1 text-blue-600 text-xs sm:text-sm font-medium max-w-full select-none"
+                  title={`${affiliationName} (${isAffiliationPending ? "Pending Verification" : "Verified"})`}
+                >
+                  <Building2 className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                  <span className="truncate max-w-[200px] sm:max-w-xs">{affiliationName}</span>
+                </div>
+              ) : (
+                <Link
+                  href="/business/affiliate"
+                  className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-700 text-xs sm:text-sm font-medium cursor-pointer hover:underline transition-colors max-w-full"
+                  title={`Link your employer`}
+                >
+                  <Building2 className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                  <span className="truncate max-w-[200px] sm:max-w-xs">{affiliationName}</span>
+                </Link>
+              )}
               {isAffiliationPending && (
                 <span className="bg-amber-50 text-amber-700 border border-amber-200/80 text-[11px] font-semibold px-2 py-0.5 rounded-full shrink-0">
                   Pending Verification
@@ -1198,8 +1208,19 @@ export default function ProfilePage() {
         <div className="mt-8 mb-6">
           <h3 className="text-[15px] font-bold text-gray-900 mb-3 px-1">Company affiliation</h3>
           <div 
-            onClick={() => router.push("/business/affiliate")}
-            className="bg-white rounded-[20px] p-4 flex items-center gap-4 shadow-sm border border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors"
+            onClick={() => {
+              if (isAffiliationPending || isAffiliationVerified) {
+                // Request already sent or verified -> cannot re-enter /business/affiliate
+                return;
+              }
+              router.push("/business/affiliate");
+            }}
+            className={cn(
+              "bg-white rounded-[20px] p-4 flex items-center gap-4 shadow-sm border border-gray-100 transition-colors",
+              isAffiliationPending || isAffiliationVerified
+                ? "cursor-default select-none"
+                : "cursor-pointer hover:bg-gray-50"
+            )}
           >
             {loading && !affiliationName ? (
               <div className="flex items-center gap-4 w-full animate-pulse py-1">
@@ -1226,12 +1247,12 @@ export default function ProfilePage() {
                       {affiliationName || "Link your employer"}
                     </h4>
                     {isAffiliationPending && (
-                      <span className="bg-yellow-100 text-yellow-800 text-xs font-medium px-2 py-0.5 rounded-full shrink-0">
+                      <span className="bg-amber-50 text-amber-700 border border-amber-200/80 text-xs font-semibold px-2.5 py-0.5 rounded-full shrink-0">
                         Pending Verification
                       </span>
                     )}
                     {isAffiliationVerified && (
-                      <span className="bg-green-100 text-green-800 text-xs font-medium px-2 py-0.5 rounded-full shrink-0">
+                      <span className="bg-emerald-50 text-emerald-700 border border-emerald-200/80 text-xs font-semibold px-2.5 py-0.5 rounded-full shrink-0">
                         Verified Company
                       </span>
                     )}
@@ -1251,9 +1272,16 @@ export default function ProfilePage() {
                       </span>
                     </div>
                   )}
+                  {isAffiliationPending && (
+                    <div className="mt-1 flex items-center">
+                      <span className="text-[12px] text-amber-600 font-medium">
+                        Affiliation request sent. Pending review by employer.
+                      </span>
+                    </div>
+                  )}
                 </div>
-                {/* Ocultar la flecha si el estado es pendiente */}
-                {!isAffiliationPending && (
+                {/* Ocultar la flecha si el estado es pendiente o verificado */}
+                {!isAffiliationPending && !isAffiliationVerified && (
                   <ChevronRightIcon className="w-5 h-5 text-gray-400 flex-shrink-0" />
                 )}
               </>

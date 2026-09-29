@@ -740,3 +740,115 @@ export async function reviewCompanyAffiliationRequestAction(
   }
 }
 
+export interface SearchCompanyItem {
+  id: string;
+  name: string;
+  logo_url: string | null;
+  location: string | null;
+}
+
+/**
+ * Searches and lists active registered companies for affiliation dropdown with autocomplete.
+ * If query is empty, returns the default list of registered companies.
+ */
+export async function searchCompaniesAction(query: string = ""): Promise<{
+  success: boolean;
+  companies: SearchCompanyItem[];
+}> {
+  const trimmed = (query || "").trim();
+  try {
+    const supabase = await createClient();
+
+    // 1. If search term has at least 2 characters, try official RPC
+    if (trimmed.length >= 2) {
+      try {
+        const { data: rpcData, error: rpcErr } = await supabase.rpc(
+          "search_companies_for_affiliation",
+          {
+            search_text: trimmed,
+            result_limit: 30,
+          }
+        );
+
+        if (!rpcErr && rpcData && Array.isArray(rpcData) && rpcData.length > 0) {
+          return {
+            success: true,
+            companies: rpcData.map((c: any) => ({
+              id: c.id || c.company_id,
+              name: c.name || c.company_name,
+              logo_url: c.logo_url || c.logo || null,
+              location: c.location || (c.city ? [c.city, c.country].filter(Boolean).join(", ") : null),
+            })),
+          };
+        }
+      } catch (rpcEx) {
+        console.warn("searchCompaniesAction RPC notice:", rpcEx);
+      }
+    }
+
+    // 2. Direct query from companies table via authenticated client
+    try {
+      let q = supabase
+        .from("companies")
+        .select("id, name, logo_url, location, city, country, status")
+        .in("status", ["active", "approved"]);
+
+      if (trimmed) {
+        q = q.ilike("name", `%${trimmed}%`);
+      }
+
+      const { data: directData, error: directErr } = await q.order("name", { ascending: true }).limit(30);
+
+      if (!directErr && directData && directData.length > 0) {
+        return {
+          success: true,
+          companies: directData.map((c: any) => ({
+            id: c.id,
+            name: c.name,
+            logo_url: c.logo_url || null,
+            location: c.location || (c.city ? [c.city, c.country].filter(Boolean).join(", ") : null),
+          })),
+        };
+      }
+    } catch (directEx) {
+      console.warn("searchCompaniesAction direct query notice:", directEx);
+    }
+
+    // 3. Fallback using admin client if service role key is available
+    if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      try {
+        const adminClient = createAdminClient();
+        let adminQ = adminClient
+          .from("companies")
+          .select("id, name, logo_url, location, city, country, status")
+          .in("status", ["active", "approved"]);
+
+        if (trimmed) {
+          adminQ = adminQ.ilike("name", `%${trimmed}%`);
+        }
+
+        const { data: adminData } = await adminQ.order("name", { ascending: true }).limit(30);
+
+        if (adminData && adminData.length > 0) {
+          return {
+            success: true,
+            companies: adminData.map((c: any) => ({
+              id: c.id,
+              name: c.name,
+              logo_url: c.logo_url || null,
+              location: c.location || (c.city ? [c.city, c.country].filter(Boolean).join(", ") : null),
+            })),
+          };
+        }
+      } catch (adminEx) {
+        console.warn("searchCompaniesAction adminClient fallback notice:", adminEx);
+      }
+    }
+
+    return { success: true, companies: [] };
+  } catch (err: any) {
+    console.error("searchCompaniesAction unexpected error:", err);
+    return { success: false, companies: [] };
+  }
+}
+

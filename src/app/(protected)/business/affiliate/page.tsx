@@ -105,11 +105,31 @@ export default function BusinessAffiliatePage() {
         }
 
         setCurrentAffiliation(foundAffiliation);
+
+        // If affiliation is already pending or verified, user cannot re-enter this form
+        if (foundAffiliation && (foundAffiliation.status === "pending" || foundAffiliation.status === "verified")) {
+          router.replace("/profile");
+          return;
+        }
       } catch (err) {
         console.error("Error loading affiliation details:", err);
       } finally {
         setIsLoading(false);
       }
+    }
+
+    // Fast check local storage cache to redirect immediately without delay
+    if (typeof window !== "undefined") {
+      try {
+        const cached = localStorage.getItem("cached_affiliation");
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (parsed && (parsed.status === "pending" || parsed.status === "verified")) {
+            router.replace("/profile");
+            return;
+          }
+        }
+      } catch {}
     }
 
     loadCurrentAffiliation();
@@ -267,6 +287,31 @@ export default function BusinessAffiliatePage() {
       setIsSubmitting(false);
     }
   };
+
+  if (currentAffiliation && (currentAffiliation.status === "pending" || currentAffiliation.status === "verified")) {
+    return (
+      <div className="min-h-screen bg-white flex flex-col items-center justify-center p-6 text-center">
+        <div className="w-12 h-12 rounded-full bg-amber-50 border border-amber-200 text-amber-600 flex items-center justify-center mb-4">
+          <Clock className="w-6 h-6" />
+        </div>
+        <h2 className="text-xl font-bold text-gray-900 mb-2">
+          {currentAffiliation.status === "verified" ? "Company Affiliated" : "Affiliation Request Pending"}
+        </h2>
+        <p className="text-sm text-gray-600 max-w-sm mb-6 leading-relaxed">
+          {currentAffiliation.status === "verified"
+            ? `You are already affiliated with ${currentAffiliation.companyName}.`
+            : `You already have an affiliation request pending review for "${currentAffiliation.companyName}". You cannot submit another affiliation request.`}
+        </p>
+        <button
+          type="button"
+          onClick={() => router.replace("/profile")}
+          className="px-6 py-2.5 rounded-full bg-[#1d4ed8] text-white font-bold text-sm hover:bg-[#1e40af] transition-colors cursor-pointer"
+        >
+          Return to Profile
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-white">
