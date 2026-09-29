@@ -1,14 +1,16 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ChevronLeft, Check, Briefcase, UserCheck } from "lucide-react";
+import { ChevronLeft, Check, Briefcase, UserCheck, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
+import { saveAvailabilityStatusAction } from "@/actions/profile";
 
 interface AvailabilityStepProps {
-  onNext?: (status: "active" | "available_for_work") => void;
+  onNext?: (status: "active" | "available_for_work") => void | Promise<void>;
   onBack?: () => void;
+  isSaving?: boolean;
 }
 
 // Map UI option to canonical DB value
@@ -17,11 +19,13 @@ type UIStatus = "active" | "available";
 const toCanonicalStatus = (s: UIStatus): "active" | "available_for_work" =>
   s === "active" ? "active" : "available_for_work";
 
-export function AvailabilityStep({ onNext, onBack }: AvailabilityStepProps) {
+export function AvailabilityStep({ onNext, onBack, isSaving: externalSaving }: AvailabilityStepProps) {
   const router = useRouter();
 
   const [selectedStatus, setSelectedStatus] = useState<UIStatus>("available");
-  const [isSaving, setIsSaving] = useState(false);
+  const [isLocalSaving, setIsLocalSaving] = useState(false);
+
+  const effectiveSaving = Boolean(externalSaving || isLocalSaving);
 
   useEffect(() => {
     try {
@@ -30,6 +34,8 @@ export function AvailabilityStep({ onNext, onBack }: AvailabilityStepProps) {
         const parsed = JSON.parse(savedPersonal);
         if (parsed.availabilityStatus === "active" || parsed.availabilityStatus === "available") {
           setSelectedStatus(parsed.availabilityStatus);
+        } else if (parsed.workAvailabilityStatus === "active" || parsed.workAvailabilityStatus === "available_for_work") {
+          setSelectedStatus(parsed.workAvailabilityStatus === "active" ? "active" : "available");
         }
       }
     } catch (e) {
@@ -38,126 +44,29 @@ export function AvailabilityStep({ onNext, onBack }: AvailabilityStepProps) {
   }, []);
 
   const handleCompleteSetup = async () => {
-    if (isSaving) return;
+    if (effectiveSaving) return;
 
-    setIsSaving(true);
+    setIsLocalSaving(true);
     try {
       const existing = localStorage.getItem("onboarding_personal");
       const parsed = existing ? JSON.parse(existing) : {};
-      const roleKey = parsed.role || "aviation_professional";
-      const roleLabel =
-        parsed.professionalRoleLabel ||
-        parsed.professionalTitle ||
-        parsed.professionalRole ||
-        "Aviation Professional";
-
-      // Read all required fields from localStorage so the DB trigger fires correctly
       const canonicalStatus = toCanonicalStatus(selectedStatus);
-
-      // Read all required fields from localStorage so the DB trigger fires correctly
-      const savedPhoto = localStorage.getItem("userProfilePhoto");
-      const finalFirstName = parsed.firstName || "";
-      const finalLastName = parsed.lastName || "";
-      const finalProfileImage = savedPhoto || parsed.profileImage || parsed.photoUrl || null;
-
-      // professionalTitleKey must be a catalogue key (e.g. operations_officer), not the label string
-      const finalProfessionalTitleKey =
-        parsed.professionalTitleKey && parsed.professionalTitleKey !== "aviation_professional"
-          ? parsed.professionalTitleKey
-          : roleKey && roleKey !== "aviation_professional"
-          ? roleKey
-          : null;
 
       const updated = {
         ...parsed,
         availabilityStatus: selectedStatus,
-        workAvailabilityStatus: canonicalStatus,  // canonical value for DB
+        workAvailabilityStatus: canonicalStatus,
         availability_status: canonicalStatus,
         category: "aviation_professional",
-        role: finalProfessionalTitleKey || roleKey,
-        professionalRole: "aviation_professional",
-        professional_role: "aviation_professional",
       };
 
       localStorage.setItem("onboarding_personal", JSON.stringify(updated));
 
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        // Update users table with ALL fields required by the onboarded trigger
-        await supabase.from("users").upsert({
-          id: session.user.id,
-          ...(finalFirstName ? { firstName: finalFirstName } : {}),
-          ...(finalLastName ? { lastName: finalLastName } : {}),
-          ...(finalProfileImage ? { profileImage: finalProfileImage } : {}),
-          availability_status: canonicalStatus,
-          accountType: "flight_crew",  // constraint: 'flight_crew' | 'business'
-          role: finalProfessionalTitleKey || roleKey || "operations_officer",
-          professionalRole: "aviation_professional",
-          ...(finalProfessionalTitleKey ? { professionalTitleKey: finalProfessionalTitleKey } : {}),
-        }, { onConflict: "id" });
-
-        // Write directly to aviation_professional_profiles (canonical extension table)
-        // This ensures the row exists before the RPC request_company_affiliation is called
-        if (finalProfessionalTitleKey) {
-          await supabase.from("aviation_professional_profiles").upsert({
-            userId: session.user.id,
-            professionalTitleKey: finalProfessionalTitleKey,
-            ...(parsed.professionalTitleOther ? { professionalTitleOther: parsed.professionalTitleOther } : { professionalTitleOther: null }),
-            workAvailabilityStatus: canonicalStatus,
-            professionalCredentials: parsed.professionalCredentials || [],
-          }, { onConflict: "userId" });
-        }
-
-        // Update resumes table
-        const { data: currentResume } = await supabase
-          .from("resumes")
-          .select("data")
-          .eq("userId", session.user.id)
-          .maybeSingle();
-
-        const resumeData = (currentResume?.data as Record<string, unknown>) || {};
-        const currentPersonal = (resumeData.personal as Record<string, unknown>) || {};
-        const updatedPersonal = {
-          ...currentPersonal,
-          ...updated,
-        };
-
-        await supabase.from("resumes").upsert({
-          userId: session.user.id,
-          data: {
-            ...resumeData,
-            personal: updatedPersonal,
-          },
-        }, { onConflict: "userId" });
-
-        // Update auth user metadata
-        await supabase.auth.updateUser({
-          data: {
-            onboarded: 1,
-            accountType: "aviation_professional",
-            role: finalProfessionalTitleKey || roleKey || "aviation_professional",
-            professionalRole: "aviation_professional",
-            professional_role: "aviation_professional",
-            professionalRoleLabel: roleLabel,
-            professionalTitle: roleLabel,
-            availability_status: canonicalStatus,
-            crew_data_saved: true,
-          },
-        });
-
-        try {
-          await supabase.auth.refreshSession();
-        } catch {}
-
-        try {
-          document.cookie = "flightcrew_onboarded=true; path=/; max-age=31536000; SameSite=Lax";
-          sessionStorage.setItem("flightcrew_onboarded", "true");
-          localStorage.setItem("flightcrew_onboarded", "true");
-        } catch {}
-      }
+      // Fast, canonical save to all tables via server action
+      await saveAvailabilityStatusAction(canonicalStatus);
 
       if (onNext) {
-        onNext(canonicalStatus);
+        await onNext(canonicalStatus);
       } else {
         router.refresh();
         router.push("/home");
@@ -165,10 +74,10 @@ export function AvailabilityStep({ onNext, onBack }: AvailabilityStepProps) {
     } catch (err) {
       console.error("Error saving availability status:", err);
       if (onNext) {
-        onNext(toCanonicalStatus(selectedStatus));
+        await onNext(toCanonicalStatus(selectedStatus));
       }
     } finally {
-      setIsSaving(false);
+      setIsLocalSaving(false);
     }
   };
 
@@ -295,10 +204,20 @@ export function AvailabilityStep({ onNext, onBack }: AvailabilityStepProps) {
           <button
             type="button"
             onClick={handleCompleteSetup}
-            disabled={isSaving}
-            className="w-full py-4 rounded-full font-bold text-white bg-[#1d4ed8] hover:bg-[#1e40af] transition-all shadow-md cursor-pointer text-center text-sm"
+            disabled={effectiveSaving}
+            className={cn(
+              "w-full py-4 rounded-full font-bold text-white bg-[#1d4ed8] hover:bg-[#1e40af] transition-all shadow-md cursor-pointer flex items-center justify-center gap-2.5 text-center text-sm",
+              effectiveSaving && "opacity-80 cursor-not-allowed pointer-events-none"
+            )}
           >
-            {isSaving ? "Completing setup..." : "Complete setup"}
+            {effectiveSaving ? (
+              <>
+                <Loader2 className="w-5 h-5 animate-spin shrink-0" />
+                <span>Completing setup...</span>
+              </>
+            ) : (
+              <span>Complete setup</span>
+            )}
           </button>
         </div>
 

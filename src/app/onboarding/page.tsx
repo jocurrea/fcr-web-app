@@ -782,7 +782,7 @@ function OnboardingContent() {
   }
 
   if (step === 7) {
-    return <>{ErrorBanner}<AvailabilityStep onBack={handleBack} onNext={handleFinish} /></>;
+    return <>{ErrorBanner}<AvailabilityStep onBack={handleBack} onNext={handleFinish} isSaving={isSaving} /></>;
   }
 
   return null;
