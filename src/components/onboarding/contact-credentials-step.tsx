@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { ChevronLeft, AlertCircle, Plus, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { saveContactCredentialsAction } from "@/actions/profile";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
@@ -13,7 +14,7 @@ interface ContactCredentialsStepProps {
   onBack?: () => void;
 }
 
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/i;
 const PHONE_REGEX = /^[+]?[\d\s().-]{7,25}$/;
 const MAX_LICENSES = 20;
 
@@ -26,6 +27,10 @@ export function ContactCredentialsStep({ onNext, onBack }: ContactCredentialsSte
   const [licensesList, setLicensesList] = useState<string[]>([]);
   const [touched, setTouched] = useState({ email: false, phone: false, license: false });
   const [isSaving, setIsSaving] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  // Sanitize phone to allow only standard valid phone characters (Scenario 3)
+  const sanitizePhone = (val: string) => val.replace(/[^\d\s+().-]/g, "");
 
   useEffect(() => {
     async function loadInitialData() {
@@ -41,7 +46,7 @@ export function ContactCredentialsStep({ onNext, onBack }: ContactCredentialsSte
             setEmail(loadedEmail);
           }
           if (parsed.contactPhone || parsed.phone) {
-            loadedPhone = parsed.contactPhone || parsed.phone;
+            loadedPhone = sanitizePhone(parsed.contactPhone || parsed.phone);
             setPhone(loadedPhone);
           }
           if (Array.isArray(parsed.licenses) && parsed.licenses.length > 0) {
@@ -49,8 +54,6 @@ export function ContactCredentialsStep({ onNext, onBack }: ContactCredentialsSte
           } else if (parsed.licenseCertification) {
             setLicensesList([parsed.licenseCertification]);
           }
-
-
         }
 
         const { data: { session } } = await supabase.auth.getSession();
@@ -68,7 +71,7 @@ export function ContactCredentialsStep({ onNext, onBack }: ContactCredentialsSte
               setEmail(loadedEmail);
             }
             if (upData?.contactPhone && !loadedPhone) {
-              loadedPhone = upData.contactPhone;
+              loadedPhone = sanitizePhone(upData.contactPhone);
               setPhone(loadedPhone);
             }
           } catch (e) {
@@ -80,8 +83,6 @@ export function ContactCredentialsStep({ onNext, onBack }: ContactCredentialsSte
         if (!loadedEmail && session?.user?.email) {
           setEmail(session.user.email);
         }
-
-
       } catch (e) {
         console.error("Error reading saved contact data:", e);
       }
@@ -89,7 +90,7 @@ export function ContactCredentialsStep({ onNext, onBack }: ContactCredentialsSte
     loadInitialData();
   }, []);
 
-  // License addition helper
+  // Free-text license addition helper (Scenario 2)
   const handleAddLicense = () => {
     const trimmed = currentLicenseInput.trim();
     if (!trimmed) return;
@@ -100,6 +101,7 @@ export function ContactCredentialsStep({ onNext, onBack }: ContactCredentialsSte
     }
     setCurrentLicenseInput("");
     setTouched(prev => ({ ...prev, license: true }));
+    if (submitError) setSubmitError(null);
   };
 
   const handleRemoveLicense = (indexToRemove: number) => {
@@ -121,17 +123,26 @@ export function ContactCredentialsStep({ onNext, onBack }: ContactCredentialsSte
   const isPhoneFormatValid = PHONE_REGEX.test(phone.trim()) && (phone.match(/\d/g) || []).length >= 7;
   const isPhoneValid = !isPhoneEmpty && isPhoneFormatValid;
 
-  // Next button activates ONLY when at least one license is added to the list via the (+) button
-  const isLicenseValid = licensesList.length > 0;
+  // License valid if list has items OR pending text is typed in input
+  const isLicenseValid = licensesList.length > 0 || currentLicenseInput.trim().length > 0;
 
   const isFormValid = isEmailValid && isPhoneValid && isLicenseValid;
 
   const handleNextClick = async () => {
     setTouched({ email: true, phone: true, license: true });
+    setSubmitError(null);
 
     if (!isFormValid || isSaving) return;
 
-    const finalLicenses = [...licensesList];
+    // Automatically incorporate pending text in currentLicenseInput if not already in list
+    let finalLicenses = [...licensesList];
+    const pendingLicense = currentLicenseInput.trim();
+    if (pendingLicense && !finalLicenses.includes(pendingLicense)) {
+      finalLicenses.push(pendingLicense);
+      setLicensesList(finalLicenses);
+      setCurrentLicenseInput("");
+    }
+
     const primaryLicense = finalLicenses[0] || "";
 
     setIsSaving(true);
@@ -147,50 +158,51 @@ export function ContactCredentialsStep({ onNext, onBack }: ContactCredentialsSte
         contactPhone: phone.trim(),
         licenseCertification: primaryLicense,
         licenses: finalLicenses,
+        professionalCredentials: finalLicenses,
         category: "aviation_professional",
         role: "aviation_professional",
       };
 
       localStorage.setItem("onboarding_personal", JSON.stringify(updated));
 
+      // 1. Server-side persistence and strict backend validation (Scenarios 1, 2 & 3)
+      const actionResult = await saveContactCredentialsAction({
+        phone: phone.trim(),
+        email: email.trim(),
+        licenses: finalLicenses,
+      });
+
+      if (!actionResult.success) {
+        setSubmitError(actionResult.error || "Failed to save contact credentials.");
+        setIsSaving(false);
+        return;
+      }
+
+      // 2. Client-side local session fallback sync
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
-        // 1. Save into user_profiles table (contact info + credentials).
-        // Uses user_id (FK to auth.users) — the same column used for SELECT on the profile page.
         try {
           const payload = {
             contactEmail: email.trim(),
             contactPhone: phone.trim(),
             professionalCredentials: finalLicenses,
           };
-          console.log("Payload enviado a user_profiles:", payload, "user_id:", session.user.id);
 
-          // Try update first (row already exists)
           const { data: updateData, error: upError } = await supabase
             .from("user_profiles")
             .update(payload)
             .eq("user_id", session.user.id)
             .select();
           
-          if (upError) {
-            console.error("Supabase Error UPDATE user_profiles:", upError.message, upError.details, upError.hint);
-          }
-
-          // If update matched 0 rows (row doesn't exist yet), insert instead
           if (!upError && (!updateData || updateData.length === 0)) {
-            console.log("UPDATE matched 0 rows, trying INSERT into user_profiles...");
-            const { error: insError } = await supabase
+            await supabase
               .from("user_profiles")
               .insert({ user_id: session.user.id, ...payload });
-            if (insError) {
-              console.error("Supabase Error INSERT user_profiles:", insError.message, insError.details, insError.hint);
-            }
           }
         } catch (upErr: any) {
           console.error("Exception saving user_profiles:", upErr?.message || upErr);
         }
 
-        // 2. Save into resumes table using contactEmail and contactPhone keys
         const { data: currentResume } = await supabase
           .from("resumes")
           .select("data")
@@ -205,6 +217,8 @@ export function ContactCredentialsStep({ onNext, onBack }: ContactCredentialsSte
           contactEmail: email.trim(),
           contactPhone: phone.trim(),
           licenseCertification: primaryLicense,
+          licenses: finalLicenses,
+          professionalCredentials: finalLicenses,
           category: "aviation_professional",
           role: "aviation_professional",
         };
@@ -225,10 +239,7 @@ export function ContactCredentialsStep({ onNext, onBack }: ContactCredentialsSte
           }
         }, { onConflict: "userId" });
 
-        // Invalidate Next.js cache to ensure profile reflects changes immediately
         router.refresh();
-
-
       }
 
       if (onNext) {
@@ -241,8 +252,9 @@ export function ContactCredentialsStep({ onNext, onBack }: ContactCredentialsSte
       } else {
         router.push("/onboarding-complete");
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error saving contact and credentials:", err);
+      setSubmitError(err?.message || "Failed to save information. Please try again.");
     } finally {
       setIsSaving(false);
     }
@@ -311,7 +323,10 @@ export function ContactCredentialsStep({ onNext, onBack }: ContactCredentialsSte
               id="phone"
               type="tel"
               value={phone}
-              onChange={(e) => setPhone(e.target.value)}
+              onChange={(e) => {
+                setPhone(sanitizePhone(e.target.value));
+                if (submitError) setSubmitError(null);
+              }}
               onBlur={() => setTouched(prev => ({ ...prev, phone: true }))}
               placeholder="e.g., +1 (555) 234-5678"
               className={cn(
@@ -322,15 +337,15 @@ export function ContactCredentialsStep({ onNext, onBack }: ContactCredentialsSte
               )}
             />
             {touched.phone && isPhoneEmpty && (
-              <p className="text-xs text-red-600 font-medium flex items-center gap-1">
-                <AlertCircle className="w-3.5 h-3.5" />
-                This field is required.
+              <p className="text-xs text-red-600 font-medium flex items-center gap-1 animate-in fade-in">
+                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                <span>This field is required.</span>
               </p>
             )}
             {touched.phone && !isPhoneEmpty && !isPhoneFormatValid && (
-              <p className="text-xs text-red-600 font-medium flex items-center gap-1">
-                <AlertCircle className="w-3.5 h-3.5" />
-                Please enter a valid phone number.
+              <p className="text-xs text-red-600 font-medium flex items-center gap-1 animate-in fade-in">
+                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                <span>Please enter a valid phone number (at least 7 digits).</span>
               </p>
             )}
           </div>
@@ -346,7 +361,10 @@ export function ContactCredentialsStep({ onNext, onBack }: ContactCredentialsSte
               id="email"
               type="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                if (submitError) setSubmitError(null);
+              }}
               onBlur={() => setTouched(prev => ({ ...prev, email: true }))}
               placeholder="e.g., alexander.wright@example.com"
               className={cn(
@@ -362,15 +380,15 @@ export function ContactCredentialsStep({ onNext, onBack }: ContactCredentialsSte
             </p>
 
             {touched.email && isEmailEmpty && (
-              <p className="text-xs text-red-600 font-medium flex items-center gap-1">
-                <AlertCircle className="w-3.5 h-3.5" />
-                This field is required.
+              <p className="text-xs text-red-600 font-medium flex items-center gap-1 animate-in fade-in">
+                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                <span>This field is required.</span>
               </p>
             )}
             {touched.email && !isEmailEmpty && !isEmailFormatValid && (
-              <p className="text-xs text-red-600 font-medium flex items-center gap-1">
-                <AlertCircle className="w-3.5 h-3.5" />
-                Please enter a valid email address.
+              <p className="text-xs text-red-600 font-medium flex items-center gap-1 animate-in fade-in">
+                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                <span>Please enter a valid email address (e.g. name@domain.com).</span>
               </p>
             )}
           </div>
@@ -401,7 +419,10 @@ export function ContactCredentialsStep({ onNext, onBack }: ContactCredentialsSte
                 id="licenseCertification"
                 type="text"
                 value={currentLicenseInput}
-                onChange={(e) => setCurrentLicenseInput(e.target.value)}
+                onChange={(e) => {
+                  setCurrentLicenseInput(e.target.value);
+                  if (submitError) setSubmitError(null);
+                }}
                 onKeyDown={handleLicenseKeyDown}
                 onBlur={() => setTouched(prev => ({ ...prev, license: true }))}
                 placeholder="e.g. A&P Certificate"
@@ -420,7 +441,7 @@ export function ContactCredentialsStep({ onNext, onBack }: ContactCredentialsSte
                 className={cn(
                   "shrink-0 w-12 h-12 rounded-full flex items-center justify-center transition-all shadow-xs",
                   currentLicenseInput.trim() && licensesList.length < MAX_LICENSES
-                    ? "bg-blue-600 hover:bg-blue-700 active:scale-95 text-white cursor-pointer"
+                    ? "bg-[#1d4ed8] hover:bg-[#1e40af] active:scale-95 text-white cursor-pointer"
                     : "bg-gray-200 text-gray-400 cursor-not-allowed"
                 )}
                 title="Add license"
@@ -452,14 +473,19 @@ export function ContactCredentialsStep({ onNext, onBack }: ContactCredentialsSte
             )}
 
             {touched.license && !isLicenseValid && (
-              <p className="text-xs text-red-600 font-medium flex items-center gap-1">
-                <AlertCircle className="w-3.5 h-3.5" />
-                Please add at least one license or certification using the (+) button.
+              <p className="text-xs text-red-600 font-medium flex items-center gap-1 animate-in fade-in">
+                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                <span>Please enter at least one license or certification.</span>
               </p>
             )}
           </div>
 
-
+          {submitError && (
+            <div className="text-xs text-red-600 font-medium bg-red-50 border border-red-200 rounded-xl p-3 mt-2 flex items-center gap-2 animate-in fade-in">
+              <AlertCircle className="w-4 h-4 shrink-0 text-red-500" />
+              <span>{submitError}</span>
+            </div>
+          )}
 
         </div>
 
@@ -468,11 +494,11 @@ export function ContactCredentialsStep({ onNext, onBack }: ContactCredentialsSte
           <button
             type="button"
             onClick={handleNextClick}
-            disabled={!isFormValid || isSaving}
-            className={`w-full py-4 rounded-full font-bold transition-all shadow-md ${
-              isFormValid && !isSaving
-                ? "bg-blue-600 hover:bg-blue-700 text-white cursor-pointer"
-                : "bg-gray-300 text-gray-500 cursor-not-allowed"
+            disabled={isSaving}
+            className={`w-full py-4 rounded-full font-bold text-white transition-all shadow-md cursor-pointer ${
+              isSaving
+                ? "bg-[#85b0fa] cursor-not-allowed opacity-90"
+                : "bg-[#1d4ed8] hover:bg-[#1e40af] active:scale-[0.99]"
             }`}
           >
             {isSaving ? "Please wait..." : "Next"}
