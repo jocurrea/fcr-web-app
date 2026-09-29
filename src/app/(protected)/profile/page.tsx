@@ -34,7 +34,7 @@ import { supabase } from "@/lib/supabase";
 import { fetchPosts } from "@/lib/api/posts";
 import { PostCard } from "@/components/home/post-card";
 import { computeProfileAreas } from "@/utils/profileCompletion";
-import { revalidateProfileLayout } from "@/actions/profile";
+import { revalidateProfileLayout, saveAvailabilityStatusAction } from "@/actions/profile";
 import { useUserProfile } from "@/components/providers/user-profile-provider";
 
 export default function ProfilePage() {
@@ -158,9 +158,18 @@ export default function ProfilePage() {
 
   const locationValue = personal?.location || personal?.cityCountry || null;
 
-  const rawStatus = personal?.availabilityStatus || personal?.availability_status || "active";
-  const isEmployed = rawStatus === "active" || rawStatus === "employed";
-  const statusDisplayText = isEmployed ? "Active / Employed" : "Available for Work";
+  const rawStatus =
+    personal?.availabilityStatus ||
+    personal?.workAvailabilityStatus ||
+    personal?.availability_status ||
+    "active";
+  const isAvailableForWork =
+    rawStatus === "available" ||
+    rawStatus === "available_for_work" ||
+    rawStatus === "#OpenToWork" ||
+    rawStatus === "open_to_work";
+  const isEmployed = !isAvailableForWork;
+  const statusDisplayText = isAvailableForWork ? "Available for Work" : "Active / Employed";
 
   const phoneValue = personal?.phone || null;
   const emailValue = personal?.email || null;
@@ -821,7 +830,14 @@ export default function ProfilePage() {
           {/* Overlapping Avatar: Absolute centered, top half on cover & bottom half on gray page background */}
           <div className="absolute left-1/2 -translate-x-1/2 -bottom-14 sm:-bottom-16 z-20">
             <div className="relative">
-              <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-full border-4 border-white shadow-md bg-slate-800 overflow-hidden flex items-center justify-center">
+              <div
+                className={cn(
+                  "w-28 h-28 sm:w-32 sm:h-32 rounded-full border-4 shadow-md bg-slate-800 overflow-hidden flex items-center justify-center transition-all duration-300",
+                  isAvailableForWork
+                    ? "border-emerald-500 ring-4 ring-emerald-500/25 shadow-emerald-500/20"
+                    : "border-white"
+                )}
+              >
                 {profilePhoto ? (
                   <img
                     src={profilePhoto}
@@ -835,10 +851,28 @@ export default function ProfilePage() {
                 )}
               </div>
 
+              {/* Visual Indicator / Badge for Available for Work on Avatar (Scenario 2) */}
+              {isAvailableForWork ? (
+                <div
+                  className="absolute -top-1.5 -right-1.5 sm:top-0 sm:right-0 bg-emerald-500 text-white text-[10px] sm:text-xs font-black px-2.5 py-0.5 rounded-full border-2 border-white shadow-md flex items-center gap-1.5 z-30 animate-in fade-in zoom-in-95 duration-200 select-none whitespace-nowrap"
+                  title="Available for Work / #OpenToWork"
+                >
+                  <span className="w-2 h-2 rounded-full bg-white animate-pulse shrink-0" />
+                  <span>Open to Work</span>
+                </div>
+              ) : (
+                <div
+                  className="absolute -top-1 -right-1 sm:top-0 sm:right-0 bg-blue-600 text-white text-[10px] sm:text-xs font-bold px-2 py-0.5 rounded-full border-2 border-white shadow-xs z-30 select-none"
+                  title="Active / Employed"
+                >
+                  Active
+                </div>
+              )}
+
               {/* Edit Pencil Icon on Avatar */}
               <Link
                 href="/onboarding?edit=true&step=1"
-                className="absolute bottom-1 right-1 w-8 h-8 rounded-full bg-white border border-gray-200 shadow-sm flex items-center justify-center text-gray-700 hover:text-[#1d4ed8] hover:bg-gray-50 transition-colors cursor-pointer"
+                className="absolute bottom-1 right-1 w-8 h-8 rounded-full bg-white border border-gray-200 shadow-sm flex items-center justify-center text-gray-700 hover:text-[#1d4ed8] hover:bg-gray-50 transition-colors cursor-pointer z-30"
                 title="Edit profile"
               >
                 <Pencil className="w-3.5 h-3.5" />
@@ -882,18 +916,29 @@ export default function ProfilePage() {
             </div>
           ) : null}
 
-          {/* Status Pill Badge: Only for aviation_professional, hidden completely for all flight_crew accounts (Pilot/Crew) */}
+          {/* Status Pill Badge / Switcher (Scenario 1) */}
           {isAviationProfessional && (
             <div className="flex justify-center mt-3">
               <button
                 type="button"
                 onClick={() => setShowAvailabilityModal(true)}
-                className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-emerald-500 text-emerald-600 bg-transparent text-xs font-bold hover:bg-emerald-50/50 transition-colors cursor-pointer shadow-2xs active:scale-95"
+                className={cn(
+                  "inline-flex items-center gap-2 px-4 py-1.5 rounded-full border text-xs font-bold transition-all cursor-pointer shadow-2xs active:scale-95",
+                  isAvailableForWork
+                    ? "bg-emerald-50 border-emerald-500 text-emerald-700 hover:bg-emerald-100/70 shadow-xs"
+                    : "bg-blue-50 border-blue-300 text-blue-700 hover:bg-blue-100/70"
+                )}
                 title="Change availability status"
               >
+                <span
+                  className={cn(
+                    "w-2 h-2 rounded-full shrink-0",
+                    isAvailableForWork ? "bg-emerald-500 animate-pulse" : "bg-blue-500"
+                  )}
+                />
                 <Briefcase className="w-3.5 h-3.5" />
                 <span>{statusDisplayText}</span>
-                <Pencil className="w-3 h-3 text-emerald-500 ml-0.5 opacity-80" />
+                <Pencil className="w-3 h-3 ml-0.5 opacity-70" />
               </button>
             </div>
           )}
@@ -1578,70 +1623,54 @@ export default function ProfilePage() {
               </p>
             </div>
 
-            {/* Availability Options */}
+            {/* Availability Options (Scenario 1) */}
             <div className="flex flex-col gap-2.5 pt-2">
-              {/* Option 1: AVAILABLE FOR WORK */}
+              {/* Option 1: AVAILABLE FOR WORK (#OpenToWork) */}
               <button
                 type="button"
                 onClick={async () => {
                   setPersonal((prev: any) => ({
                     ...(prev || {}),
-                    availabilityStatus: "available",
-                    availability_status: "available",
+                    availabilityStatus: "available_for_work",
+                    availability_status: "available_for_work",
+                    workAvailabilityStatus: "available_for_work",
                   }));
                   setShowAvailabilityModal(false);
 
                   try {
                     const savedPersonal = localStorage.getItem("onboarding_personal");
                     const parsed = savedPersonal ? JSON.parse(savedPersonal) : {};
-                    parsed.availabilityStatus = "available";
-                    parsed.availability_status = "available";
+                    parsed.availabilityStatus = "available_for_work";
+                    parsed.availability_status = "available_for_work";
+                    parsed.workAvailabilityStatus = "available_for_work";
                     parsed.workAvailability = "available";
                     localStorage.setItem("onboarding_personal", JSON.stringify(parsed));
-                  } catch (e) {}
+                  } catch {}
 
                   try {
-                    const { data: { session } } = await supabase.auth.getSession();
-                    if (session?.user) {
-                      await supabase.from("users").update({
-                        availability_status: "available",
-                        work_availability: "available",
-                      }).eq("id", session.user.id);
-
-                      const { data: resumeData } = await supabase.from("resumes").select("data").eq("userId", session.user.id).maybeSingle();
-                      if (resumeData?.data) {
-                        const currentData = resumeData.data as any;
-                        await supabase.from("resumes").update({
-                          data: {
-                            ...currentData,
-                            personal: { ...(currentData.personal || {}), availabilityStatus: "available", workAvailability: "available" },
-                          },
-                        }).eq("userId", session.user.id);
-                      }
-
-                      // Re-fetch get_my_profile RPC and revalidate server layout
-                      await supabase.rpc("get_my_profile");
-                      await revalidateProfileLayout();
-                      await refetchProfile();
-                      if (typeof window !== "undefined") {
-                        window.dispatchEvent(new CustomEvent("profile-updated"));
-                      }
+                    await saveAvailabilityStatusAction("available_for_work");
+                    await refetchProfile();
+                    if (typeof window !== "undefined") {
+                      window.dispatchEvent(new CustomEvent("profile-updated"));
                     }
                   } catch (err) {
                     console.error("Error syncing availability:", err);
                   }
                 }}
                 className={cn(
-                  "w-full py-4 px-4 sm:px-5 rounded-2xl flex items-center justify-between text-left transition-all cursor-pointer",
-                  !isEmployed
-                    ? "bg-gray-50 border border-gray-200/80 font-bold"
-                    : "hover:bg-gray-50/70 border border-transparent font-semibold"
+                  "w-full py-4 px-4 sm:px-5 rounded-2xl flex items-center justify-between text-left transition-all cursor-pointer border",
+                  isAvailableForWork
+                    ? "bg-emerald-50/80 border-emerald-500 font-bold shadow-xs"
+                    : "hover:bg-gray-50/80 border-gray-200 font-semibold"
                 )}
               >
-                <span className="text-xs sm:text-sm text-gray-900 uppercase tracking-wider font-extrabold">
-                  AVAILABLE FOR WORK
-                </span>
-                {!isEmployed && (
+                <div className="flex items-center gap-2.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                  <span className="text-xs sm:text-sm text-gray-900 uppercase tracking-wider font-extrabold">
+                    AVAILABLE FOR WORK / #OPENTOWORK
+                  </span>
+                </div>
+                {isAvailableForWork && (
                   <Check className="w-5 h-5 text-emerald-600 stroke-[2.5]" />
                 )}
               </button>
@@ -1654,6 +1683,7 @@ export default function ProfilePage() {
                     ...(prev || {}),
                     availabilityStatus: "active",
                     availability_status: "active",
+                    workAvailabilityStatus: "active",
                   }));
                   setShowAvailabilityModal(false);
 
@@ -1662,53 +1692,36 @@ export default function ProfilePage() {
                     const parsed = savedPersonal ? JSON.parse(savedPersonal) : {};
                     parsed.availabilityStatus = "active";
                     parsed.availability_status = "active";
+                    parsed.workAvailabilityStatus = "active";
                     parsed.workAvailability = "active";
                     localStorage.setItem("onboarding_personal", JSON.stringify(parsed));
-                  } catch (e) {}
+                  } catch {}
 
                   try {
-                    const { data: { session } } = await supabase.auth.getSession();
-                    if (session?.user) {
-                      await supabase.from("users").update({
-                        availability_status: "active",
-                        work_availability: "active",
-                      }).eq("id", session.user.id);
-
-                      const { data: resumeData } = await supabase.from("resumes").select("data").eq("userId", session.user.id).maybeSingle();
-                      if (resumeData?.data) {
-                        const currentData = resumeData.data as any;
-                        await supabase.from("resumes").update({
-                          data: {
-                            ...currentData,
-                            personal: { ...(currentData.personal || {}), availabilityStatus: "active", workAvailability: "active" },
-                          },
-                        }).eq("userId", session.user.id);
-                      }
-
-                      // Re-fetch get_my_profile RPC and revalidate server layout
-                      await supabase.rpc("get_my_profile");
-                      await revalidateProfileLayout();
-                      await refetchProfile();
-                      if (typeof window !== "undefined") {
-                        window.dispatchEvent(new CustomEvent("profile-updated"));
-                      }
+                    await saveAvailabilityStatusAction("active");
+                    await refetchProfile();
+                    if (typeof window !== "undefined") {
+                      window.dispatchEvent(new CustomEvent("profile-updated"));
                     }
                   } catch (err) {
                     console.error("Error syncing availability:", err);
                   }
                 }}
                 className={cn(
-                  "w-full py-4 px-4 sm:px-5 rounded-2xl flex items-center justify-between text-left transition-all cursor-pointer",
-                  isEmployed
-                    ? "bg-gray-50 border border-gray-200/80 font-bold"
-                    : "hover:bg-gray-50/70 border border-transparent font-semibold"
+                  "w-full py-4 px-4 sm:px-5 rounded-2xl flex items-center justify-between text-left transition-all cursor-pointer border",
+                  !isAvailableForWork
+                    ? "bg-blue-50/80 border-blue-500 font-bold shadow-xs"
+                    : "hover:bg-gray-50/80 border-gray-200 font-semibold"
                 )}
               >
-                <span className="text-xs sm:text-sm text-gray-900 uppercase tracking-wider font-extrabold">
-                  ACTIVE / EMPLOYED
-                </span>
-                {isEmployed && (
-                  <Check className="w-5 h-5 text-emerald-600 stroke-[2.5]" />
+                <div className="flex items-center gap-2.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-blue-500 shrink-0" />
+                  <span className="text-xs sm:text-sm text-gray-900 uppercase tracking-wider font-extrabold">
+                    ACTIVE / EMPLOYED
+                  </span>
+                </div>
+                {!isAvailableForWork && (
+                  <Check className="w-5 h-5 text-blue-600 stroke-[2.5]" />
                 )}
               </button>
             </div>

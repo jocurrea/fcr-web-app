@@ -56,16 +56,19 @@ export default function PublicProfilePage() {
         } = await supabase.auth.getSession();
         setIsOwnProfile(session?.user?.id === profileId);
 
-        const [userRes, resumeRes] = await Promise.all([
+        const [userRes, resumeRes, userProfileRes] = await Promise.all([
           supabase.from("users").select("*").eq("id", profileId).maybeSingle(),
           supabase.from("resumes").select("data").eq("userId", profileId).maybeSingle(),
+          supabase.from("user_profiles").select("*").eq("user_id", profileId).maybeSingle(),
         ]);
 
         const dbUser = userRes.data;
         const dbResume = resumeRes.data?.data;
+        const dbUserProfile = userProfileRes.data;
 
         setProfileData({
           user: dbUser,
+          userProfile: dbUserProfile,
           personal: dbResume?.personal || {},
           work: dbResume?.work || dbResume?.personal?.workExperience || [],
         });
@@ -180,6 +183,23 @@ export default function PublicProfilePage() {
   const isApproved = rawStatus === "active" || rawStatus === "approved";
   const isPending = !isApproved;
 
+  // Work Availability Status — E01-HU09
+  const userProfile = profileData?.userProfile || {};
+  const rawAvailability =
+    userProfile?.workAvailabilityStatus ||
+    userProfile?.work_availability_status ||
+    user?.availability_status ||
+    user?.work_availability ||
+    personal?.availabilityStatus ||
+    personal?.workAvailabilityStatus ||
+    "active";
+
+  const isAvailableForWork =
+    rawAvailability === "available_for_work" ||
+    rawAvailability === "available" ||
+    rawAvailability === "#OpenToWork" ||
+    rawAvailability === "open_to_work";
+
   // Dynamic Status Badge & Dot Styling (Orange for Pending, Green for Active)
   const statusBadgeText = isPending ? "Pending" : "Active";
   const statusBadgeStyle = isPending
@@ -266,9 +286,16 @@ export default function PublicProfilePage() {
             {/* Left Side: Avatar + Name, Role, Summary */}
             <div className="flex items-start gap-3.5 min-w-0 flex-1">
               
-              {/* Avatar with Solid Status Dot */}
+              {/* Avatar with Status Badge / Indicator */}
               <div className="relative shrink-0 mt-0.5">
-                <div className="w-16 h-16 sm:w-18 sm:h-18 rounded-full overflow-hidden bg-gray-100 border border-gray-200 shadow-2xs">
+                <div
+                  className={cn(
+                    "w-16 h-16 sm:w-18 sm:h-18 rounded-full overflow-hidden bg-gray-100 border shadow-2xs transition-all duration-300",
+                    isAvailableForWork
+                      ? "border-2 border-emerald-500 ring-2 ring-emerald-500/30"
+                      : "border-gray-200"
+                  )}
+                >
                   {avatarUrl ? (
                     <img
                       src={avatarUrl}
@@ -282,11 +309,24 @@ export default function PublicProfilePage() {
                   )}
                 </div>
 
-                {/* Status Dot (Bottom-Right of Avatar: Orange if Pending, Green if Active) */}
-                <span
-                  className={cn("absolute bottom-0.5 right-0.5 w-3.5 h-3.5 rounded-full border-2 border-white shadow-xs", statusDotStyle)}
-                  title={statusBadgeText}
-                />
+                {/* Status Dot / Badge (Scenario 2: Visible indicator on avatar) */}
+                {isAvailableForWork ? (
+                  <span
+                    className="absolute -bottom-1 -right-1 bg-emerald-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full border border-white shadow-xs flex items-center gap-1 z-10 select-none animate-in fade-in"
+                    title="Available for Work / #OpenToWork"
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse shrink-0" />
+                    <span>Open</span>
+                  </span>
+                ) : (
+                  <span
+                    className={cn(
+                      "absolute bottom-0.5 right-0.5 w-3.5 h-3.5 rounded-full border-2 border-white shadow-xs",
+                      statusDotStyle
+                    )}
+                    title={statusBadgeText}
+                  />
+                )}
               </div>
 
               {/* Profile Details (Name, Role Pill, Company Link, Summary) */}
@@ -346,11 +386,16 @@ export default function PublicProfilePage() {
             <div className="flex items-center gap-1.5 shrink-0 pt-0.5">
               <span
                 className={cn(
-                  "inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold capitalize whitespace-nowrap",
-                  statusBadgeStyle
+                  "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold capitalize whitespace-nowrap",
+                  isAvailableForWork
+                    ? "bg-emerald-50 text-emerald-700 border border-emerald-200/80"
+                    : statusBadgeStyle
                 )}
               >
-                {statusBadgeText}
+                {isAvailableForWork && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                )}
+                {isAvailableForWork ? "Available for Work" : statusBadgeText}
               </span>
 
               {isOwnProfile && (

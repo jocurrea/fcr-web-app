@@ -461,5 +461,135 @@ export async function saveSkillsAction(
   }
 }
 
+export interface SaveAvailabilityResponse {
+  success: boolean;
+  status?: "active" | "available_for_work";
+  error?: string;
+}
 
+/**
+ * [Web] E01-HU09: Work Availability Status
+ * Toggles and updates availability status across user_profiles, aviation_professional_profiles,
+ * users, and resumes tables.
+ */
+export async function saveAvailabilityStatusAction(
+  rawStatus: "active" | "available_for_work" | "available" | string
+): Promise<SaveAvailabilityResponse> {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
 
+    if (authError || !user) {
+      return {
+        success: false,
+        error: "Authentication required to update availability status.",
+      };
+    }
+
+    // DB check constraint on user_profiles.workAvailabilityStatus strictly accepts 'active' | 'available_for_work'
+    const canonicalStatus: "active" | "available_for_work" =
+      rawStatus === "available" ||
+      rawStatus === "available_for_work" ||
+      rawStatus === "#OpenToWork" ||
+      rawStatus === "open_to_work"
+        ? "available_for_work"
+        : "active";
+
+    // 1. Update user_profiles
+    try {
+      const { data: upData, error: upError } = await supabase
+        .from("user_profiles")
+        .update({ workAvailabilityStatus: canonicalStatus })
+        .eq("user_id", user.id)
+        .select();
+
+      if (!upError && (!upData || upData.length === 0)) {
+        const { data: upData2, error: upError2 } = await supabase
+          .from("user_profiles")
+          .update({ workAvailabilityStatus: canonicalStatus })
+          .eq("userId", user.id)
+          .select();
+
+        if (!upError2 && (!upData2 || upData2.length === 0)) {
+          await supabase
+            .from("user_profiles")
+            .insert({ user_id: user.id, workAvailabilityStatus: canonicalStatus });
+        }
+      }
+    } catch (e) {
+      console.warn("[saveAvailabilityStatusAction] user_profiles notice:", e);
+    }
+
+    // 2. Update aviation_professional_profiles
+    try {
+      await supabase
+        .from("aviation_professional_profiles")
+        .update({ workAvailabilityStatus: canonicalStatus })
+        .eq("userId", user.id);
+    } catch (e) {
+      console.warn("[saveAvailabilityStatusAction] aviation_professional_profiles notice:", e);
+    }
+
+    // 3. Update users table
+    try {
+      await supabase
+        .from("users")
+        .update({
+          availability_status: canonicalStatus,
+          work_availability: canonicalStatus === "available_for_work" ? "available" : "active",
+        })
+        .eq("id", user.id);
+    } catch (e) {
+      console.warn("[saveAvailabilityStatusAction] users notice:", e);
+    }
+
+    // 4. Update resumes table
+    try {
+      const { data: currentResume } = await supabase
+        .from("resumes")
+        .select("data")
+        .eq("userId", user.id)
+        .maybeSingle();
+
+      const resumeData = (currentResume?.data as any) || {};
+      const updatedPersonal = {
+        ...(resumeData.personal || {}),
+        availabilityStatus: canonicalStatus,
+        workAvailability: canonicalStatus === "available_for_work" ? "available" : "active",
+      };
+
+      await supabase.from("resumes").upsert(
+        {
+          userId: user.id,
+          data: {
+            ...resumeData,
+            personal: updatedPersonal,
+          },
+        },
+        { onConflict: "userId" }
+      );
+    } catch (e) {
+      console.warn("[saveAvailabilityStatusAction] resumes notice:", e);
+    }
+
+    // 5. Try calling get_my_profile RPC
+    try {
+      await supabase.rpc("get_my_profile");
+    } catch {}
+
+    revalidatePath("/", "layout");
+    revalidatePath("/profile");
+    revalidatePath("/search");
+
+    return { success: true, status: canonicalStatus };
+  } catch (err: any) {
+    console.error("[saveAvailabilityStatusAction] Unexpected error:", err);
+    return {
+      success: false,
+      error: err?.message || "An unexpected error occurred while saving availability status.",
+    };
+  }
+}

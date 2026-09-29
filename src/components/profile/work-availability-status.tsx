@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
-import { revalidateProfileLayout } from "@/actions/profile";
+import { saveAvailabilityStatusAction, revalidateProfileLayout } from "@/actions/profile";
 
 export type AvailabilityStatus = "active" | "available_for_work";
 
@@ -87,53 +87,9 @@ export function WorkAvailabilityStatus({
     if (syncWithBackend) {
       setIsUpdating(true);
       try {
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
-        if (session) {
-          // Update users record
-          await supabase
-            .from("users")
-            .update({
-              availability_status: newStatus,
-              work_availability:
-                newStatus === "available_for_work" ? "available" : "active",
-            })
-            .eq("id", session.user.id);
-
-          // Update resume data
-          const { data: resumeData } = await supabase
-            .from("resumes")
-            .select("data")
-            .eq("userId", session.user.id)
-            .maybeSingle();
-
-          if (resumeData?.data) {
-            const currentData = resumeData.data as any;
-            const updatedPersonal = {
-              ...(currentData.personal || {}),
-              availabilityStatus: newStatus,
-              workAvailability:
-                newStatus === "available_for_work" ? "available" : "active",
-            };
-
-            await supabase
-              .from("resumes")
-              .update({
-                data: {
-                  ...currentData,
-                  personal: updatedPersonal,
-                },
-              })
-              .eq("userId", session.user.id);
-          }
-
-          // Re-fetch get_my_profile RPC and revalidate server layout
-          await supabase.rpc("get_my_profile");
-          await revalidateProfileLayout();
-          if (typeof window !== "undefined") {
-            window.dispatchEvent(new CustomEvent("profile-updated"));
-          }
+        await saveAvailabilityStatusAction(newStatus);
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("profile-updated"));
         }
       } catch (err) {
         console.error("Error syncing availability to backend:", err);
