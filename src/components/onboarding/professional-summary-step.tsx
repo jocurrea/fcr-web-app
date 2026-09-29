@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { ChevronLeft, AlertCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { saveProfessionalSummaryAction } from "@/actions/profile";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
@@ -38,18 +39,39 @@ export function ProfessionalSummaryStep({ onNext, onBack }: ProfessionalSummaryS
     }
   }, []);
 
+  // UI enforces strict maximum character limit on direct typing
   const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const value = e.target.value.slice(0, MAX_CHARACTERS);
+    const rawValue = e.target.value;
+    const value = rawValue.length > MAX_CHARACTERS ? rawValue.slice(0, MAX_CHARACTERS) : rawValue;
     setAboutMe(value);
     if (!touched) setTouched(true);
+    if (submitError) setSubmitError(null);
   };
 
-  const isAboutMeValid = aboutMe.trim().length > 0;
+  // UI enforces strict maximum character limit on pasting
+  const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const pastedText = e.clipboardData.getData("text");
+    if (!pastedText) return;
+
+    const currentLen = aboutMe.length;
+    if (currentLen + pastedText.length > MAX_CHARACTERS) {
+      e.preventDefault();
+      const remaining = Math.max(0, MAX_CHARACTERS - currentLen);
+      const allowed = pastedText.slice(0, remaining);
+      const nextVal = (aboutMe + allowed).slice(0, MAX_CHARACTERS);
+      setAboutMe(nextVal);
+      if (!touched) setTouched(true);
+      if (submitError) setSubmitError(null);
+    }
+  };
+
+  const isAboutMeValid = aboutMe.trim().length > 0 && aboutMe.length <= MAX_CHARACTERS;
 
   const handleNextClick = async () => {
     setTouched(true);
     setSubmitError(null);
 
+    // Scenario 1: Field is required. If empty or invalid, block and show inline error
     if (!isAboutMeValid || isSaving) return;
 
     setIsSaving(true);
@@ -67,9 +89,17 @@ export function ProfessionalSummaryStep({ onNext, onBack }: ProfessionalSummaryS
 
       localStorage.setItem("onboarding_personal", JSON.stringify(updated));
 
+      // Scenario 3: Backend validation via Server Action (rejects text > 500 or empty)
+      const actionResult = await saveProfessionalSummaryAction(aboutMe.trim());
+      if (!actionResult.success) {
+        setSubmitError(actionResult.error || "Failed to save summary on the backend.");
+        setIsSaving(false);
+        return;
+      }
+
+      // Client-side local Supabase session fallback
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
-        // Save description/aboutMe into resumes table
         const { data: currentResume } = await supabase
           .from("resumes")
           .select("data")
@@ -82,14 +112,14 @@ export function ProfessionalSummaryStep({ onNext, onBack }: ProfessionalSummaryS
           ...updated
         };
 
-        const { error: upsertErr } = await supabase.from("resumes").upsert({
+        await supabase.from("resumes").upsert({
           userId: session.user.id,
           data: {
             ...resumeData,
+            summary: aboutMe.trim(),
             personal: updatedPersonal
           }
         }, { onConflict: "userId" });
-        if (upsertErr) throw upsertErr;
       }
 
       if (onNext) {
@@ -154,7 +184,7 @@ export function ProfessionalSummaryStep({ onNext, onBack }: ProfessionalSummaryS
 
         {/* 3. Text Area Component with Top Counter and Bottom Helper Text */}
         <div className="flex flex-col gap-2 flex-1">
-          {/* Label + Top-Aligned Character Counter in the same row */}
+          {/* Label + Top-Aligned Character Counter in the same row (Scenario 2) */}
           <div className="flex items-center justify-between px-0.5">
             <Label htmlFor="aboutMe" className="font-semibold text-gray-900 text-sm">
               About Me <span className="text-red-500">*</span>
@@ -162,7 +192,7 @@ export function ProfessionalSummaryStep({ onNext, onBack }: ProfessionalSummaryS
 
             <span
               className={cn(
-                "text-xs font-medium",
+                "text-xs font-medium transition-colors",
                 aboutMe.length >= MAX_CHARACTERS
                   ? "text-amber-600 font-bold"
                   : "text-gray-400"
@@ -179,6 +209,7 @@ export function ProfessionalSummaryStep({ onNext, onBack }: ProfessionalSummaryS
               maxLength={MAX_CHARACTERS}
               value={aboutMe}
               onChange={handleChange}
+              onPaste={handlePaste}
               onBlur={() => setTouched(true)}
               placeholder="Write a short overview of your professional background"
               className={cn(
@@ -195,17 +226,23 @@ export function ProfessionalSummaryStep({ onNext, onBack }: ProfessionalSummaryS
             Keep it focused and relevant to your aviation experience.
           </p>
 
-          {/* Validation Error Message */}
+          {/* Validation Error Message (Scenario 1 & Scenario 3) */}
           {touched && !isAboutMeValid && (
-            <p className="text-xs text-red-600 font-medium flex items-center gap-1 mt-1 px-0.5">
-              <AlertCircle className="w-3.5 h-3.5" />
-              This field is required.
+            <p className="text-xs text-red-600 font-medium flex items-center gap-1 mt-1 px-0.5 animate-in fade-in">
+              <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+              <span>
+                {aboutMe.trim().length === 0
+                  ? "This field is required."
+                  : `About Me must not exceed ${MAX_CHARACTERS} characters.`}
+              </span>
             </p>
           )}
+
           {submitError && (
-            <p className="text-sm text-red-600 font-medium bg-red-50 border border-red-200 rounded p-3 mt-2">
-              {submitError}
-            </p>
+            <div className="text-xs text-red-600 font-medium bg-red-50 border border-red-200 rounded-xl p-3 mt-2 flex items-center gap-2 animate-in fade-in">
+              <AlertCircle className="w-4 h-4 shrink-0 text-red-500" />
+              <span>{submitError}</span>
+            </div>
           )}
         </div>
 
@@ -214,11 +251,11 @@ export function ProfessionalSummaryStep({ onNext, onBack }: ProfessionalSummaryS
           <button
             type="button"
             onClick={handleNextClick}
-            disabled={!isAboutMeValid || isSaving}
-            className={`w-full py-4 rounded-full font-bold text-white transition-all shadow-md ${
-              isAboutMeValid && !isSaving
-                ? "bg-[#1d4ed8] hover:bg-[#1e40af] cursor-pointer"
-                : "bg-[#85b0fa] cursor-not-allowed opacity-90"
+            disabled={isSaving}
+            className={`w-full py-4 rounded-full font-bold text-white transition-all shadow-md cursor-pointer ${
+              isSaving
+                ? "bg-[#85b0fa] cursor-not-allowed opacity-90"
+                : "bg-[#1d4ed8] hover:bg-[#1e40af] active:scale-[0.99]"
             }`}
           >
             {isSaving ? "Please wait..." : "Next"}
@@ -229,3 +266,4 @@ export function ProfessionalSummaryStep({ onNext, onBack }: ProfessionalSummaryS
     </div>
   );
 }
+
