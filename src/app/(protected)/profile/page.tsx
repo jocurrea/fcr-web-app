@@ -397,7 +397,7 @@ export default function ProfilePage() {
   const affiliationName = affiliationInfo?.name || null;
   const derivedStatus = affiliationInfo?.status || null;
   const isAffiliationVerified = derivedStatus === "active" || derivedStatus === "approved" || derivedStatus === "verified";
-  const isAffiliationPending = derivedStatus === "pending" || derivedStatus === "unverified";
+  const isAffiliationPending = derivedStatus === "pending";
 
   const completionPercentage = profileProgress;
 
@@ -903,6 +903,30 @@ export default function ProfilePage() {
               </Link>
             )}
           </div>
+
+          {/* Company Display — E01-HU11 & E01-HU12 (Scenario 3) */}
+          {affiliationName && (
+            <div className="mt-1 flex items-center justify-center gap-1.5 max-w-full flex-wrap">
+              <Link
+                href="/business/affiliate"
+                className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-700 text-xs sm:text-sm font-medium cursor-pointer hover:underline transition-colors max-w-full"
+                title={`Manage ${affiliationName} affiliation`}
+              >
+                <Building2 className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                <span className="truncate max-w-[200px] sm:max-w-xs">{affiliationName}</span>
+              </Link>
+              {isAffiliationPending && (
+                <span className="bg-amber-50 text-amber-700 border border-amber-200/80 text-[11px] font-semibold px-2 py-0.5 rounded-full shrink-0">
+                  Pending Verification
+                </span>
+              )}
+              {isAffiliationVerified && (
+                <span className="bg-emerald-50 text-emerald-700 border border-emerald-200/80 text-[11px] font-semibold px-2 py-0.5 rounded-full shrink-0">
+                  Verified Company
+                </span>
+              )}
+            </div>
+          )}
 
           {/* Description / Summary under role (Sobre mí) */}
           {summaryText ? (
