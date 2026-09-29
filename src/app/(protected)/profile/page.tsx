@@ -882,14 +882,14 @@ export default function ProfilePage() {
         </div>
 
         {/* Main Info, Status, Interaction Buttons & Professional Summary Paragraph */}
-        <div className="pt-12 sm:pt-14 w-full flex flex-col items-center text-center">
+        <div className="pt-12 sm:pt-14 w-full max-w-full overflow-hidden flex flex-col items-center text-center px-4">
           {/* Full Name */}
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight leading-tight">
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight leading-tight max-w-full break-words">
             {fullName}
           </h1>
 
           {/* Role in blue */}
-          <div className="flex items-center justify-center gap-2 mt-1">
+          <div className="flex items-center justify-center gap-2 mt-1 max-w-full">
             <p className="text-sm sm:text-base font-bold text-[#1d4ed8]">
               {roleLabel}
             </p>
@@ -904,15 +904,26 @@ export default function ProfilePage() {
             )}
           </div>
 
-          {/* Description / Summary under role - matching Mobile app exactly */}
+          {/* Description / Summary under role (Sobre mí) */}
           {summaryText ? (
-            <p className="text-sm sm:text-base text-gray-700 max-w-xl mx-auto mt-2.5 px-4 leading-relaxed font-normal">
-              {summaryText}
-            </p>
+            <div className="w-full max-w-xl mx-auto mt-2.5 px-2 flex items-center justify-center gap-1.5">
+              <p className="text-sm sm:text-base text-gray-600 leading-relaxed font-normal text-center break-words [overflow-wrap:anywhere] [word-break:break-word] overflow-hidden min-w-0">
+                {summaryText}
+              </p>
+              {isAviationProfessional && (
+                <Link
+                  href="/onboarding?edit=true&step=3&category=aviation_professional"
+                  className="text-gray-400 hover:text-[#1d4ed8] transition-colors p-1 shrink-0 cursor-pointer"
+                  title="Edit summary"
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                </Link>
+              )}
+            </div>
           ) : isFlightCrew && locationValue ? (
-            <div className="text-xs sm:text-sm text-gray-500 mt-1 inline-flex items-center justify-center gap-1">
+            <div className="text-xs sm:text-sm text-gray-500 mt-1 inline-flex items-center justify-center gap-1 max-w-full">
               <MapPin className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-              <span>{locationValue}</span>
+              <span className="truncate">{locationValue}</span>
             </div>
           ) : null}
 

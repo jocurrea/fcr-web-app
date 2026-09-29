@@ -375,7 +375,7 @@ export default function PublicProfilePage() {
                 </div>
 
                 {/* Professional Summary */}
-                <p className="text-xs sm:text-sm text-gray-600 leading-relaxed font-normal">
+                <p className="text-xs sm:text-sm text-gray-600 leading-relaxed font-normal break-words [overflow-wrap:anywhere] [word-break:break-word] overflow-hidden min-w-0">
                   {summaryText}
                 </p>
               </div>
