@@ -991,73 +991,65 @@ export default function ProfilePage() {
             </div>
 
             <div className="flex flex-col gap-3">
-              {/* Tarjeta 1: Contact and credentials */}
-              {(!completionAreas || completionAreas.find((a: any) => a.key === "contact_credentials")?.isDone !== true) && (
-                <div 
-                  onClick={() => router.push("/onboarding?edit=true&step=4&category=aviation_professional")}
-                  className="bg-white rounded-[20px] p-4 flex items-center gap-4 shadow-sm border border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors"
-                >
-                  <div className="w-10 h-10 rounded-full bg-[#F0F4FF] flex items-center justify-center flex-shrink-0">
-                    <PlusIcon className="w-5 h-5 text-blue-500" />
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="text-[15px] font-bold text-gray-900">Contact and credentials</h3>
-                    <p className="text-[13px] text-gray-500 leading-snug mt-0.5">Add your public contact details and a credential.</p>
-                  </div>
-                  <ChevronRightIcon className="w-5 h-5 text-gray-400 flex-shrink-0" />
+              {/* Tarjeta 1: About Me */}
+              <div 
+                onClick={() => router.push("/onboarding?edit=true&step=3&category=aviation_professional")}
+                className="bg-white rounded-[20px] p-4 flex items-center gap-4 shadow-sm border border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors"
+              >
+                <div className="w-10 h-10 rounded-full bg-[#F0F4FF] flex items-center justify-center flex-shrink-0">
+                  <PlusIcon className="w-5 h-5 text-blue-500" />
                 </div>
-              )}
+                <div className="flex-1">
+                  <h3 className="text-[15px] font-bold text-gray-900">About Me</h3>
+                  <p className="text-[13px] text-gray-500 leading-snug mt-0.5">Describe your professional background.</p>
+                </div>
+                <ChevronRightIcon className="w-5 h-5 text-gray-400 flex-shrink-0" />
+              </div>
 
-              {/* Tarjeta 2: Languages */}
-              {(!completionAreas || completionAreas.find((a: any) => a.key === "languages")?.isDone !== true) && (
-                <div 
-                  onClick={() => router.push("/onboarding?edit=true&step=5&section=languages&category=aviation_professional")}
-                  className="bg-white rounded-[20px] p-4 flex items-center gap-4 shadow-sm border border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors"
-                >
-                  <div className="w-10 h-10 rounded-full bg-[#F0F4FF] flex items-center justify-center flex-shrink-0">
-                    <PlusIcon className="w-5 h-5 text-blue-500" />
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="text-[15px] font-bold text-gray-900">Languages</h3>
-                    <p className="text-[13px] text-gray-500 leading-snug mt-0.5">Add at least one language you speak.</p>
-                  </div>
-                  <ChevronRightIcon className="w-5 h-5 text-gray-400 flex-shrink-0" />
+              {/* Tarjeta 2: Contact and credentials */}
+              <div 
+                onClick={() => router.push("/onboarding?edit=true&step=4&category=aviation_professional")}
+                className="bg-white rounded-[20px] p-4 flex items-center gap-4 shadow-sm border border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors"
+              >
+                <div className="w-10 h-10 rounded-full bg-[#F0F4FF] flex items-center justify-center flex-shrink-0">
+                  <PlusIcon className="w-5 h-5 text-blue-500" />
                 </div>
-              )}
+                <div className="flex-1">
+                  <h3 className="text-[15px] font-bold text-gray-900">Contact and credentials</h3>
+                  <p className="text-[13px] text-gray-500 leading-snug mt-0.5">Add your public contact details and a credential.</p>
+                </div>
+                <ChevronRightIcon className="w-5 h-5 text-gray-400 flex-shrink-0" />
+              </div>
 
               {/* Tarjeta 3: Work experience */}
-              {(!completionAreas || completionAreas.find((a: any) => a.key === "work_experience")?.isDone !== true) && (
-                <div 
-                  onClick={() => router.push("/onboarding?edit=true&step=5&section=work&category=aviation_professional")}
-                  className="bg-white rounded-[20px] p-4 flex items-center gap-4 shadow-sm border border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors"
-                >
-                  <div className="w-10 h-10 rounded-full bg-[#F0F4FF] flex items-center justify-center flex-shrink-0">
-                    <PlusIcon className="w-5 h-5 text-blue-500" />
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="text-[15px] font-bold text-gray-900">Work experience</h3>
-                    <p className="text-[13px] text-gray-500 leading-snug mt-0.5">Add at least one professional experience.</p>
-                  </div>
-                  <ChevronRightIcon className="w-5 h-5 text-gray-400 flex-shrink-0" />
+              <div 
+                onClick={() => router.push("/onboarding?edit=true&step=5&section=work&category=aviation_professional")}
+                className="bg-white rounded-[20px] p-4 flex items-center gap-4 shadow-sm border border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors"
+              >
+                <div className="w-10 h-10 rounded-full bg-[#F0F4FF] flex items-center justify-center flex-shrink-0">
+                  <PlusIcon className="w-5 h-5 text-blue-500" />
                 </div>
-              )}
+                <div className="flex-1">
+                  <h3 className="text-[15px] font-bold text-gray-900">Work experience</h3>
+                  <p className="text-[13px] text-gray-500 leading-snug mt-0.5">Add at least one professional experience.</p>
+                </div>
+                <ChevronRightIcon className="w-5 h-5 text-gray-400 flex-shrink-0" />
+              </div>
 
               {/* Tarjeta 4: Skills and expertise */}
-              {(!completionAreas || completionAreas.find((a: any) => a.key === "skills")?.isDone !== true) && (
-                <div 
-                  onClick={() => router.push("/onboarding?edit=true&step=6&category=aviation_professional")}
-                  className="bg-white rounded-[20px] p-4 flex items-center gap-4 shadow-sm border border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors"
-                >
-                  <div className="w-10 h-10 rounded-full bg-[#F0F4FF] flex items-center justify-center flex-shrink-0">
-                    <PlusIcon className="w-5 h-5 text-blue-500" />
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="text-[15px] font-bold text-gray-900">Skills and expertise</h3>
-                    <p className="text-[13px] text-gray-500 leading-snug mt-0.5">Add at least one professional skill.</p>
-                  </div>
-                  <ChevronRightIcon className="w-5 h-5 text-gray-400 flex-shrink-0" />
+              <div 
+                onClick={() => router.push("/onboarding?edit=true&step=6&category=aviation_professional")}
+                className="bg-white rounded-[20px] p-4 flex items-center gap-4 shadow-sm border border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors"
+              >
+                <div className="w-10 h-10 rounded-full bg-[#F0F4FF] flex items-center justify-center flex-shrink-0">
+                  <PlusIcon className="w-5 h-5 text-blue-500" />
                 </div>
-              )}
+                <div className="flex-1">
+                  <h3 className="text-[15px] font-bold text-gray-900">Skills and expertise</h3>
+                  <p className="text-[13px] text-gray-500 leading-snug mt-0.5">Add at least one professional skill.</p>
+                </div>
+                <ChevronRightIcon className="w-5 h-5 text-gray-400 flex-shrink-0" />
+              </div>
             </div>
           </>
         ) : (
