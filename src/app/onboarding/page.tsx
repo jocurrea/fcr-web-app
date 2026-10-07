@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { requestCompanyAffiliationFallbackAction } from "@/actions/affiliations";
 import { revalidateProfileLayout } from "@/actions/profile";
+import { sanitizeUrl } from "@/lib/validation/url-validation";
 import { ChevronLeft } from "lucide-react";
 
 // Flight Crew Steps
@@ -243,13 +244,19 @@ function OnboardingContent() {
       const avatarPhoto = localStorage.getItem("userProfilePhoto");
 
       const personalData = personalRaw ? JSON.parse(personalRaw) : {};
+      const resumeData = resumeRaw ? JSON.parse(resumeRaw) : {};
+      if (Array.isArray(resumeData.websites)) {
+        resumeData.websites = resumeData.websites
+          .map((w: string) => sanitizeUrl(w))
+          .filter(Boolean);
+      }
 
       const crewData = {
         personal: personalData,
         licenses: licensesRaw ? JSON.parse(licensesRaw) : [],
         ratings: ratingsRaw ? JSON.parse(ratingsRaw) : [],
         work: workRaw ? JSON.parse(workRaw) : personalData.workExperiences || [],
-        resume: resumeRaw ? JSON.parse(resumeRaw) : {},
+        resume: resumeData,
         skills: personalData.skills || [],
       };
 

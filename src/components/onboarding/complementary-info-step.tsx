@@ -20,6 +20,12 @@ import { saveComplementaryInfoAction } from "@/actions/profile";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import {
+  isPasteAllowed,
+  hasInvalidCharacters,
+  RESTRICTED_INPUT_ERROR_MSG,
+  CLIPBOARD_RESTRICTED_ERROR_MSG,
+} from "@/lib/validation/input-restrictions";
 
 export interface WorkExperienceItem {
   id: string;
@@ -472,6 +478,7 @@ export function ComplementaryInfoStep({ onNext, onBack, onSkip }: ComplementaryI
   const router = useRouter();
 
   const [city, setCity] = useState("");
+  const [cityError, setCityError] = useState<string | null>(null);
   const [selectedCountry, setSelectedCountry] = useState<CountryOption | null>(null);
   const [isCountryDropdownOpen, setIsCountryDropdownOpen] = useState(false);
   const [countrySearch, setCountrySearch] = useState("");
@@ -690,6 +697,10 @@ export function ComplementaryInfoStep({ onNext, onBack, onSkip }: ComplementaryI
     if (isSaving) return;
 
     if (!skip) {
+      if (hasInvalidCharacters(city)) {
+        setCityError(RESTRICTED_INPUT_ERROR_MSG);
+        return;
+      }
       if (city.trim() && !selectedCountry) {
         setFormError("Please select a country for your city location.");
         return;
@@ -874,10 +885,39 @@ export function ComplementaryInfoStep({ onNext, onBack, onSkip }: ComplementaryI
                 id="location-city-input"
                 type="text"
                 value={city}
-                onChange={(e) => setCity(e.target.value)}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setCity(val);
+                  if (hasInvalidCharacters(val)) {
+                    setCityError(RESTRICTED_INPUT_ERROR_MSG);
+                  } else if (cityError) {
+                    setCityError(null);
+                  }
+                  if (formError) setFormError(null);
+                }}
+                onPaste={(e) => {
+                  const pasted = e.clipboardData.getData("text");
+                  if (!isPasteAllowed(pasted)) {
+                    e.preventDefault();
+                    setCityError(CLIPBOARD_RESTRICTED_ERROR_MSG);
+                  }
+                }}
                 placeholder="City"
-                className="w-full rounded-2xl py-6 px-4 text-sm bg-white border border-gray-200 focus:border-[#1d4ed8] focus:ring-2 focus:ring-[#1d4ed8]/20 transition-all"
+                className={cn(
+                  "w-full rounded-2xl py-6 px-4 text-sm bg-white border transition-all",
+                  cityError
+                    ? "border-red-400 ring-1 ring-red-200/50 bg-red-50/10 focus:border-red-500 focus:ring-red-300"
+                    : "border-gray-200 focus:border-[#1d4ed8] focus:ring-2 focus:ring-[#1d4ed8]/20"
+                )}
               />
+
+              {/* Inline validation error for City */}
+              {cityError && (
+                <p className="text-xs text-red-600 font-medium flex items-center gap-1 animate-in fade-in -mt-1 px-1">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                  <span>{cityError}</span>
+                </p>
+              )}
 
               {/* Custom Country Select with Flag Icons */}
               <div className="relative" ref={countryDropdownRef}>
@@ -1093,8 +1133,8 @@ export function ComplementaryInfoStep({ onNext, onBack, onSkip }: ComplementaryI
           <button
             type="button"
             onClick={() => handleSaveAndProceed(false)}
-            disabled={isSaving}
-            className="flex-1 py-4 rounded-full font-bold text-white bg-[#1d4ed8] hover:bg-[#1e40af] transition-all shadow-md cursor-pointer text-center text-sm"
+            disabled={isSaving || !!cityError || hasInvalidCharacters(city)}
+            className="flex-1 py-4 rounded-full font-bold text-white bg-[#1d4ed8] hover:bg-[#1e40af] transition-all shadow-md cursor-pointer text-center text-sm disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isSaving ? "Please wait..." : "Next"}
           </button>

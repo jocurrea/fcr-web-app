@@ -2,6 +2,18 @@ import React, { useState, useEffect, useRef, ChangeEvent } from "react";
 import { Upload, X, AlertCircle } from "lucide-react";
 import { useBusinessOnboarding } from "@/components/onboarding-business/business-onboarding-context";
 import { supabase } from "@/lib/supabase";
+import {
+  isPasteAllowed,
+  hasInvalidCharacters,
+  RESTRICTED_INPUT_ERROR_MSG,
+  CLIPBOARD_RESTRICTED_ERROR_MSG,
+} from "@/lib/validation/input-restrictions";
+import {
+  isValidStrictUrl,
+  INVALID_URL_ERROR_MSG,
+  hasXssOrInjection,
+  XSS_SECURITY_ERROR_MSG,
+} from "@/lib/validation/url-validation";
 
 interface CompanyProfileStepProps {
   onNext: () => void;
@@ -25,6 +37,12 @@ export function CompanyProfileStep({ onNext }: CompanyProfileStepProps) {
   const [fleetInput, setFleetInput] = useState("");
   const [fleetTypes, setFleetTypes] = useState<string[]>([]);
   const [logo, setLogo] = useState<string | null>(null);
+
+  const [locationError, setLocationError] = useState<string | null>(null);
+  const [websiteError, setWebsiteError] = useState<string | null>(null);
+  const [operatingAreaError, setOperatingAreaError] = useState<string | null>(null);
+  const [servicesError, setServicesError] = useState<string | null>(null);
+  const [fleetError, setFleetError] = useState<string | null>(null);
 
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
@@ -51,6 +69,33 @@ export function CompanyProfileStep({ onNext }: CompanyProfileStepProps) {
   }, [onboarding?.company]);
 
   const handleNext = async () => {
+    if (hasInvalidCharacters(location)) {
+      setLocationError(RESTRICTED_INPUT_ERROR_MSG);
+      return;
+    }
+    if (hasInvalidCharacters(operatingAreaInput) || operatingAreas.some(hasInvalidCharacters)) {
+      setOperatingAreaError(RESTRICTED_INPUT_ERROR_MSG);
+      return;
+    }
+    if (hasInvalidCharacters(servicesInput) || servicesOffered.some(hasInvalidCharacters)) {
+      setServicesError(RESTRICTED_INPUT_ERROR_MSG);
+      return;
+    }
+    if (hasInvalidCharacters(fleetInput) || fleetTypes.some(hasInvalidCharacters)) {
+      setFleetError(RESTRICTED_INPUT_ERROR_MSG);
+      return;
+    }
+    if (website.trim()) {
+      if (hasXssOrInjection(website.trim())) {
+        setWebsiteError(XSS_SECURITY_ERROR_MSG);
+        return;
+      }
+      if (!isValidStrictUrl(website.trim())) {
+        setWebsiteError(INVALID_URL_ERROR_MSG);
+        return;
+      }
+    }
+
     if (!isFormValid) return;
 
     setIsSaving(true);
@@ -86,6 +131,19 @@ export function CompanyProfileStep({ onNext }: CompanyProfileStepProps) {
     companyName.trim() !== "" &&
     !!logo &&
     location.trim() !== "" &&
+    !locationError &&
+    !operatingAreaError &&
+    !servicesError &&
+    !fleetError &&
+    !websiteError &&
+    (!website.trim() || isValidStrictUrl(website.trim())) &&
+    !hasInvalidCharacters(location) &&
+    !hasInvalidCharacters(operatingAreaInput) &&
+    !hasInvalidCharacters(servicesInput) &&
+    !hasInvalidCharacters(fleetInput) &&
+    !operatingAreas.some(hasInvalidCharacters) &&
+    !servicesOffered.some(hasInvalidCharacters) &&
+    !fleetTypes.some(hasInvalidCharacters) &&
     email.trim() !== "" &&
     isEmailValid(email) &&
     isPhoneValid(phone) &&
@@ -97,11 +155,19 @@ export function CompanyProfileStep({ onNext }: CompanyProfileStepProps) {
     input: string, 
     setInput: (val: string) => void, 
     list: string[], 
-    setList: (val: string[]) => void
+    setList: (val: string[]) => void,
+    setError?: (msg: string | null) => void
   ) => {
-    if (input.trim() && !list.includes(input.trim())) {
-      setList([...list, input.trim()]);
+    const trimmed = input.trim();
+    if (!trimmed) return;
+    if (hasInvalidCharacters(trimmed)) {
+      if (setError) setError(RESTRICTED_INPUT_ERROR_MSG);
+      return;
+    }
+    if (!list.includes(trimmed)) {
+      setList([...list, trimmed]);
       setInput("");
+      if (setError) setError(null);
     }
   };
 
@@ -231,10 +297,33 @@ export function CompanyProfileStep({ onNext }: CompanyProfileStepProps) {
               <input
                 type="text"
                 value={location}
-                onChange={(e) => setLocation(e.target.value)}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setLocation(val);
+                  if (hasInvalidCharacters(val)) {
+                    setLocationError(RESTRICTED_INPUT_ERROR_MSG);
+                  } else if (locationError) {
+                    setLocationError(null);
+                  }
+                }}
+                onPaste={(e) => {
+                  const pasted = e.clipboardData.getData("text");
+                  if (!isPasteAllowed(pasted)) {
+                    e.preventDefault();
+                    setLocationError(CLIPBOARD_RESTRICTED_ERROR_MSG);
+                  }
+                }}
                 placeholder="Miami, Florida, United States"
-                className="w-full px-5 py-[14px] bg-white border border-gray-300 rounded-[24px] text-[15px] placeholder-gray-400 focus:outline-none focus:border-[#2d73f5] focus:ring-1 focus:ring-[#2d73f5] transition-shadow"
+                className={`w-full px-5 py-[14px] bg-white border ${
+                  locationError ? "border-red-500 focus:border-red-500 focus:ring-red-500" : "border-gray-300 focus:border-[#2d73f5] focus:ring-[#2d73f5]"
+                } rounded-[24px] text-[15px] placeholder-gray-400 focus:outline-none focus:ring-1 transition-shadow`}
               />
+              {locationError && (
+                <p className="text-red-500 text-sm mt-1 ml-2 flex items-center gap-1">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                  <span>{locationError}</span>
+                </p>
+              )}
             </div>
 
             <div>
@@ -274,10 +363,30 @@ export function CompanyProfileStep({ onNext }: CompanyProfileStepProps) {
               <input
                 type="url"
                 value={website}
-                onChange={(e) => setWebsite(e.target.value)}
-                placeholder="www.pilotinsight.com"
-                className="w-full px-5 py-[14px] bg-white border border-gray-300 rounded-[24px] text-[15px] placeholder-gray-400 focus:outline-none focus:border-[#2d73f5] focus:ring-1 focus:ring-[#2d73f5] transition-shadow"
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setWebsite(val);
+                  if (!val.trim()) {
+                    setWebsiteError(null);
+                  } else if (hasXssOrInjection(val)) {
+                    setWebsiteError(XSS_SECURITY_ERROR_MSG);
+                  } else if (!isValidStrictUrl(val)) {
+                    setWebsiteError(INVALID_URL_ERROR_MSG);
+                  } else {
+                    setWebsiteError(null);
+                  }
+                }}
+                placeholder="https://www.pilotinsight.com"
+                className={`w-full px-5 py-[14px] bg-white border ${
+                  websiteError ? "border-red-500 focus:border-red-500 focus:ring-red-500" : "border-gray-300 focus:border-[#2d73f5] focus:ring-[#2d73f5]"
+                } rounded-[24px] text-[15px] placeholder-gray-400 focus:outline-none focus:ring-1 transition-shadow`}
               />
+              {websiteError && (
+                <p className="text-red-500 text-sm mt-1 ml-2 flex items-center gap-1">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                  <span>{websiteError}</span>
+                </p>
+              )}
             </div>
 
             <div>
@@ -318,19 +427,43 @@ export function CompanyProfileStep({ onNext }: CompanyProfileStepProps) {
                 <input
                   type="text"
                   value={operatingAreaInput}
-                  onChange={(e) => setOperatingAreaInput(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && addPill(operatingAreaInput, setOperatingAreaInput, operatingAreas, setOperatingAreas)}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setOperatingAreaInput(val);
+                    if (hasInvalidCharacters(val)) {
+                      setOperatingAreaError(RESTRICTED_INPUT_ERROR_MSG);
+                    } else if (operatingAreaError) {
+                      setOperatingAreaError(null);
+                    }
+                  }}
+                  onPaste={(e) => {
+                    const pasted = e.clipboardData.getData("text");
+                    if (!isPasteAllowed(pasted)) {
+                      e.preventDefault();
+                      setOperatingAreaError(CLIPBOARD_RESTRICTED_ERROR_MSG);
+                    }
+                  }}
+                  onKeyDown={(e) => e.key === 'Enter' && addPill(operatingAreaInput, setOperatingAreaInput, operatingAreas, setOperatingAreas, setOperatingAreaError)}
                   placeholder="North America"
-                  className="flex-1 px-5 py-[14px] bg-white border border-gray-300 rounded-[24px] text-[15px] placeholder-gray-400 focus:outline-none focus:border-[#2d73f5] focus:ring-1 focus:ring-[#2d73f5] transition-shadow"
+                  className={`flex-1 px-5 py-[14px] bg-white border ${
+                    operatingAreaError ? "border-red-500 focus:border-red-500 focus:ring-red-500" : "border-gray-300 focus:border-[#2d73f5] focus:ring-[#2d73f5]"
+                  } rounded-[24px] text-[15px] placeholder-gray-400 focus:outline-none focus:ring-1 transition-shadow`}
                 />
                 <button 
                   type="button"
-                  onClick={() => addPill(operatingAreaInput, setOperatingAreaInput, operatingAreas, setOperatingAreas)}
-                  className="px-7 py-[14px] bg-[#1a66ff] hover:bg-[#1554d6] text-white font-bold rounded-full transition-colors text-[15px]"
+                  onClick={() => addPill(operatingAreaInput, setOperatingAreaInput, operatingAreas, setOperatingAreas, setOperatingAreaError)}
+                  disabled={!operatingAreaInput.trim() || hasInvalidCharacters(operatingAreaInput) || !!operatingAreaError}
+                  className="px-7 py-[14px] bg-[#1a66ff] hover:bg-[#1554d6] disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-bold rounded-full transition-colors text-[15px]"
                 >
                   Add
                 </button>
               </div>
+              {operatingAreaError && (
+                <p className="text-red-500 text-sm mt-1 ml-2 flex items-center gap-1">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                  <span>{operatingAreaError}</span>
+                </p>
+              )}
               {renderPills(operatingAreas, setOperatingAreas)}
             </div>
 
@@ -340,19 +473,43 @@ export function CompanyProfileStep({ onNext }: CompanyProfileStepProps) {
                 <input
                   type="text"
                   value={servicesInput}
-                  onChange={(e) => setServicesInput(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && addPill(servicesInput, setServicesInput, servicesOffered, setServicesOffered)}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setServicesInput(val);
+                    if (hasInvalidCharacters(val)) {
+                      setServicesError(RESTRICTED_INPUT_ERROR_MSG);
+                    } else if (servicesError) {
+                      setServicesError(null);
+                    }
+                  }}
+                  onPaste={(e) => {
+                    const pasted = e.clipboardData.getData("text");
+                    if (!isPasteAllowed(pasted)) {
+                      e.preventDefault();
+                      setServicesError(CLIPBOARD_RESTRICTED_ERROR_MSG);
+                    }
+                  }}
+                  onKeyDown={(e) => e.key === 'Enter' && addPill(servicesInput, setServicesInput, servicesOffered, setServicesOffered, setServicesError)}
                   placeholder="Pilot Hiring"
-                  className="flex-1 px-5 py-[14px] bg-white border border-gray-300 rounded-[24px] text-[15px] placeholder-gray-400 focus:outline-none focus:border-[#2d73f5] focus:ring-1 focus:ring-[#2d73f5] transition-shadow"
+                  className={`flex-1 px-5 py-[14px] bg-white border ${
+                    servicesError ? "border-red-500 focus:border-red-500 focus:ring-red-500" : "border-gray-300 focus:border-[#2d73f5] focus:ring-[#2d73f5]"
+                  } rounded-[24px] text-[15px] placeholder-gray-400 focus:outline-none focus:ring-1 transition-shadow`}
                 />
                 <button 
                   type="button"
-                  onClick={() => addPill(servicesInput, setServicesInput, servicesOffered, setServicesOffered)}
-                  className="px-7 py-[14px] bg-[#1a66ff] hover:bg-[#1554d6] text-white font-bold rounded-full transition-colors text-[15px]"
+                  onClick={() => addPill(servicesInput, setServicesInput, servicesOffered, setServicesOffered, setServicesError)}
+                  disabled={!servicesInput.trim() || hasInvalidCharacters(servicesInput) || !!servicesError}
+                  className="px-7 py-[14px] bg-[#1a66ff] hover:bg-[#1554d6] disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-bold rounded-full transition-colors text-[15px]"
                 >
                   Add
                 </button>
               </div>
+              {servicesError && (
+                <p className="text-red-500 text-sm mt-1 ml-2 flex items-center gap-1">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                  <span>{servicesError}</span>
+                </p>
+              )}
               {renderPills(servicesOffered, setServicesOffered)}
             </div>
 
@@ -362,19 +519,43 @@ export function CompanyProfileStep({ onNext }: CompanyProfileStepProps) {
                 <input
                   type="text"
                   value={fleetInput}
-                  onChange={(e) => setFleetInput(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && addPill(fleetInput, setFleetInput, fleetTypes, setFleetTypes)}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setFleetInput(val);
+                    if (hasInvalidCharacters(val)) {
+                      setFleetError(RESTRICTED_INPUT_ERROR_MSG);
+                    } else if (fleetError) {
+                      setFleetError(null);
+                    }
+                  }}
+                  onPaste={(e) => {
+                    const pasted = e.clipboardData.getData("text");
+                    if (!isPasteAllowed(pasted)) {
+                      e.preventDefault();
+                      setFleetError(CLIPBOARD_RESTRICTED_ERROR_MSG);
+                    }
+                  }}
+                  onKeyDown={(e) => e.key === 'Enter' && addPill(fleetInput, setFleetInput, fleetTypes, setFleetTypes, setFleetError)}
                   placeholder="Gulfstream"
-                  className="flex-1 px-5 py-[14px] bg-white border border-gray-300 rounded-[24px] text-[15px] placeholder-gray-400 focus:outline-none focus:border-[#2d73f5] focus:ring-1 focus:ring-[#2d73f5] transition-shadow"
+                  className={`flex-1 px-5 py-[14px] bg-white border ${
+                    fleetError ? "border-red-500 focus:border-red-500 focus:ring-red-500" : "border-gray-300 focus:border-[#2d73f5] focus:ring-[#2d73f5]"
+                  } rounded-[24px] text-[15px] placeholder-gray-400 focus:outline-none focus:ring-1 transition-shadow`}
                 />
                 <button 
                   type="button"
-                  onClick={() => addPill(fleetInput, setFleetInput, fleetTypes, setFleetTypes)}
-                  className="px-7 py-[14px] bg-[#1a66ff] hover:bg-[#1554d6] text-white font-bold rounded-full transition-colors text-[15px]"
+                  onClick={() => addPill(fleetInput, setFleetInput, fleetTypes, setFleetTypes, setFleetError)}
+                  disabled={!fleetInput.trim() || hasInvalidCharacters(fleetInput) || !!fleetError}
+                  className="px-7 py-[14px] bg-[#1a66ff] hover:bg-[#1554d6] disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-bold rounded-full transition-colors text-[15px]"
                 >
                   Add
                 </button>
               </div>
+              {fleetError && (
+                <p className="text-red-500 text-sm mt-1 ml-2 flex items-center gap-1">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                  <span>{fleetError}</span>
+                </p>
+              )}
               {renderPills(fleetTypes, setFleetTypes)}
             </div>
           </div>

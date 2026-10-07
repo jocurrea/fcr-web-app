@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { hasInvalidCharacters } from "@/lib/validation/input-restrictions";
 
 const MAX_SUMMARY_LENGTH = 500;
 
@@ -157,6 +158,16 @@ export async function saveContactCredentialsAction(input: SaveContactCredentials
       return { success: false, error: "Please specify at least one license or certification." };
     }
 
+    // Backend validation: Emoji and special character restriction
+    for (const lic of validLicenses) {
+      if (hasInvalidCharacters(lic)) {
+        return {
+          success: false,
+          error: "Licenses/certifications can only contain alphanumeric characters, spaces, and standard punctuation (., -). Emojis and special characters are not allowed.",
+        };
+      }
+    }
+
     // 4. Authenticate user
     const supabase = await createClient();
     const {
@@ -277,6 +288,12 @@ export async function saveComplementaryInfoAction(input: SaveComplementaryInfoIn
     }
 
     const trimmedCity = typeof city === "string" ? city.trim() : "";
+    if (trimmedCity && hasInvalidCharacters(trimmedCity)) {
+      return {
+        success: false,
+        error: "City can only contain alphanumeric characters, spaces, and standard punctuation (., -). Emojis and special characters are not allowed.",
+      };
+    }
     const trimmedCountry = typeof country === "string" ? country.trim() : "";
     const combinedLocation = [trimmedCity, trimmedCountry].filter(Boolean).join(", ");
 

@@ -17,8 +17,14 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
-import { supabase } from "@/lib/supabase";
-import { Loader2 } from "lucide-react";
+import { Loader2, AlertCircle } from "lucide-react";
+import {
+  isValidStrictUrl,
+  sanitizeUrl,
+  INVALID_URL_ERROR_MSG,
+  hasXssOrInjection,
+  XSS_SECURITY_ERROR_MSG,
+} from "@/lib/validation/url-validation";
 
 interface ResumeStepProps {
   onNext: () => void;
@@ -39,6 +45,7 @@ export function ResumeStep({ onNext, isSaving }: ResumeStepProps) {
 
   const [isWebsiteModalOpen, setIsWebsiteModalOpen] = useState(false);
   const [websiteUrl, setWebsiteUrl] = useState("");
+  const [websiteError, setWebsiteError] = useState<string | null>(null);
   const [websites, setWebsites] = useState<string[]>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem("onboarding_resume");
@@ -580,7 +587,16 @@ export function ResumeStep({ onNext, isSaving }: ResumeStepProps) {
         </Button>
       </div>
 
-      <Dialog open={isWebsiteModalOpen} onOpenChange={setIsWebsiteModalOpen}>
+      <Dialog
+        open={isWebsiteModalOpen}
+        onOpenChange={(open) => {
+          setIsWebsiteModalOpen(open);
+          if (!open) {
+            setWebsiteUrl("");
+            setWebsiteError(null);
+          }
+        }}
+      >
         <DialogContent className="sm:max-w-[500px] bg-white p-6 rounded-3xl">
           <DialogHeader className="mb-2">
             <DialogTitle className="text-xl font-bold text-gray-900 text-left">
@@ -588,12 +604,35 @@ export function ResumeStep({ onNext, isSaving }: ResumeStepProps) {
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-6">
-            <Input 
-              placeholder="Enter URL" 
-              className="rounded-2xl py-6"
-              value={websiteUrl}
-              onChange={(e) => setWebsiteUrl(e.target.value)}
-            />
+            <div className="space-y-2">
+              <Input 
+                placeholder="Enter URL (e.g. https://www.example.com)" 
+                className={cn(
+                  "rounded-2xl py-6",
+                  websiteError ? "border-red-500 focus-visible:ring-red-500" : ""
+                )}
+                value={websiteUrl}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setWebsiteUrl(val);
+                  if (!val.trim()) {
+                    setWebsiteError(null);
+                  } else if (hasXssOrInjection(val)) {
+                    setWebsiteError(XSS_SECURITY_ERROR_MSG);
+                  } else if (!isValidStrictUrl(val)) {
+                    setWebsiteError(INVALID_URL_ERROR_MSG);
+                  } else {
+                    setWebsiteError(null);
+                  }
+                }}
+              />
+              {websiteError && (
+                <p className="text-xs text-red-600 font-medium flex items-center gap-1 animate-in fade-in pt-1">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                  <span>{websiteError}</span>
+                </p>
+              )}
+            </div>
             <div className="flex gap-4">
               <Button 
                 type="button"
@@ -602,17 +641,26 @@ export function ResumeStep({ onNext, isSaving }: ResumeStepProps) {
                 onClick={() => {
                   setIsWebsiteModalOpen(false);
                   setWebsiteUrl("");
+                  setWebsiteError(null);
                 }}
               >
                 close
               </Button>
               <Button 
                 type="button"
-                className="flex-1 rounded-full py-6 bg-blue-600 hover:bg-blue-700 text-white text-base"
+                disabled={!websiteUrl.trim() || !!websiteError || !isValidStrictUrl(websiteUrl)}
+                className="flex-1 rounded-full py-6 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white text-base"
                 onClick={() => {
-                  if (websiteUrl.trim()) {
-                    setWebsites([...websites, websiteUrl.trim()]);
+                  const trimmed = websiteUrl.trim();
+                  if (!isValidStrictUrl(trimmed)) {
+                    setWebsiteError(hasXssOrInjection(trimmed) ? XSS_SECURITY_ERROR_MSG : INVALID_URL_ERROR_MSG);
+                    return;
+                  }
+                  const clean = sanitizeUrl(trimmed);
+                  if (clean) {
+                    setWebsites([...websites, clean]);
                     setWebsiteUrl("");
+                    setWebsiteError(null);
                     setIsWebsiteModalOpen(false);
                   }
                 }}

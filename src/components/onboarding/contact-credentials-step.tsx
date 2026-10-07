@@ -9,6 +9,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 
+import {
+  isPasteAllowed,
+  hasInvalidCharacters,
+  RESTRICTED_INPUT_ERROR_MSG,
+  CLIPBOARD_RESTRICTED_ERROR_MSG,
+} from "@/lib/validation/input-restrictions";
+
 interface ContactCredentialsStepProps {
   onNext?: (data: { email: string; phone: string; licenseCertification: string; licenses?: string[] }) => void;
   onBack?: () => void;
@@ -25,6 +32,7 @@ export function ContactCredentialsStep({ onNext, onBack }: ContactCredentialsSte
   const [email, setEmail] = useState("");
   const [currentLicenseInput, setCurrentLicenseInput] = useState("");
   const [licensesList, setLicensesList] = useState<string[]>([]);
+  const [licenseError, setLicenseError] = useState<string | null>(null);
   const [touched, setTouched] = useState({ email: false, phone: false, license: false });
   const [isSaving, setIsSaving] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -94,12 +102,17 @@ export function ContactCredentialsStep({ onNext, onBack }: ContactCredentialsSte
   const handleAddLicense = () => {
     const trimmed = currentLicenseInput.trim();
     if (!trimmed) return;
+    if (hasInvalidCharacters(trimmed)) {
+      setLicenseError(RESTRICTED_INPUT_ERROR_MSG);
+      return;
+    }
     if (licensesList.length >= MAX_LICENSES) return;
 
     if (!licensesList.includes(trimmed)) {
       setLicensesList(prev => [...prev, trimmed]);
     }
     setCurrentLicenseInput("");
+    setLicenseError(null);
     setTouched(prev => ({ ...prev, license: true }));
     if (submitError) setSubmitError(null);
   };
@@ -123,8 +136,9 @@ export function ContactCredentialsStep({ onNext, onBack }: ContactCredentialsSte
   const isPhoneFormatValid = PHONE_REGEX.test(phone.trim()) && (phone.match(/\d/g) || []).length >= 7;
   const isPhoneValid = !isPhoneEmpty && isPhoneFormatValid;
 
-  // License valid if list has items OR pending text is typed in input
-  const isLicenseValid = licensesList.length > 0 || currentLicenseInput.trim().length > 0;
+  // License valid if list has items OR pending text is typed in input, AND format adheres strictly to regex rule
+  const isLicenseFormatValid = !licenseError && !hasInvalidCharacters(currentLicenseInput) && !licensesList.some(hasInvalidCharacters);
+  const isLicenseValid = (licensesList.length > 0 || currentLicenseInput.trim().length > 0) && isLicenseFormatValid;
 
   const isFormValid = isEmailValid && isPhoneValid && isLicenseValid;
 
@@ -132,12 +146,21 @@ export function ContactCredentialsStep({ onNext, onBack }: ContactCredentialsSte
     setTouched({ email: true, phone: true, license: true });
     setSubmitError(null);
 
+    if (hasInvalidCharacters(currentLicenseInput) || licensesList.some(hasInvalidCharacters)) {
+      setLicenseError(RESTRICTED_INPUT_ERROR_MSG);
+      return;
+    }
+
     if (!isFormValid || isSaving) return;
 
     // Automatically incorporate pending text in currentLicenseInput if not already in list
     let finalLicenses = [...licensesList];
     const pendingLicense = currentLicenseInput.trim();
     if (pendingLicense && !finalLicenses.includes(pendingLicense)) {
+      if (hasInvalidCharacters(pendingLicense)) {
+        setLicenseError(RESTRICTED_INPUT_ERROR_MSG);
+        return;
+      }
       finalLicenses.push(pendingLicense);
       setLicensesList(finalLicenses);
       setCurrentLicenseInput("");
@@ -420,15 +443,28 @@ export function ContactCredentialsStep({ onNext, onBack }: ContactCredentialsSte
                 type="text"
                 value={currentLicenseInput}
                 onChange={(e) => {
-                  setCurrentLicenseInput(e.target.value);
+                  const val = e.target.value;
+                  setCurrentLicenseInput(val);
+                  if (hasInvalidCharacters(val)) {
+                    setLicenseError(RESTRICTED_INPUT_ERROR_MSG);
+                  } else if (licenseError) {
+                    setLicenseError(null);
+                  }
                   if (submitError) setSubmitError(null);
+                }}
+                onPaste={(e) => {
+                  const pasted = e.clipboardData.getData("text");
+                  if (!isPasteAllowed(pasted)) {
+                    e.preventDefault();
+                    setLicenseError(CLIPBOARD_RESTRICTED_ERROR_MSG);
+                  }
                 }}
                 onKeyDown={handleLicenseKeyDown}
                 onBlur={() => setTouched(prev => ({ ...prev, license: true }))}
-                placeholder="e.g. A&P Certificate"
+                placeholder="e.g. Aircraft Maintenance Engineer"
                 className={cn(
                   "flex-1 rounded-2xl py-6 px-4 text-sm bg-white border transition-all",
-                  touched.license && !isLicenseValid
+                  (touched.license && !isLicenseValid) || !!licenseError
                     ? "border-red-400 ring-1 ring-red-200/50 bg-red-50/10 focus:border-red-500 focus:ring-red-300"
                     : "border-gray-200 focus:border-[#1d4ed8] focus:ring-2 focus:ring-[#1d4ed8]/20"
                 )}
@@ -437,10 +473,10 @@ export function ContactCredentialsStep({ onNext, onBack }: ContactCredentialsSte
               <button
                 type="button"
                 onClick={handleAddLicense}
-                disabled={!currentLicenseInput.trim() || licensesList.length >= MAX_LICENSES}
+                disabled={!currentLicenseInput.trim() || licensesList.length >= MAX_LICENSES || hasInvalidCharacters(currentLicenseInput) || !!licenseError}
                 className={cn(
                   "shrink-0 w-12 h-12 rounded-full flex items-center justify-center transition-all shadow-xs",
-                  currentLicenseInput.trim() && licensesList.length < MAX_LICENSES
+                  currentLicenseInput.trim() && licensesList.length < MAX_LICENSES && !hasInvalidCharacters(currentLicenseInput) && !licenseError
                     ? "bg-[#1d4ed8] hover:bg-[#1e40af] active:scale-95 text-white cursor-pointer"
                     : "bg-gray-200 text-gray-400 cursor-not-allowed"
                 )}
@@ -449,6 +485,14 @@ export function ContactCredentialsStep({ onNext, onBack }: ContactCredentialsSte
                 <Plus className="w-6 h-6 stroke-[2.5]" />
               </button>
             </div>
+
+            {/* Inline validation error for emojis or unsupported characters */}
+            {licenseError && (
+              <p className="text-xs text-red-600 font-medium flex items-center gap-1 animate-in fade-in">
+                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                <span>{licenseError}</span>
+              </p>
+            )}
 
             {/* Added Licenses Badges List */}
             {licensesList.length > 0 && (
@@ -472,7 +516,7 @@ export function ContactCredentialsStep({ onNext, onBack }: ContactCredentialsSte
               </div>
             )}
 
-            {touched.license && !isLicenseValid && (
+            {touched.license && !isLicenseValid && !licenseError && (
               <p className="text-xs text-red-600 font-medium flex items-center gap-1 animate-in fade-in">
                 <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                 <span>Please enter at least one license or certification.</span>
@@ -494,7 +538,7 @@ export function ContactCredentialsStep({ onNext, onBack }: ContactCredentialsSte
           <button
             type="button"
             onClick={handleNextClick}
-            disabled={isSaving}
+            disabled={isSaving || !isFormValid || !!licenseError}
             className={`w-full py-4 rounded-full font-bold text-white transition-all shadow-md cursor-pointer ${
               isSaving
                 ? "bg-[#85b0fa] cursor-not-allowed opacity-90"

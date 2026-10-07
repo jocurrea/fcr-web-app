@@ -1,4 +1,6 @@
 import { supabase } from "@/lib/supabase";
+import { hasInvalidCharacters } from "@/lib/validation/input-restrictions";
+import { isValidStrictUrl, sanitizeUrl, hasXssOrInjection } from "@/lib/validation/url-validation";
 
 export type CompanyType = {
   id: string;
@@ -99,6 +101,27 @@ function getCompanyProfileValidationError(profile: CompanyProfileInput) {
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(profile.email)) return "Please enter a valid company email.";
   if (profile.phone && !/^\+?\d+$/.test(profile.phone)) return "Phone number can only include digits and one leading +.";
   if (profile.description && profile.description.length > 500) return "Company description must be 500 characters or less.";
+  if (hasInvalidCharacters(profile.location)) {
+    return "Company location can only contain alphanumeric characters, spaces, and standard punctuation (., -). Emojis and special characters are not allowed.";
+  }
+  if (profile.operatingAreas && profile.operatingAreas.some(hasInvalidCharacters)) {
+    return "Operating areas can only contain alphanumeric characters, spaces, and standard punctuation (., -). Emojis and special characters are not allowed.";
+  }
+  if (profile.servicesOffered && profile.servicesOffered.some(hasInvalidCharacters)) {
+    return "Services offered can only contain alphanumeric characters, spaces, and standard punctuation (., -). Emojis and special characters are not allowed.";
+  }
+  if (profile.fleetTypes && profile.fleetTypes.some(hasInvalidCharacters)) {
+    return "Fleet types can only contain alphanumeric characters, spaces, and standard punctuation (., -). Emojis and special characters are not allowed.";
+  }
+  if (profile.website && profile.website.trim()) {
+    const trimmedWebsite = profile.website.trim();
+    if (hasXssOrInjection(trimmedWebsite)) {
+      return "Security alert: Malicious code injection or invalid URL scheme detected in website.";
+    }
+    if (!isValidStrictUrl(trimmedWebsite)) {
+      return "Website must be a valid URL starting with http:// or https:// (e.g. https://www.company.com).";
+    }
+  }
   return null;
 }
 
@@ -434,7 +457,7 @@ export async function saveCompanyProfile(profile: CompanyProfileInput): Promise<
         description: normalizeOptionalText(profile.description),
         contact_email: profile.email.trim(),
         phone: normalizeOptionalText(profile.phone),
-        website: normalizeOptionalText(profile.website),
+        website: profile.website ? sanitizeUrl(profile.website.trim()) : null,
         location: profile.location.trim(),
         founded_year: parseFoundedYear(profile.foundedYear),
         operating_areas: profile.operatingAreas ?? [],
