@@ -386,15 +386,17 @@ export function ProfessionalTypeStep({ onNext, onBack }: ProfessionalTypeStepPro
                   <div className="mt-1 px-1 animate-in fade-in slide-in-from-top-1 duration-200">
                     <input
                       type="text"
+                      maxLength={100}
                       value={customRole}
-                      onChange={(e) => setCustomRole(sanitizeAlpha(e.target.value))}
+                      onChange={(e) => setCustomRole(sanitizeAlpha(e.target.value.slice(0, 100)))}
                       placeholder="Specify your professional role"
                       className="w-full px-4 py-3.5 bg-white border border-gray-200 rounded-2xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[#1d4ed8] focus:ring-1 focus:ring-[#1d4ed8] transition-all shadow-xs"
                       autoFocus
                     />
-                    <p className="text-[11px] text-gray-500 mt-1 pl-1">
-                      Only alphabetic characters allowed (letters and spaces).
-                    </p>
+                    <div className="flex items-center justify-between text-[11px] text-gray-500 mt-1 pl-1 pr-1">
+                      <span>Only alphabetic characters allowed (letters and spaces).</span>
+                      <span className="font-mono text-gray-400 font-medium">{customRole.length}/100</span>
+                    </div>
                   </div>
                 )}
               </div>

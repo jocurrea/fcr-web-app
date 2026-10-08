@@ -70,6 +70,22 @@ export function ResumeStep({ onNext, isSaving }: ResumeStepProps) {
   });
   const [emailError, setEmailError] = useState("");
 
+  const [address, setAddress] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem("onboarding_resume");
+      if (saved) { const p = JSON.parse(saved); if (p.address) return p.address; }
+    }
+    return "";
+  });
+
+  const [summary, setSummary] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem("onboarding_resume");
+      if (saved) { const p = JSON.parse(saved); if (p.summary) return p.summary; }
+    }
+    return "";
+  });
+
   const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setEmail(e.target.value);
     if (emailError) {
@@ -208,9 +224,9 @@ export function ResumeStep({ onNext, isSaving }: ResumeStepProps) {
 
   useEffect(() => {
     localStorage.setItem("onboarding_resume", JSON.stringify({
-      phone, email, dateOfBirth, websites, skills, languages, awards, trainingFacilities, experiences
+      phone, email, dateOfBirth, websites, skills, languages, awards, trainingFacilities, experiences, address, summary
     }));
-  }, [phone, email, dateOfBirth, websites, skills, languages, awards, trainingFacilities, experiences]);
+  }, [phone, email, dateOfBirth, websites, skills, languages, awards, trainingFacilities, experiences, address, summary]);
 
   const handleFinishLocal = () => {
     onNext();
@@ -263,8 +279,17 @@ export function ResumeStep({ onNext, isSaving }: ResumeStepProps) {
           </div>
 
           <div className="space-y-2">
-            <Label className="text-gray-700">Address</Label>
-            <Input className="rounded-2xl py-6" />
+            <div className="flex items-center justify-between">
+              <Label className="text-gray-700">Address</Label>
+              <span className="text-xs text-gray-400 font-mono">{address.length}/255</span>
+            </div>
+            <Input 
+              maxLength={255}
+              value={address}
+              onChange={(e) => setAddress(e.target.value.slice(0, 255))}
+              placeholder="Enter your address"
+              className="rounded-2xl py-6" 
+            />
           </div>
 
           <div className="space-y-2 pt-2">
@@ -292,8 +317,14 @@ export function ResumeStep({ onNext, isSaving }: ResumeStepProps) {
 
         {/* Summary Section */}
         <div className="space-y-4 pt-2">
-          <h2 className="text-xl font-bold text-gray-900">Summary</h2>
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-bold text-gray-900">Summary</h2>
+            <span className="text-xs text-gray-400 font-mono">{summary.length}/1000</span>
+          </div>
           <Textarea 
+            maxLength={1000}
+            value={summary}
+            onChange={(e) => setSummary(e.target.value.slice(0, 1000))}
             placeholder="Brief summary" 
             className="rounded-2xl p-4 min-h-[120px]" 
           />
@@ -316,14 +347,15 @@ export function ResumeStep({ onNext, isSaving }: ResumeStepProps) {
           ) : (
             <div className="flex flex-wrap gap-2 mt-2">
               {skills.map((skill, i) => (
-                <div key={i} className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-full text-sm flex items-center gap-2">
-                  {skill}
+                <div key={i} className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-full text-sm flex items-center gap-2 max-w-full overflow-hidden shadow-xs">
+                  <span className="truncate max-w-[200px] sm:max-w-xs">{skill}</span>
                   <button 
                     type="button" 
                     onClick={() => setSkills(skills.filter(s => s !== skill))}
-                    className="hover:opacity-80 transition-opacity flex items-center justify-center"
+                    className="hover:opacity-80 transition-opacity flex items-center justify-center shrink-0 w-[18px] h-[18px]"
+                    aria-label={`Remove ${skill}`}
                   >
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="#ef4444" xmlns="http://www.w3.org/2000/svg">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="#ef4444" xmlns="http://www.w3.org/2000/svg" className="shrink-0">
                       <circle cx="12" cy="12" r="10" />
                       <path d="M15 9l-6 6M9 9l6 6" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
@@ -351,17 +383,18 @@ export function ResumeStep({ onNext, isSaving }: ResumeStepProps) {
           ) : (
             <div className="space-y-3 mt-4">
               {languages.map((lang, i) => (
-                <div key={i} className="flex items-center justify-between">
-                  <div className="text-base">
-                    <span className="font-semibold text-gray-900">{lang.name}</span>
-                    <span className="text-gray-500 ml-2">({lang.proficiency})</span>
+                <div key={i} className="flex items-center justify-between gap-3 min-w-0">
+                  <div className="text-base truncate min-w-0 flex-1">
+                    <span className="font-semibold text-gray-900 truncate">{lang.name}</span>
+                    <span className="text-gray-500 ml-2 shrink-0">({lang.proficiency})</span>
                   </div>
                   <button 
                     type="button" 
                     onClick={() => setLanguages(languages.filter((_, index) => index !== i))}
-                    className="hover:opacity-80 transition-opacity flex items-center justify-center"
+                    className="hover:opacity-80 transition-opacity flex items-center justify-center shrink-0 w-[18px] h-[18px]"
+                    aria-label={`Remove ${lang.name}`}
                   >
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="#ef4444" xmlns="http://www.w3.org/2000/svg">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="#ef4444" xmlns="http://www.w3.org/2000/svg" className="shrink-0">
                       <circle cx="12" cy="12" r="10" />
                       <path d="M15 9l-6 6M9 9l6 6" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
@@ -389,14 +422,15 @@ export function ResumeStep({ onNext, isSaving }: ResumeStepProps) {
           ) : (
             <div className="flex flex-wrap gap-2 mt-2">
               {awards.map((award, i) => (
-                <div key={i} className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-full text-sm flex items-center gap-2">
-                  {award}
+                <div key={i} className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-full text-sm flex items-center gap-2 max-w-full overflow-hidden shadow-xs">
+                  <span className="truncate max-w-[200px] sm:max-w-xs">{award}</span>
                   <button 
                     type="button" 
                     onClick={() => setAwards(awards.filter((_, index) => index !== i))}
-                    className="hover:opacity-80 transition-opacity flex items-center justify-center"
+                    className="hover:opacity-80 transition-opacity flex items-center justify-center shrink-0 w-[18px] h-[18px]"
+                    aria-label={`Remove ${award}`}
                   >
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="#ef4444" xmlns="http://www.w3.org/2000/svg">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="#ef4444" xmlns="http://www.w3.org/2000/svg" className="shrink-0">
                       <circle cx="12" cy="12" r="10" />
                       <path d="M15 9l-6 6M9 9l6 6" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
@@ -480,20 +514,21 @@ export function ResumeStep({ onNext, isSaving }: ResumeStepProps) {
           ) : (
             <div className="space-y-4 mt-4">
               {trainingFacilities.map((tf, i) => (
-                <div key={i} className="flex items-start justify-between">
-                  <div className="text-base">
-                    <div className="font-semibold text-gray-900">
+                <div key={i} className="flex items-start justify-between gap-3 min-w-0">
+                  <div className="text-base min-w-0 flex-1 break-words">
+                    <div className="font-semibold text-gray-900 break-words">
                       {tf.facility}
                       {tf.type && <span className="text-gray-500 font-normal ml-2">({tf.type})</span>}
                     </div>
-                    {tf.details && <div className="text-sm text-gray-600 mt-1">{tf.details}</div>}
+                    {tf.details && <div className="text-sm text-gray-600 mt-1 break-words">{tf.details}</div>}
                   </div>
                   <button 
                     type="button" 
                     onClick={() => setTrainingFacilities(trainingFacilities.filter((_, index) => index !== i))}
-                    className="hover:opacity-80 transition-opacity flex items-center justify-center shrink-0 ml-4 mt-1"
+                    className="hover:opacity-80 transition-opacity flex items-center justify-center shrink-0 ml-4 mt-1 w-[18px] h-[18px]"
+                    aria-label={`Remove ${tf.facility}`}
                   >
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="#ef4444" xmlns="http://www.w3.org/2000/svg">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="#ef4444" xmlns="http://www.w3.org/2000/svg" className="shrink-0">
                       <circle cx="12" cy="12" r="10" />
                       <path d="M15 9l-6 6M9 9l6 6" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
@@ -521,21 +556,22 @@ export function ResumeStep({ onNext, isSaving }: ResumeStepProps) {
           ) : (
             <div className="space-y-4 mt-4">
               {experiences.map((exp, i) => (
-                <div key={i} className="flex items-start justify-between">
-                  <div className="text-base">
-                    <div className="font-semibold text-gray-900">
+                <div key={i} className="flex items-start justify-between gap-3 min-w-0">
+                  <div className="text-base min-w-0 flex-1 break-words">
+                    <div className="font-semibold text-gray-900 break-words">
                       {exp.title} at {exp.company}
                     </div>
-                    <div className="text-sm text-gray-600 mt-1">
+                    <div className="text-sm text-gray-600 mt-1 break-words">
                       {exp.startDate} - {exp.endDate || "Present"} | {exp.city}, {exp.country}
                     </div>
                   </div>
                   <button 
                     type="button" 
                     onClick={() => setExperiences(experiences.filter((_, index) => index !== i))}
-                    className="hover:opacity-80 transition-opacity flex items-center justify-center shrink-0 ml-4 mt-1"
+                    className="hover:opacity-80 transition-opacity flex items-center justify-center shrink-0 ml-4 mt-1 w-[18px] h-[18px]"
+                    aria-label={`Remove ${exp.title}`}
                   >
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="#ef4444" xmlns="http://www.w3.org/2000/svg">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="#ef4444" xmlns="http://www.w3.org/2000/svg" className="shrink-0">
                       <circle cx="12" cy="12" r="10" />
                       <path d="M15 9l-6 6M9 9l6 6" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
@@ -681,12 +717,18 @@ export function ResumeStep({ onNext, isSaving }: ResumeStepProps) {
           </DialogHeader>
           
           <div className="flex-1 overflow-y-auto px-2 space-y-4">
-            <Input 
-              placeholder="Enter text" 
-              className="rounded-2xl py-6"
-              value={skillText}
-              onChange={(e) => setSkillText(e.target.value)}
-            />
+            <div className="space-y-1">
+              <div className="flex items-center justify-end">
+                <span className="text-xs text-gray-400 font-mono">{skillText.length}/60</span>
+              </div>
+              <Input 
+                placeholder="Enter text" 
+                maxLength={60}
+                className="rounded-2xl py-6"
+                value={skillText}
+                onChange={(e) => setSkillText(e.target.value.slice(0, 60))}
+              />
+            </div>
             
             <p className="text-gray-400 text-sm">or choose from the list of skills</p>
             
@@ -815,12 +857,18 @@ export function ResumeStep({ onNext, isSaving }: ResumeStepProps) {
           </DialogHeader>
           <div className="space-y-6">
             
-            <Input 
-              placeholder="Enter text" 
-              className="rounded-2xl py-6"
-              value={awardText}
-              onChange={(e) => setAwardText(e.target.value)}
-            />
+            <div className="space-y-1">
+              <div className="flex items-center justify-end">
+                <span className="text-xs text-gray-400 font-mono">{awardText.length}/100</span>
+              </div>
+              <Input 
+                placeholder="Enter text" 
+                maxLength={100}
+                className="rounded-2xl py-6"
+                value={awardText}
+                onChange={(e) => setAwardText(e.target.value.slice(0, 100))}
+              />
+            </div>
 
             <div className="flex gap-4">
               <Button 
@@ -862,29 +910,42 @@ export function ResumeStep({ onNext, isSaving }: ResumeStepProps) {
           <div className="space-y-6">
             
             <div className="space-y-2">
-              <Label className="text-gray-700 font-normal">Training Facility</Label>
+              <div className="flex items-center justify-between">
+                <Label className="text-gray-700 font-normal">Training Facility</Label>
+                <span className="text-xs text-gray-400 font-mono">{trainingFacility.length}/100</span>
+              </div>
               <Input 
+                maxLength={100}
                 className="rounded-2xl py-6"
                 value={trainingFacility}
-                onChange={(e) => setTrainingFacility(e.target.value)}
+                onChange={(e) => setTrainingFacility(e.target.value.slice(0, 100))}
               />
             </div>
 
             <div className="space-y-2">
-              <Label className="text-gray-700 font-normal">Type</Label>
+              <div className="flex items-center justify-between">
+                <Label className="text-gray-700 font-normal">Type</Label>
+                <span className="text-xs text-gray-400 font-mono">{trainingType.length}/100</span>
+              </div>
               <Input 
+                maxLength={100}
                 className="rounded-2xl py-6"
                 value={trainingType}
-                onChange={(e) => setTrainingType(e.target.value)}
+                onChange={(e) => setTrainingType(e.target.value.slice(0, 100))}
               />
             </div>
 
             <div className="space-y-2">
-              <Label className="text-gray-700 font-normal">Details</Label>
+              <div className="flex items-center justify-between">
+                <Label className="text-gray-700 font-normal">Details</Label>
+                <span className="text-xs text-gray-400 font-mono">{trainingDetails.length}/500</span>
+              </div>
               <Textarea 
+                maxLength={500}
                 className="rounded-2xl py-4 min-h-[100px]"
                 value={trainingDetails}
-                onChange={(e) => setTrainingDetails(e.target.value)}
+                onChange={(e) => setTrainingDetails(e.target.value.slice(0, 500))}
+                placeholder="Enter training details..."
               />
             </div>
 
@@ -939,11 +1000,15 @@ export function ResumeStep({ onNext, isSaving }: ResumeStepProps) {
           <div className="flex-1 overflow-y-auto px-2 space-y-6 pb-6">
             
             <div className="space-y-2">
-              <Label className="text-gray-700 font-normal">Company</Label>
+              <div className="flex items-center justify-between">
+                <Label className="text-gray-700 font-normal">Company</Label>
+                <span className="text-xs text-gray-400 font-mono">{expCompany.length}/100</span>
+              </div>
               <Input 
+                maxLength={100}
                 className="rounded-2xl py-6"
                 value={expCompany}
-                onChange={(e) => setExpCompany(e.target.value)}
+                onChange={(e) => setExpCompany(e.target.value.slice(0, 100))}
               />
             </div>
 
@@ -1017,20 +1082,28 @@ export function ResumeStep({ onNext, isSaving }: ResumeStepProps) {
             </div>
 
             <div className="space-y-2">
-              <Label className="text-gray-700 font-normal">city</Label>
+              <div className="flex items-center justify-between">
+                <Label className="text-gray-700 font-normal">City</Label>
+                <span className="text-xs text-gray-400 font-mono">{expCity.length}/100</span>
+              </div>
               <Input 
+                maxLength={100}
                 className="rounded-2xl py-6"
                 value={expCity}
-                onChange={(e) => setExpCity(e.target.value)}
+                onChange={(e) => setExpCity(e.target.value.slice(0, 100))}
               />
             </div>
 
             <div className="space-y-2">
-              <Label className="text-gray-700 font-normal">Title</Label>
+              <div className="flex items-center justify-between">
+                <Label className="text-gray-700 font-normal">Title</Label>
+                <span className="text-xs text-gray-400 font-mono">{expTitle.length}/100</span>
+              </div>
               <Input 
+                maxLength={100}
                 className="rounded-2xl py-6"
                 value={expTitle}
-                onChange={(e) => setExpTitle(e.target.value)}
+                onChange={(e) => setExpTitle(e.target.value.slice(0, 100))}
               />
             </div>
 
@@ -1079,12 +1152,13 @@ export function ResumeStep({ onNext, isSaving }: ResumeStepProps) {
               ) : (
                 <div className="flex flex-wrap gap-2 mt-2">
                   {expPlanes.map((plane, i) => (
-                    <div key={i} className="px-4 py-2 bg-gray-100 text-gray-700 rounded-full text-sm flex items-center gap-2">
-                      {plane}
+                    <div key={i} className="px-4 py-2 bg-gray-100 text-gray-700 rounded-full text-sm flex items-center gap-2 max-w-full overflow-hidden shadow-xs">
+                      <span className="truncate max-w-[200px]">{plane}</span>
                       <button 
                         type="button" 
                         onClick={() => setExpPlanes(expPlanes.filter((_, index) => index !== i))}
-                        className="hover:text-red-500 transition-colors"
+                        className="hover:text-red-500 transition-colors shrink-0 w-4 h-4 flex items-center justify-center font-bold"
+                        aria-label={`Remove ${plane}`}
                       >
                         ×
                       </button>
@@ -1204,12 +1278,18 @@ export function ResumeStep({ onNext, isSaving }: ResumeStepProps) {
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-6">
-            <Input 
-              placeholder="Enter text" 
-              className="rounded-2xl py-6"
-              value={expPlaneInput}
-              onChange={(e) => setExpPlaneInput(e.target.value)}
-            />
+            <div className="space-y-1">
+              <div className="flex items-center justify-end">
+                <span className="text-xs text-gray-400 font-mono">{expPlaneInput.length}/50</span>
+              </div>
+              <Input 
+                placeholder="Enter plane model" 
+                maxLength={50}
+                className="rounded-2xl py-6"
+                value={expPlaneInput}
+                onChange={(e) => setExpPlaneInput(e.target.value.slice(0, 50))}
+              />
+            </div>
 
             <div className="flex gap-4">
               <Button 

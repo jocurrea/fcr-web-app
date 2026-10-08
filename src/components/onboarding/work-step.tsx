@@ -344,8 +344,17 @@ export function WorkStep({ onNext }: WorkStepProps) {
             </div>
 
             <div className="space-y-2">
-              <Label className="text-gray-700">Admin Role Description</Label>
-              <Textarea value={adminDescription} onChange={(e) => setAdminDescription(e.target.value)} placeholder="description..." className="rounded-2xl p-4 min-h-[120px]" />
+              <div className="flex items-center justify-between">
+                <Label className="text-gray-700">Admin Role Description</Label>
+                <span className="text-xs text-gray-400 font-mono">{adminDescription.length}/500</span>
+              </div>
+              <Textarea 
+                maxLength={500}
+                value={adminDescription} 
+                onChange={(e) => setAdminDescription(e.target.value.slice(0, 500))} 
+                placeholder="description..." 
+                className="rounded-2xl p-4 min-h-[120px]" 
+              />
             </div>
           </div>
         )}

@@ -14,7 +14,7 @@ interface ProfessionalSummaryStepProps {
   onBack?: () => void;
 }
 
-const MAX_CHARACTERS = 500;
+const MAX_CHARACTERS = 1000;
 
 export function ProfessionalSummaryStep({ onNext, onBack }: ProfessionalSummaryStepProps) {
   const router = useRouter();

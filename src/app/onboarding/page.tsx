@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase";
 import { requestCompanyAffiliationFallbackAction } from "@/actions/affiliations";
 import { revalidateProfileLayout } from "@/actions/profile";
 import { sanitizeUrl } from "@/lib/validation/url-validation";
+import { sanitizeAndClampText, TEXT_LIMITS, hasScriptInjection } from "@/lib/validation/text-limits";
 import { ChevronLeft } from "lucide-react";
 
 // Flight Crew Steps
@@ -245,11 +246,55 @@ function OnboardingContent() {
 
       const personalData = personalRaw ? JSON.parse(personalRaw) : {};
       const resumeData = resumeRaw ? JSON.parse(resumeRaw) : {};
+      const workData = workRaw ? JSON.parse(workRaw) : {};
+
+      // Backend enforcement: Maximum character limits and XSS script sanitization
+      if (resumeData.summary) {
+        resumeData.summary = sanitizeAndClampText(resumeData.summary, TEXT_LIMITS.SUMMARY);
+      }
+      if (resumeData.address) {
+        resumeData.address = sanitizeAndClampText(resumeData.address, TEXT_LIMITS.ADDRESS);
+      }
+      if (Array.isArray(resumeData.trainingFacilities)) {
+        resumeData.trainingFacilities = resumeData.trainingFacilities.map((tf: any) => ({
+          ...tf,
+          facility: sanitizeAndClampText(tf?.facility, TEXT_LIMITS.TRAINING_FACILITY),
+          type: sanitizeAndClampText(tf?.type, TEXT_LIMITS.TRAINING_TYPE),
+          details: sanitizeAndClampText(tf?.details, TEXT_LIMITS.TRAINING_DETAILS),
+        }));
+      }
+      if (Array.isArray(resumeData.experiences)) {
+        resumeData.experiences = resumeData.experiences.map((exp: any) => ({
+          ...exp,
+          company: sanitizeAndClampText(exp?.company, TEXT_LIMITS.EXP_COMPANY),
+          city: sanitizeAndClampText(exp?.city, TEXT_LIMITS.EXP_CITY),
+          title: sanitizeAndClampText(exp?.title, TEXT_LIMITS.EXP_TITLE),
+          planes: Array.isArray(exp?.planes)
+            ? exp.planes.map((p: string) => sanitizeAndClampText(p, TEXT_LIMITS.EXP_PLANE))
+            : [],
+        }));
+      }
+      if (workData.adminDescription) {
+        workData.adminDescription = sanitizeAndClampText(workData.adminDescription, TEXT_LIMITS.ADMIN_ROLE_DESCRIPTION);
+      }
+      if (personalData.adminRoleDescription) {
+        personalData.adminRoleDescription = sanitizeAndClampText(personalData.adminRoleDescription, TEXT_LIMITS.ADMIN_ROLE_DESCRIPTION);
+      }
+      if (personalData.customRole) {
+        personalData.customRole = sanitizeAndClampText(personalData.customRole, TEXT_LIMITS.OTHER_PROF_TYPE);
+      }
+
       if (Array.isArray(resumeData.websites)) {
         resumeData.websites = resumeData.websites
           .map((w: string) => sanitizeUrl(w))
           .filter(Boolean);
       }
+
+      const finalAdminDescription =
+        sanitizeAndClampText(
+          workData?.adminDescription || personalData?.adminRoleDescription || null,
+          TEXT_LIMITS.ADMIN_ROLE_DESCRIPTION
+        ) || null;
 
       const crewData = {
         personal: personalData,
@@ -295,12 +340,15 @@ function OnboardingContent() {
         : null;
 
       const validProfessionalTitleOther = isAviationPro
-        ? personalData?.professionalTitleOther ||
-          personalData?.customRole ||
-          personalData?.otherRole ||
-          personalData?.specifiedRole ||
-          existingUser?.professionalTitleOther ||
-          null
+        ? sanitizeAndClampText(
+            personalData?.professionalTitleOther ||
+            personalData?.customRole ||
+            personalData?.otherRole ||
+            personalData?.specifiedRole ||
+            existingUser?.professionalTitleOther ||
+            null,
+            TEXT_LIMITS.OTHER_PROF_TYPE
+          ) || null
         : null;
 
       const validRole =
@@ -389,8 +437,8 @@ function OnboardingContent() {
         bio: personalData?.description || personalData?.bio || null,
         hasCrossedOcean: personalData?.hasCrossedOcean ? 1 : 0,
         hasAdminExp: personalData?.hasAdminExp ? 1 : 0,
-        adminRole: personalData?.adminRole || null,
-        adminRoleDescription: personalData?.adminRoleDescription || null,
+        adminRole: personalData?.adminRole || workData?.adminRole || null,
+        adminRoleDescription: finalAdminDescription,
       };
 
       if (isPilot) {
@@ -539,8 +587,8 @@ function OnboardingContent() {
           employmentStatus: personalData?.employmentStatus || null,
           hasCrossedOcean: Boolean(personalData?.hasCrossedOcean),
           hasAdminExp: Boolean(personalData?.hasAdminExp),
-          adminRole: personalData?.adminRole || null,
-          adminRoleDescription: personalData?.adminRoleDescription || null,
+          adminRole: personalData?.adminRole || workData?.adminRole || null,
+          adminRoleDescription: finalAdminDescription,
           englishProficiency: personalData?.englishProficiency || null,
         };
 

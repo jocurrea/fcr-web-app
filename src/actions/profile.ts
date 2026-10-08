@@ -3,8 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { hasInvalidCharacters } from "@/lib/validation/input-restrictions";
+import { hasScriptInjection, TEXT_LIMITS, sanitizeAndClampText } from "@/lib/validation/text-limits";
 
-const MAX_SUMMARY_LENGTH = 500;
+const MAX_SUMMARY_LENGTH = TEXT_LIMITS.SUMMARY;
 
 /**
  * Server Action to revalidate Next.js server cache for layouts,
@@ -26,7 +27,8 @@ export async function revalidateProfileLayout() {
  * Server Action to validate and persist the Aviation Professional Summary ("About Me").
  * Enforces strict backend validation:
  * - Field is required (non-empty)
- * - Maximum character length: 500 chars (rejects anything exceeding limit)
+ * - Maximum character length: 1000 chars (rejects anything exceeding limit)
+ * - XSS script injection blocking
  */
 export async function saveProfessionalSummaryAction(summary: string) {
   try {
@@ -40,7 +42,15 @@ export async function saveProfessionalSummaryAction(summary: string) {
 
     const trimmed = summary.trim();
 
-    // 2. Backend validation: Character limit check
+    // 2. Backend validation: Script injection check
+    if (hasScriptInjection(trimmed)) {
+      return {
+        success: false,
+        error: "Security alert: Potentially malicious script injection detected in summary.",
+      };
+    }
+
+    // 3. Backend validation: Character limit check
     if (trimmed.length > MAX_SUMMARY_LENGTH) {
       return {
         success: false,
@@ -287,14 +297,22 @@ export async function saveComplementaryInfoAction(input: SaveComplementaryInfoIn
       return { success: false, error: "Authentication required to update profile details." };
     }
 
-    const trimmedCity = typeof city === "string" ? city.trim() : "";
-    if (trimmedCity && hasInvalidCharacters(trimmedCity)) {
-      return {
-        success: false,
-        error: "City can only contain alphanumeric characters, spaces, and standard punctuation (., -). Emojis and special characters are not allowed.",
-      };
+    const trimmedCity = typeof city === "string" ? city.trim().slice(0, TEXT_LIMITS.EXP_CITY) : "";
+    if (trimmedCity) {
+      if (hasScriptInjection(trimmedCity)) {
+        return {
+          success: false,
+          error: "Security alert: Potentially malicious script injection detected in city.",
+        };
+      }
+      if (hasInvalidCharacters(trimmedCity)) {
+        return {
+          success: false,
+          error: "City can only contain alphanumeric characters, spaces, and standard punctuation (., -). Emojis and special characters are not allowed.",
+        };
+      }
     }
-    const trimmedCountry = typeof country === "string" ? country.trim() : "";
+    const trimmedCountry = typeof country === "string" ? country.trim().slice(0, 100) : "";
     const combinedLocation = [trimmedCity, trimmedCountry].filter(Boolean).join(", ");
 
     // 1. Update user_profiles if location provided
@@ -325,7 +343,14 @@ export async function saveComplementaryInfoAction(input: SaveComplementaryInfoIn
 
     const resumeData = (currentResume?.data as any) || {};
     const validExperiences = Array.isArray(workExperiences)
-      ? workExperiences.filter(exp => exp.companyName?.trim() || exp.roleTitle?.trim())
+      ? workExperiences
+          .filter(exp => exp.companyName?.trim() || exp.roleTitle?.trim())
+          .map(exp => ({
+            ...exp,
+            companyName: sanitizeAndClampText(exp.companyName, TEXT_LIMITS.EXP_COMPANY),
+            roleTitle: sanitizeAndClampText(exp.roleTitle, TEXT_LIMITS.EXP_TITLE),
+          }))
+          .filter(exp => !hasScriptInjection(exp.companyName) && !hasScriptInjection(exp.roleTitle))
       : [];
 
     const updatedPersonal = {
@@ -405,8 +430,8 @@ export async function saveSkillsAction(
     }
 
     const cleanedSkills = (Array.isArray(skills) ? skills : [])
-      .map((s) => (typeof s === "string" ? s.trim() : ""))
-      .filter(Boolean);
+      .map((s) => (typeof s === "string" ? sanitizeAndClampText(s, TEXT_LIMITS.SKILL_NAME) : ""))
+      .filter((s) => Boolean(s) && !hasScriptInjection(s));
 
     // Limit to max 30 skills to prevent payload abuse
     const uniqueSkills = Array.from(new Set(cleanedSkills)).slice(0, 30);
