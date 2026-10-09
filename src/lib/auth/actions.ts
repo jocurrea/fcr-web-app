@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 
 import { siteUrl } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
+import { validatePassword } from "@/lib/validation/password-rules";
 
 const safeRedirectParam = (value: string) => encodeURIComponent(value);
 
@@ -64,6 +65,12 @@ export async function signInWithPassword(formData: FormData) {
 export async function signUpWithPassword(formData: FormData) {
   const email = String(formData.get("email") ?? "");
   const password = String(formData.get("password") ?? "");
+
+  const validation = validatePassword(password);
+  if (!validation.isValid) {
+    redirect(`/register?error=${safeRedirectParam(validation.error || "Password does not meet security requirements.")}`);
+  }
+
   const origin = await getOrigin();
   const supabase = await createClient();
 

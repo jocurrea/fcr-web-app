@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { signUpWithPassword } from "@/lib/auth/actions";
 import { AuthBrand } from "@/sections/auth/auth-brand";
+import { validatePassword } from "@/lib/validation/password-rules";
 
 type RegisterProps = {
   error?: string;
@@ -35,18 +36,10 @@ export function Register({ error }: RegisterProps) {
     return "";
   };
 
-  const validatePassword = (val: string) => {
-    if (!val) return "Password is required.";
-    if (val.length < 8) return "Password must be at least 8 characters.";
-    if (!/[A-Z]/.test(val)) return "Password must contain at least one uppercase letter.";
-    if (!/[a-z]/.test(val)) return "Password must contain at least one lowercase letter.";
-    if (!/[0-9]/.test(val)) return "Password must contain at least one number.";
-    return "";
-  };
-
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     const eErr = validateEmail(email);
-    const pErr = validatePassword(password);
+    const pRes = validatePassword(password);
+    const pErr = pRes.error || "";
     const cErr = confirmPassword && password !== confirmPassword ? "Passwords do not match." : (!confirmPassword ? "Please confirm your password." : "");
 
     setEmailError(eErr);

@@ -831,3 +831,136 @@ export async function saveCareerExperienceAction(input: SaveCareerExperienceInpu
     };
   }
 }
+
+export interface SavePersonalInfoInput {
+  role?: "pilot" | "crew";
+  employmentStatus?: string;
+  civilStatus?: string;
+  dateOfBirth?: string;
+  children?: string;
+  purgeIncompatibleData?: boolean;
+}
+
+/**
+ * [Web] FIX-07: Role Change Dependency Safeguards & Personal Information Action
+ * Enforces safeguards when switching from Pilot to Crew:
+ * Purges incompatible licenses and flight hour metrics to prevent DB inconsistencies
+ * and ensure pilot licenses never appear on cabin crew profiles.
+ */
+export async function savePersonalInfoAction(input: SavePersonalInfoInput) {
+  try {
+    const {
+      role,
+      employmentStatus,
+      civilStatus,
+      dateOfBirth,
+      children,
+      purgeIncompatibleData = true,
+    } = input;
+
+    const supabase = await createClient();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return { success: false, error: "Authentication required to update personal information." };
+    }
+
+    const isCrew = role === "crew";
+
+    // 1. Update users table if role provided
+    if (role) {
+      await supabase
+        .from("users")
+        .update({
+          role: isCrew ? "crew" : "pilot",
+          professionalRole: isCrew ? "crew" : "pilot",
+        })
+        .eq("id", user.id);
+    }
+
+    // 2. Update user_profiles table
+    const userProfileUpdate: Record<string, any> = {};
+    if (role) {
+      userProfileUpdate.role = isCrew ? "crew" : "pilot";
+      userProfileUpdate.professionalRole = isCrew ? "crew" : "pilot";
+    }
+    if (dateOfBirth) userProfileUpdate.dateOfBirth = dateOfBirth;
+
+    if (Object.keys(userProfileUpdate).length > 0) {
+      try {
+        await supabase
+          .from("user_profiles")
+          .update(userProfileUpdate)
+          .eq("user_id", user.id);
+      } catch (e) {
+        console.warn("[savePersonalInfoAction] user_profiles update notice:", e);
+      }
+    }
+
+    // 3. Update resumes table
+    const { data: currentResume } = await supabase
+      .from("resumes")
+      .select("data")
+      .eq("userId", user.id)
+      .maybeSingle();
+
+    const resumeData = (currentResume?.data as any) || {};
+    const existingPersonal = resumeData.personal || {};
+
+    const updatedPersonal: Record<string, any> = {
+      ...existingPersonal,
+      ...(role ? { role: isCrew ? "crew" : "pilot", professionalRole: isCrew ? "crew" : "pilot" } : {}),
+      ...(employmentStatus ? { employmentStatus } : {}),
+      ...(civilStatus ? { civilStatus } : {}),
+      ...(dateOfBirth ? { dateOfBirth, dob: dateOfBirth } : {}),
+      ...(children !== undefined ? { children } : {}),
+    };
+
+    // If switching to crew with safeguard enabled, purge incompatible pilot data
+    if (isCrew && purgeIncompatibleData) {
+      updatedPersonal.totalFlightHours = null;
+      updatedPersonal.flightHours = null;
+      updatedPersonal.flight_hours = null;
+      updatedPersonal.licenses = [];
+      updatedPersonal.licenseCertification = null;
+    }
+
+    const updatedResumeData: Record<string, any> = {
+      ...resumeData,
+      personal: updatedPersonal,
+    };
+
+    if (isCrew && purgeIncompatibleData) {
+      updatedResumeData.licenses = [];
+      updatedResumeData.ratings = [];
+    }
+
+    await supabase.from("resumes").upsert(
+      {
+        userId: user.id,
+        data: updatedResumeData,
+      },
+      { onConflict: "userId" }
+    );
+
+    revalidatePath("/", "layout");
+    revalidatePath("/profile");
+    revalidatePath("/onboarding");
+
+    return {
+      success: true,
+      purged: isCrew && purgeIncompatibleData,
+      role: role || existingPersonal.role,
+    };
+  } catch (err: any) {
+    console.error("[savePersonalInfoAction] Error:", err);
+    return {
+      success: false,
+      error: err?.message || "An unexpected error occurred while saving personal information.",
+    };
+  }
+}
+

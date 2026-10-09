@@ -18,9 +18,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Search, Check, ChevronDown, Upload, X, Camera, Image as ImageIcon, User } from "lucide-react";
+import { Search, Check, ChevronDown, Upload, X, Camera, Image as ImageIcon, User, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
+import { ConfirmationModal } from "@/components/ui/confirmation-modal";
 
 const COUNTRIES = [
   { id: "ar", label: "Argentina" },
@@ -168,6 +169,7 @@ export function PersonalInfoForm({ onNext }: PersonalInfoFormProps) {
   };
 
   const [role, setRole] = useState<"pilot" | "crew">("pilot");
+  const [showRoleSafeguardModal, setShowRoleSafeguardModal] = useState(false);
   const [isCountryModalOpen, setIsCountryModalOpen] = useState(false);
   const [selectedCountry, setSelectedCountry] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
@@ -179,6 +181,41 @@ export function PersonalInfoForm({ onNext }: PersonalInfoFormProps) {
   const [totalFlightHours, setTotalFlightHours] = useState("");
 
   const sanitizeName = (val: string) => val.replace(/[^a-zA-ZÀ-ÿ\s]/g, '');
+
+  /**
+   * FIX-07 Role Dependency Safeguard:
+   * Switching role from Pilot to Crew purges incompatible pilot licenses and flight hours.
+   */
+  const handleRoleToggle = (targetRole: "pilot" | "crew") => {
+    if (targetRole === role) return;
+    if (role === "pilot" && targetRole === "crew") {
+      setShowRoleSafeguardModal(true);
+    } else {
+      setRole(targetRole);
+    }
+  };
+
+  const handleConfirmRoleChange = () => {
+    setRole("crew");
+    setTotalFlightHours("");
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("onboarding_personal");
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          delete parsed.totalFlightHours;
+          delete parsed.flightHours;
+          delete parsed.licenses;
+          parsed.role = "crew";
+          localStorage.setItem("onboarding_personal", JSON.stringify(parsed));
+        }
+        localStorage.removeItem("onboarding_licenses");
+      } catch (e) {
+        console.warn("Storage cleanup notice:", e);
+      }
+    }
+    setShowRoleSafeguardModal(false);
+  };
 
   // Load draft from localStorage after hydration
   useEffect(() => {
@@ -273,7 +310,7 @@ export function PersonalInfoForm({ onNext }: PersonalInfoFormProps) {
             <div className="flex bg-gray-100/80 p-1 rounded-full items-center">
               <button
                 type="button"
-                onClick={() => setRole("pilot")}
+                onClick={() => handleRoleToggle("pilot")}
                 className={cn(
                   "flex-1 py-2.5 px-4 text-sm font-semibold rounded-full transition-all text-center",
                   role === "pilot"
@@ -285,7 +322,7 @@ export function PersonalInfoForm({ onNext }: PersonalInfoFormProps) {
               </button>
               <button
                 type="button"
-                onClick={() => setRole("crew")}
+                onClick={() => handleRoleToggle("crew")}
                 className={cn(
                   "flex-1 py-2.5 px-4 text-sm font-semibold rounded-full transition-all text-center",
                   role === "crew"
@@ -535,6 +572,19 @@ export function PersonalInfoForm({ onNext }: PersonalInfoFormProps) {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* FIX-07 Role Dependency Safeguard Alert Modal */}
+      <ConfirmationModal
+        isOpen={showRoleSafeguardModal}
+        onClose={() => setShowRoleSafeguardModal(false)}
+        onConfirm={handleConfirmRoleChange}
+        title="Role Dependency Safeguard: Change Role?"
+        description="Switching your role from Pilot to Cabin Crew will purge incompatible license and total flight hour data to maintain profile consistency. Are you sure you want to proceed?"
+        confirmText="Confirm Role Change"
+        cancelText="Cancel"
+        isDestructive={true}
+        icon="alert"
+      />
     </div>
   );
 }

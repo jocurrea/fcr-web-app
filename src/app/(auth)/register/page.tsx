@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { ChevronLeft, Lock, EyeOff, Eye, AlertCircle, Building2, CheckCircle2, Mail } from "lucide-react";
 import { useState, useEffect, Suspense } from "react";
 import { supabase } from "@/lib/supabase";
+import { validatePassword } from "@/lib/validation/password-rules";
 
 // Helper to thoroughly purge any stale session cache, tokens, and storage
 async function clearStaleSessionCache() {
@@ -179,8 +180,9 @@ function RegisterForm() {
     setError(null);
     setIsDuplicateEmail(false);
 
-    if (password.length < 8) {
-      setError("Password must be at least 8 characters long.");
+    const passwordValidation = validatePassword(password);
+    if (!passwordValidation.isValid) {
+      setError(passwordValidation.error || "Password does not meet security requirements.");
       setIsLoading(false);
       return;
     }

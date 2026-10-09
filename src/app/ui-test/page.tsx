@@ -44,7 +44,7 @@ export default function UITestPage() {
           <div className="flex items-center justify-between border-b pb-4">
             <div>
               <h2 className="text-xl font-semibold">4. Personal Info Modal (Perfil - Personal)</h2>
-              <p className="text-sm text-muted-foreground">Children validation (0-10) and Date of Birth (minimum 18 years age check & block future dates).</p>
+              <p className="text-sm text-muted-foreground">Role Selector (Pilot/Crew) with Dependency Safeguard (modal warning &amp; purge of incompatible data), Children (0-10), and DOB.</p>
             </div>
             <PersonalInfoModal />
           </div>
