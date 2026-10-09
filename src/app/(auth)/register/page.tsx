@@ -627,7 +627,7 @@ function RegisterForm() {
             href={`/login${redirectQuery ? `?redirect=${encodeURIComponent(redirectQuery)}` : ""}`}
             className="text-xs text-[#0f172a] font-bold hover:underline"
           >
-            Log in
+            Login
           </Link>
         </div>
 

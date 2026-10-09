@@ -1,16 +1,20 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronLeft, Lock } from "lucide-react";
 
 export default function ForgotPasswordPage() {
   const router = useRouter();
+  const [message, setMessage] = useState<string | null>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // Simulate sending email then navigating back to login
-    alert("Password reset link sent to your email!");
-    router.push("/login");
+    const successMsg = "A verification link has been sent to your email. Please check your inbox.";
+    setMessage(successMsg);
+    if (typeof window !== "undefined" && typeof window.alert === "function") {
+      alert(successMsg);
+    }
   };
 
   return (
@@ -33,12 +37,19 @@ export default function ForgotPasswordPage() {
       </div>
 
       {/* Titles */}
-      <div className="text-center mb-10">
+      <div className="text-center mb-6">
         <h1 className="text-2xl font-bold text-gray-900 leading-tight">
-          Forget Password
+          Forgot Password
         </h1>
         <p className="text-[11px] text-gray-500 mt-2">Please enter your email to continue</p>
       </div>
+
+      {/* Message */}
+      {message && (
+        <div className="mb-6 p-4 text-sm text-green-700 bg-green-50 border border-green-200 rounded-2xl text-center">
+          {message}
+        </div>
+      )}
 
       {/* Form */}
       <form className="flex flex-col flex-1" onSubmit={handleSubmit}>

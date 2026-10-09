@@ -184,7 +184,7 @@ export function WorkStep({ onNext }: WorkStepProps) {
 
 
         <div className="space-y-2">
-          <Label className="text-gray-700">Employement Status</Label>
+          <Label className="text-gray-700">Employment Status</Label>
           <Select value={employmentStatus} onValueChange={setEmploymentStatus}>
             <SelectTrigger className="w-full rounded-2xl py-6">
               <SelectValue placeholder="Select an Item" />

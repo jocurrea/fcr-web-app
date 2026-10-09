@@ -130,7 +130,7 @@ export function Register({ error }: RegisterProps) {
           <p className="text-center text-sm text-muted-foreground">
             Already have an account?{" "}
             <Link className="font-medium text-foreground underline" href="/login">
-              Log in
+              Login
             </Link>
           </p>
         </CardContent>

@@ -67,7 +67,7 @@ export default function WelcomePage() {
         {/* Footer Section */}
         <div className="flex flex-col items-center gap-2">
           <div className="text-center">
-            <span className="text-sm text-gray-500">Already have an account! </span>
+            <span className="text-sm text-gray-500">Already have an account? </span>
             <Link href="/login" className="text-sm text-[#0f172a] font-bold hover:underline">
               Login
             </Link>

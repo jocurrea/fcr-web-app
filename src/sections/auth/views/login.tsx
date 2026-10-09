@@ -88,12 +88,12 @@ export function Login({ error, message }: LoginProps) {
           </form>
 
           <p className="text-center text-sm text-muted-foreground">
-            New to Flight Crew?{" "}
+            Don&apos;t have an account?{" "}
             <Link
               className="font-medium text-foreground underline"
               href="/register"
             >
-              Create an account
+              Signup
             </Link>
           </p>
         </CardContent>
