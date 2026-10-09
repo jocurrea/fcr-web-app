@@ -490,7 +490,11 @@ function OnboardingContent() {
         userProfilePayload.pilotStripe = personalData?.pilotStripe || null;
       } else if (isCrewRole) {
         userProfilePayload.industryYears = parsedIndustryYears;
-        userProfilePayload.flightAttendantStripe = personalData?.flightAttendantStripe || null;
+        userProfilePayload.flightAttendantStripe =
+          personalData?.flightAttendantStripe ||
+          workData?.flightAttendantStripe ||
+          workData?.crewRole ||
+          null;
       } else if (isAviationPro && validProfessionalTitleKey) {
         userProfilePayload.professionalCredentials = personalData?.professionalCredentials || [];
         userProfilePayload.spokenLanguages = finalLanguages.length > 0 ? finalLanguages : personalData?.languages || [];
@@ -553,7 +557,11 @@ function OnboardingContent() {
         userUpdatePayload.pilotStripe = personalData?.pilotStripe || null;
       } else if (isCrewRole) {
         userUpdatePayload.industryYears = parsedIndustryYears !== null ? String(parsedIndustryYears) : null;
-        userUpdatePayload.flightAttendantStripe = personalData?.flightAttendantStripe || null;
+        userUpdatePayload.flightAttendantStripe =
+          personalData?.flightAttendantStripe ||
+          workData?.flightAttendantStripe ||
+          workData?.crewRole ||
+          null;
       }
 
       const { error: usersProfileError } = await supabase
@@ -641,7 +649,11 @@ function OnboardingContent() {
           flightCrewPayload.pilotStripe = personalData?.pilotStripe || null;
         } else if (isCrewRole) {
           flightCrewPayload.industryYears = parsedIndustryYears;
-          flightCrewPayload.flightAttendantStripe = personalData?.flightAttendantStripe || null;
+          flightCrewPayload.flightAttendantStripe =
+            personalData?.flightAttendantStripe ||
+            workData?.flightAttendantStripe ||
+            workData?.crewRole ||
+            null;
         }
 
         const { error: flightCrewError } = await supabase

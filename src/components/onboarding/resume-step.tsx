@@ -1283,29 +1283,37 @@ export function ResumeStep({ onNext, isSaving }: ResumeStepProps) {
 
             <div className="space-y-2">
               <Label className="text-gray-700 font-normal">Role</Label>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => setExpRole("Pilot in Command")}
-                  className={`flex-1 py-3 px-4 rounded-full text-sm font-medium transition-colors ${
-                    expRole === "Pilot in Command"
-                      ? "bg-blue-600 text-white"
-                      : "bg-gray-200 text-gray-600 hover:bg-gray-300"
-                  }`}
-                >
-                  Pilot in Command
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setExpRole("Second in Command")}
-                  className={`flex-1 py-3 px-4 rounded-full text-sm font-medium transition-colors ${
-                    expRole === "Second in Command"
-                      ? "bg-blue-600 text-white"
-                      : "bg-gray-200 text-gray-600 hover:bg-gray-300"
-                  }`}
-                >
-                  Second in Command
-                </button>
+              <div className="flex flex-wrap gap-2 w-full">
+                {(() => {
+                  let isCrewRole = false;
+                  if (typeof window !== "undefined") {
+                    try {
+                      const p = localStorage.getItem("onboarding_personal");
+                      if (p && JSON.parse(p).role === "crew") isCrewRole = true;
+                      const w = localStorage.getItem("onboarding_work");
+                      if (w && (JSON.parse(w).role === "crew" || JSON.parse(w).crewRole)) isCrewRole = true;
+                    } catch (e) {}
+                  }
+
+                  const options = isCrewRole
+                    ? ["Flight Attendant", "Chief Flight Attendant"]
+                    : ["Pilot in Command", "Second in Command"];
+
+                  return options.map((opt) => (
+                    <button
+                      key={opt}
+                      type="button"
+                      onClick={() => setExpRole(opt)}
+                      className={`flex-1 min-w-[130px] min-h-[44px] py-2.5 px-3 sm:px-4 rounded-full text-sm font-medium transition-colors flex items-center justify-center text-center leading-snug break-words ${
+                        expRole === opt
+                          ? "bg-blue-600 text-white shadow-xs"
+                          : "bg-gray-200 text-gray-600 hover:bg-gray-300"
+                      }`}
+                    >
+                      <span className="w-full text-center whitespace-normal">{opt}</span>
+                    </button>
+                  ));
+                })()}
               </div>
             </div>
 

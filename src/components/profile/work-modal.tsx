@@ -25,12 +25,14 @@ import {
   sanitizeInteger,
   validateYearsInIndustry,
 } from "@/lib/validation/numeric-rules";
+import { cn } from "@/lib/utils";
 
 export function WorkModal() {
   const [industryYears, setIndustryYears] = useState("");
   const [industryYearsError, setIndustryYearsError] = useState<string | null>(null);
   const [employmentStatus, setEmploymentStatus] = useState("employed");
   const [medicalClass, setMedicalClass] = useState("1st");
+  const [crewRole, setCrewRole] = useState("Chief Flight Attendant");
 
   const handleYearsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = sanitizeInteger(e.target.value);
@@ -88,6 +90,41 @@ export function WorkModal() {
                 <p className="col-span-3 text-red-500 text-xs mt-0.5">{industryYearsError}</p>
               </div>
             )}
+          </div>
+
+          {/* FIX-12: Crew Role Buttons with Layout Elasticity & Text Wrapping */}
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label className="text-right font-medium">
+              Crew Role
+            </Label>
+            <div className="col-span-3">
+              <div className="flex flex-wrap gap-2 w-full">
+                <button
+                  type="button"
+                  onClick={() => setCrewRole("Flight Attendant")}
+                  className={cn(
+                    "flex-1 min-w-[120px] min-h-[44px] py-2 px-3 rounded-full text-xs font-semibold transition-all flex items-center justify-center text-center leading-snug break-words",
+                    crewRole === "Flight Attendant"
+                      ? "bg-blue-600 text-white shadow-xs"
+                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                  )}
+                >
+                  <span className="whitespace-normal">Flight Attendant</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCrewRole("Chief Flight Attendant")}
+                  className={cn(
+                    "flex-1 min-w-[120px] min-h-[44px] py-2 px-3 rounded-full text-xs font-semibold transition-all flex items-center justify-center text-center leading-snug break-words",
+                    crewRole === "Chief Flight Attendant"
+                      ? "bg-blue-600 text-white shadow-xs"
+                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                  )}
+                >
+                  <span className="whitespace-normal">Chief Flight Attendant</span>
+                </button>
+              </div>
+            </div>
           </div>
 
           <div className="grid grid-cols-4 items-center gap-4">

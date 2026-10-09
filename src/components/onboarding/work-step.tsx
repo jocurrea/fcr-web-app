@@ -20,6 +20,7 @@ import {
 
 interface WorkStepProps {
   onNext: () => void;
+  role?: string;
 }
 
 const COUNTRIES: Record<string, string> = {
@@ -36,7 +37,33 @@ const COUNTRIES: Record<string, string> = {
   gb: "United Kingdom", us: "United States", ve: "Venezuela", vn: "Vietnam"
 };
 
-export function WorkStep({ onNext }: WorkStepProps) {
+export function WorkStep({ onNext, role: propRole }: WorkStepProps) {
+  const [role, setRole] = useState<string>(() => {
+    if (propRole) return propRole;
+    if (typeof window !== "undefined") {
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlRole = urlParams.get("role") || urlParams.get("category");
+      if (urlRole) return urlRole;
+
+      const personal = localStorage.getItem("onboarding_personal");
+      if (personal) {
+        try {
+          const parsed = JSON.parse(personal);
+          if (parsed.role) return parsed.role;
+        } catch (e) {}
+      }
+      const savedWork = localStorage.getItem("onboarding_work");
+      if (savedWork) {
+        try {
+          const parsed = JSON.parse(savedWork);
+          if (parsed.role) return parsed.role;
+          if (parsed.crewRole || parsed.flightAttendantStripe) return "crew";
+        } catch (e) {}
+      }
+    }
+    return "crew";
+  });
+
   const [medicalClass, setMedicalClass] = useState<string>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem("onboarding_work");
@@ -47,6 +74,7 @@ export function WorkStep({ onNext }: WorkStepProps) {
     }
     return "1st";
   });
+
   const [commandType, setCommandType] = useState<string>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem("onboarding_work");
@@ -56,6 +84,18 @@ export function WorkStep({ onNext }: WorkStepProps) {
       }
     }
     return "pic";
+  });
+
+  const [crewRole, setCrewRole] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem("onboarding_work");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.crewRole) return parsed.crewRole;
+        if (parsed.flightAttendantStripe) return parsed.flightAttendantStripe;
+      }
+    }
+    return "Chief Flight Attendant";
   });
   const [crossedOcean, setCrossedOcean] = useState<string>(() => {
     if (typeof window !== 'undefined') {
@@ -143,9 +183,20 @@ export function WorkStep({ onNext }: WorkStepProps) {
 
   useEffect(() => {
     localStorage.setItem("onboarding_work", JSON.stringify({
-      medicalClass, commandType, crossedOcean, adminExp, adminRole, employmentStatus, workCountry, adminDescription, industryYears
+      medicalClass,
+      commandType,
+      crewRole,
+      flightAttendantStripe: crewRole,
+      role,
+      crossedOcean,
+      adminExp,
+      adminRole,
+      employmentStatus,
+      workCountry,
+      adminDescription,
+      industryYears
     }));
-  }, [medicalClass, commandType, crossedOcean, adminExp, adminRole, employmentStatus, workCountry, adminDescription, industryYears]);
+  }, [medicalClass, commandType, crewRole, role, crossedOcean, adminExp, adminRole, employmentStatus, workCountry, adminDescription, industryYears]);
 
   const handleNextLocal = () => {
     if (industryYears) {
@@ -316,30 +367,64 @@ export function WorkStep({ onNext }: WorkStepProps) {
           )}
         </div>
 
-        <div className="flex gap-4 mt-6">
-          <button
-            type="button"
-            onClick={() => setCommandType("pic")}
-            className={`flex-1 py-3 rounded-full font-semibold transition-colors text-sm ${
-              commandType === "pic"
-                ? "bg-blue-600 text-white"
-                : "bg-gray-200 text-gray-400"
-            }`}
-          >
-            Pilot in Command
-          </button>
-          <button
-            type="button"
-            onClick={() => setCommandType("sic")}
-            className={`flex-1 py-3 rounded-full font-semibold transition-colors text-sm ${
-              commandType === "sic"
-                ? "bg-blue-600 text-white"
-                : "bg-gray-200 text-gray-400"
-            }`}
-          >
-            Second in Command
-          </button>
-        </div>
+        {/* FIX-12: Role Buttons with Layout Elasticity & Text Wrapping (No truncation on small screens/iPhone SE) */}
+        {role === "crew" ? (
+          <div className="space-y-2 mt-6">
+            <Label className="text-gray-700 font-medium">Crew Role</Label>
+            <div className="flex flex-wrap gap-3 w-full">
+              <button
+                type="button"
+                onClick={() => setCrewRole("Flight Attendant")}
+                className={`flex-1 min-w-[130px] min-h-[48px] py-2.5 px-3 sm:px-4 rounded-full font-semibold transition-colors text-sm text-center flex items-center justify-center leading-snug break-words ${
+                  crewRole === "Flight Attendant"
+                    ? "bg-blue-600 text-white shadow-xs"
+                    : "bg-gray-200 text-gray-500 hover:bg-gray-300"
+                }`}
+              >
+                <span className="w-full text-center whitespace-normal">Flight Attendant</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setCrewRole("Chief Flight Attendant")}
+                className={`flex-1 min-w-[130px] min-h-[48px] py-2.5 px-3 sm:px-4 rounded-full font-semibold transition-colors text-sm text-center flex items-center justify-center leading-snug break-words ${
+                  crewRole === "Chief Flight Attendant"
+                    ? "bg-blue-600 text-white shadow-xs"
+                    : "bg-gray-200 text-gray-500 hover:bg-gray-300"
+                }`}
+              >
+                <span className="w-full text-center whitespace-normal">Chief Flight Attendant</span>
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-2 mt-6">
+            <Label className="text-gray-700 font-medium">Command Role</Label>
+            <div className="flex flex-wrap gap-3 w-full">
+              <button
+                type="button"
+                onClick={() => setCommandType("pic")}
+                className={`flex-1 min-w-[130px] min-h-[48px] py-2.5 px-3 sm:px-4 rounded-full font-semibold transition-colors text-sm text-center flex items-center justify-center leading-snug break-words ${
+                  commandType === "pic"
+                    ? "bg-blue-600 text-white shadow-xs"
+                    : "bg-gray-200 text-gray-400 hover:bg-gray-300"
+                }`}
+              >
+                <span className="w-full text-center whitespace-normal">Pilot in Command</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setCommandType("sic")}
+                className={`flex-1 min-w-[130px] min-h-[48px] py-2.5 px-3 sm:px-4 rounded-full font-semibold transition-colors text-sm text-center flex items-center justify-center leading-snug break-words ${
+                  commandType === "sic"
+                    ? "bg-blue-600 text-white shadow-xs"
+                    : "bg-gray-200 text-gray-400 hover:bg-gray-300"
+                }`}
+              >
+                <span className="w-full text-center whitespace-normal">Second in Command</span>
+              </button>
+            </div>
+          </div>
+        )}
 
         <div className="space-y-3 mt-6">
           <Label className="text-gray-700">Have you crossed any ocean (Atlantic or Pacific)?</Label>
