@@ -10,6 +10,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { AlertCircle } from "lucide-react";
+import { cn } from "@/lib/utils";
+import {
+  handleNumericKeyDown,
+  sanitizeInteger,
+  validateYearsInIndustry,
+} from "@/lib/validation/numeric-rules";
 
 interface WorkStepProps {
   onNext: () => void;
@@ -120,11 +127,36 @@ export function WorkStep({ onNext }: WorkStepProps) {
     return "";
   });
 
+  const [industryYears, setIndustryYears] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem("onboarding_work");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.industryYears !== undefined && parsed.industryYears !== null) {
+          return String(parsed.industryYears);
+        }
+      }
+    }
+    return "";
+  });
+  const [industryYearsError, setIndustryYearsError] = useState<string | null>(null);
+
   useEffect(() => {
     localStorage.setItem("onboarding_work", JSON.stringify({
-      medicalClass, commandType, crossedOcean, adminExp, adminRole, employmentStatus, workCountry, adminDescription
+      medicalClass, commandType, crossedOcean, adminExp, adminRole, employmentStatus, workCountry, adminDescription, industryYears
     }));
-  }, [medicalClass, commandType, crossedOcean, adminExp, adminRole, employmentStatus, workCountry, adminDescription]);
+  }, [medicalClass, commandType, crossedOcean, adminExp, adminRole, employmentStatus, workCountry, adminDescription, industryYears]);
+
+  const handleNextLocal = () => {
+    if (industryYears) {
+      const { error } = validateYearsInIndustry(industryYears);
+      if (error) {
+        setIndustryYearsError(error);
+        return;
+      }
+    }
+    onNext();
+  };
 
   return (
     <div className="flex-1 flex flex-col mt-4 min-h-0">
@@ -239,6 +271,49 @@ export function WorkStep({ onNext }: WorkStepProps) {
               <SelectItem value="vn"><div className="flex items-center gap-2"><img src="https://flagcdn.com/w20/vn.png" srcSet="https://flagcdn.com/w40/vn.png 2x" width="20" alt="" className="shadow-sm" /> <span>Vietnam</span></div></SelectItem>
             </SelectContent>
           </Select>
+        </div>
+
+        <div className="space-y-2">
+          <Label className="text-gray-700">Years in Industry</Label>
+          <Input 
+            type="text" 
+            inputMode="numeric"
+            maxLength={2}
+            value={industryYears}
+            placeholder="e.g. 5"
+            onChange={(e) => {
+              const clean = sanitizeInteger(e.target.value);
+              setIndustryYears(clean);
+              const { error } = validateYearsInIndustry(clean);
+              setIndustryYearsError(error);
+            }}
+            onKeyDown={handleNumericKeyDown}
+            onPaste={(e) => {
+              const pasteData = e.clipboardData.getData("text");
+              if (pasteData && !/^\d+$/.test(pasteData.trim())) {
+                e.preventDefault();
+                const sanitized = sanitizeInteger(pasteData);
+                setIndustryYears(sanitized);
+                const { error } = validateYearsInIndustry(sanitized);
+                setIndustryYearsError(
+                  error ||
+                    (sanitized === ""
+                      ? "Only non-negative whole numbers (0 to 65) are allowed."
+                      : null)
+                );
+              }
+            }}
+            className={cn(
+              "rounded-2xl py-6", 
+              industryYearsError ? "border-red-500 focus-visible:ring-red-500" : ""
+            )} 
+          />
+          {industryYearsError && (
+            <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
+              <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+              {industryYearsError}
+            </p>
+          )}
         </div>
 
         <div className="flex gap-4 mt-6">
@@ -363,8 +438,9 @@ export function WorkStep({ onNext }: WorkStepProps) {
 
       <div className="p-4 bg-white mt-auto mb-4">
         <Button 
-          onClick={onNext}
-          className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-full py-6 text-lg font-semibold"
+          onClick={handleNextLocal}
+          disabled={!!industryYearsError}
+          className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-full py-6 text-lg font-semibold"
         >
           Next / Skip
         </Button>

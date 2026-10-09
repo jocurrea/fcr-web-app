@@ -21,13 +21,21 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+import {
+  handleNumericKeyDown,
+  sanitizeInteger,
+  validateChildren,
+} from "@/lib/validation/numeric-rules";
+
 export function PersonalInfoModal() {
   const [children, setChildren] = useState("");
+  const [childrenError, setChildrenError] = useState<string | null>(null);
 
   const handleChildrenChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    // QA Fix: Children only accepts integers
-    const value = e.target.value.replace(/[^0-9]/g, "");
+    const value = sanitizeInteger(e.target.value);
     setChildren(value);
+    const { error } = validateChildren(value);
+    setChildrenError(error);
   };
 
   return (
@@ -80,18 +88,38 @@ export function PersonalInfoModal() {
             </div>
           </div>
 
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="children" className="text-right">
-              Children
-            </Label>
-            <Input
-              id="children"
-              value={children}
-              onChange={handleChildrenChange}
-              placeholder="e.g. 2"
-              className="col-span-3"
-              inputMode="numeric"
-            />
+          <div className="space-y-1">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="children" className="text-right">
+                Children
+              </Label>
+              <Input
+                id="children"
+                value={children}
+                onChange={handleChildrenChange}
+                onKeyDown={handleNumericKeyDown}
+                onPaste={(e) => {
+                  const pasteData = e.clipboardData.getData("text");
+                  if (pasteData && !/^\d+$/.test(pasteData.trim())) {
+                    e.preventDefault();
+                    const sanitized = sanitizeInteger(pasteData);
+                    setChildren(sanitized);
+                    const { error } = validateChildren(sanitized);
+                    setChildrenError(error || (sanitized === "" ? "Only non-negative whole numbers (0 to 10) are allowed." : null));
+                  }
+                }}
+                placeholder="e.g. 2"
+                className={`col-span-3 ${childrenError ? "border-red-500 focus-visible:ring-red-500" : ""}`}
+                inputMode="numeric"
+                maxLength={2}
+              />
+            </div>
+            {childrenError && (
+              <div className="grid grid-cols-4 gap-4">
+                <div />
+                <p className="col-span-3 text-red-500 text-xs mt-0.5">{childrenError}</p>
+              </div>
+            )}
           </div>
 
         </div>
@@ -99,7 +127,7 @@ export function PersonalInfoModal() {
           <DialogClose render={<Button type="button" variant="secondary" />}>
             Close
           </DialogClose>
-          <Button type="button">Save changes</Button>
+          <Button type="button" disabled={!!childrenError}>Save changes</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

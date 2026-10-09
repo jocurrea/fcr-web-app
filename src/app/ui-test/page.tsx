@@ -2,6 +2,7 @@ import { LicenseModal } from "@/components/profile/license-modal";
 import { FlightsModal } from "@/components/profile/flights-modal";
 import { ContactModal } from "@/components/profile/contact-modal";
 import { PersonalInfoModal } from "@/components/profile/personal-info-modal";
+import { WorkModal } from "@/components/profile/work-modal";
 
 export default function UITestPage() {
   return (
@@ -39,12 +40,20 @@ export default function UITestPage() {
             <ContactModal />
           </div>
 
-          <div className="flex items-center justify-between pt-2">
+          <div className="flex items-center justify-between border-b pb-4">
             <div>
               <h2 className="text-xl font-semibold">4. Personal Info Modal</h2>
               <p className="text-sm text-muted-foreground">Children validation and visual spacing correction on Selectors.</p>
             </div>
             <PersonalInfoModal />
+          </div>
+
+          <div className="flex items-center justify-between pt-2">
+            <div>
+              <h2 className="text-xl font-semibold">5. Work Info Modal</h2>
+              <p className="text-sm text-muted-foreground">Years in Industry: Positive integer constraint (0-65) and keypress blocking.</p>
+            </div>
+            <WorkModal />
           </div>
         </div>
       </div>

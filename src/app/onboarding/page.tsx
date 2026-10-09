@@ -7,6 +7,7 @@ import { requestCompanyAffiliationFallbackAction } from "@/actions/affiliations"
 import { revalidateProfileLayout } from "@/actions/profile";
 import { sanitizeUrl } from "@/lib/validation/url-validation";
 import { sanitizeAndClampText, TEXT_LIMITS, hasScriptInjection } from "@/lib/validation/text-limits";
+import { validateChildren, validateYearsInIndustry } from "@/lib/validation/numeric-rules";
 import { ChevronLeft } from "lucide-react";
 
 // Flight Crew Steps
@@ -296,8 +297,30 @@ function OnboardingContent() {
           TEXT_LIMITS.ADMIN_ROLE_DESCRIPTION
         ) || null;
 
+      const rawIndustryYears = workData?.industryYears ?? personalData?.industryYears;
+      const parsedIndustryYears =
+        rawIndustryYears !== undefined &&
+        rawIndustryYears !== null &&
+        rawIndustryYears !== "" &&
+        validateYearsInIndustry(rawIndustryYears).isValid
+          ? Number(rawIndustryYears)
+          : null;
+
+      const rawChildren = resumeData?.children ?? personalData?.children;
+      const parsedChildren =
+        rawChildren !== undefined &&
+        rawChildren !== null &&
+        rawChildren !== "" &&
+        validateChildren(rawChildren).isValid
+          ? Number(rawChildren)
+          : null;
+
       const crewData = {
-        personal: personalData,
+        personal: {
+          ...personalData,
+          ...(parsedChildren !== null ? { children: parsedChildren } : {}),
+          ...(parsedIndustryYears !== null ? { industryYears: parsedIndustryYears } : {}),
+        },
         licenses: licensesRaw ? JSON.parse(licensesRaw) : [],
         ratings: ratingsRaw ? JSON.parse(ratingsRaw) : [],
         work: workRaw ? JSON.parse(workRaw) : personalData.workExperiences || [],
@@ -450,9 +473,7 @@ function OnboardingContent() {
           : null;
         userProfilePayload.pilotStripe = personalData?.pilotStripe || null;
       } else if (isCrewRole) {
-        userProfilePayload.industryYears = personalData?.industryYears
-          ? Number(personalData.industryYears)
-          : null;
+        userProfilePayload.industryYears = parsedIndustryYears;
         userProfilePayload.flightAttendantStripe = personalData?.flightAttendantStripe || null;
       } else if (isAviationPro && validProfessionalTitleKey) {
         userProfilePayload.professionalCredentials = personalData?.professionalCredentials || [];
@@ -511,9 +532,7 @@ function OnboardingContent() {
         userUpdatePayload.medicalCert = personalData?.medicalCert || null;
         userUpdatePayload.pilotStripe = personalData?.pilotStripe || null;
       } else if (isCrewRole) {
-        userUpdatePayload.industryYears = personalData?.industryYears
-          ? String(personalData.industryYears)
-          : null;
+        userUpdatePayload.industryYears = parsedIndustryYears !== null ? String(parsedIndustryYears) : null;
         userUpdatePayload.flightAttendantStripe = personalData?.flightAttendantStripe || null;
       }
 
@@ -601,9 +620,7 @@ function OnboardingContent() {
             : null;
           flightCrewPayload.pilotStripe = personalData?.pilotStripe || null;
         } else if (isCrewRole) {
-          flightCrewPayload.industryYears = personalData?.industryYears
-            ? Number(personalData.industryYears)
-            : null;
+          flightCrewPayload.industryYears = parsedIndustryYears;
           flightCrewPayload.flightAttendantStripe = personalData?.flightAttendantStripe || null;
         }
 

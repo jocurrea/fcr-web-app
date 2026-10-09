@@ -14,6 +14,11 @@ import {
   hasXssOrInjection,
   XSS_SECURITY_ERROR_MSG,
 } from "@/lib/validation/url-validation";
+import {
+  handleNumericKeyDown,
+  sanitizeInteger,
+  validateFoundedYear,
+} from "@/lib/validation/numeric-rules";
 
 interface CompanyProfileStepProps {
   onNext: () => void;
@@ -40,6 +45,7 @@ export function CompanyProfileStep({ onNext }: CompanyProfileStepProps) {
 
   const [locationError, setLocationError] = useState<string | null>(null);
   const [websiteError, setWebsiteError] = useState<string | null>(null);
+  const [foundedYearError, setFoundedYearError] = useState<string | null>(null);
   const [operatingAreaError, setOperatingAreaError] = useState<string | null>(null);
   const [servicesError, setServicesError] = useState<string | null>(null);
   const [fleetError, setFleetError] = useState<string | null>(null);
@@ -95,6 +101,13 @@ export function CompanyProfileStep({ onNext }: CompanyProfileStepProps) {
         return;
       }
     }
+    if (foundedYear.trim()) {
+      const { isValid, error } = validateFoundedYear(foundedYear);
+      if (!isValid && error) {
+        setFoundedYearError(error);
+        return;
+      }
+    }
 
     if (!isFormValid) return;
 
@@ -147,7 +160,8 @@ export function CompanyProfileStep({ onNext }: CompanyProfileStepProps) {
     email.trim() !== "" &&
     isEmailValid(email) &&
     isPhoneValid(phone) &&
-    (foundedYear === "" || foundedYear.length === 4) &&
+    !foundedYearError &&
+    (foundedYear === "" || validateFoundedYear(foundedYear).isValid) &&
     !isLoading &&
     !isSaving;
 
@@ -397,12 +411,40 @@ export function CompanyProfileStep({ onNext }: CompanyProfileStepProps) {
                 maxLength={4}
                 value={foundedYear}
                 onChange={(e) => {
-                  const val = e.target.value.replace(/\D/g, '');
-                  setFoundedYear(val);
+                  const clean = sanitizeInteger(e.target.value);
+                  setFoundedYear(clean);
+                  const { error } = validateFoundedYear(clean);
+                  setFoundedYearError(error);
+                }}
+                onKeyDown={handleNumericKeyDown}
+                onPaste={(e) => {
+                  const pasteData = e.clipboardData.getData("text");
+                  if (pasteData && !/^\d+$/.test(pasteData.trim())) {
+                    e.preventDefault();
+                    const sanitized = sanitizeInteger(pasteData);
+                    setFoundedYear(sanitized);
+                    const { error } = validateFoundedYear(sanitized);
+                    setFoundedYearError(
+                      error ||
+                        (sanitized === ""
+                          ? "Only non-negative whole numbers (0 to current year) are allowed."
+                          : null)
+                    );
+                  }
                 }}
                 placeholder="2018"
-                className="w-full px-5 py-[14px] bg-white border border-gray-300 rounded-[24px] text-[15px] placeholder-gray-400 focus:outline-none focus:border-[#2d73f5] focus:ring-1 focus:ring-[#2d73f5] transition-shadow"
+                className={`w-full px-5 py-[14px] bg-white border rounded-[24px] text-[15px] placeholder-gray-400 focus:outline-none focus:ring-1 transition-shadow ${
+                  foundedYearError
+                    ? "border-red-500 focus:border-red-500 focus:ring-red-500"
+                    : "border-gray-300 focus:border-[#2d73f5] focus:ring-[#2d73f5]"
+                }`}
               />
+              {foundedYearError && (
+                <p className="text-red-500 text-xs mt-1.5 ml-1 flex items-center gap-1">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                  {foundedYearError}
+                </p>
+              )}
             </div>
 
             <div>

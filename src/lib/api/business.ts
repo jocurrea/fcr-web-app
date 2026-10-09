@@ -1,6 +1,7 @@
 import { supabase } from "@/lib/supabase";
 import { hasInvalidCharacters } from "@/lib/validation/input-restrictions";
 import { isValidStrictUrl, sanitizeUrl, hasXssOrInjection } from "@/lib/validation/url-validation";
+import { validateFoundedYear } from "@/lib/validation/numeric-rules";
 
 export type CompanyType = {
   id: string;
@@ -84,6 +85,8 @@ async function getCurrentUserId() {
 
 function parseFoundedYear(value?: string) {
   if (!value?.trim()) return null;
+  const { isValid } = validateFoundedYear(value);
+  if (!isValid) return null;
   const parsed = Number.parseInt(value, 10);
   return Number.isNaN(parsed) ? null : parsed;
 }
@@ -120,6 +123,12 @@ function getCompanyProfileValidationError(profile: CompanyProfileInput) {
     }
     if (!isValidStrictUrl(trimmedWebsite)) {
       return "Website must be a valid URL starting with http:// or https:// (e.g. https://www.company.com).";
+    }
+  }
+  if (profile.foundedYear && profile.foundedYear.trim()) {
+    const { isValid, error } = validateFoundedYear(profile.foundedYear);
+    if (!isValid && error) {
+      return error;
     }
   }
   return null;

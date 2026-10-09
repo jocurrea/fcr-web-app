@@ -25,6 +25,11 @@ import {
   hasXssOrInjection,
   XSS_SECURITY_ERROR_MSG,
 } from "@/lib/validation/url-validation";
+import {
+  handleNumericKeyDown,
+  sanitizeInteger,
+  validateChildren,
+} from "@/lib/validation/numeric-rules";
 
 interface ResumeStepProps {
   onNext: () => void;
@@ -85,6 +90,18 @@ export function ResumeStep({ onNext, isSaving }: ResumeStepProps) {
     }
     return "";
   });
+
+  const [children, setChildren] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem("onboarding_resume");
+      if (saved) {
+        const p = JSON.parse(saved);
+        if (p.children !== undefined && p.children !== null) return String(p.children);
+      }
+    }
+    return "0";
+  });
+  const [childrenError, setChildrenError] = useState<string | null>(null);
 
   const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setEmail(e.target.value);
@@ -224,11 +241,16 @@ export function ResumeStep({ onNext, isSaving }: ResumeStepProps) {
 
   useEffect(() => {
     localStorage.setItem("onboarding_resume", JSON.stringify({
-      phone, email, dateOfBirth, websites, skills, languages, awards, trainingFacilities, experiences, address, summary
+      phone, email, dateOfBirth, websites, skills, languages, awards, trainingFacilities, experiences, address, summary, children
     }));
-  }, [phone, email, dateOfBirth, websites, skills, languages, awards, trainingFacilities, experiences, address, summary]);
+  }, [phone, email, dateOfBirth, websites, skills, languages, awards, trainingFacilities, experiences, address, summary, children]);
 
   const handleFinishLocal = () => {
+    const { error } = validateChildren(children);
+    if (error) {
+      setChildrenError(error);
+      return;
+    }
     onNext();
   };
 
@@ -482,18 +504,36 @@ export function ResumeStep({ onNext, isSaving }: ResumeStepProps) {
             <Input 
               type="text" 
               inputMode="numeric"
-              pattern="[0-9]*"
-              defaultValue="0"
-              className="rounded-2xl py-6" 
-              onInput={(e) => {
-                e.currentTarget.value = e.currentTarget.value.replace(/\D/g, "");
+              maxLength={2}
+              value={children}
+              onChange={(e) => {
+                const clean = sanitizeInteger(e.target.value);
+                setChildren(clean);
+                const { error } = validateChildren(clean);
+                setChildrenError(error);
               }}
-              onBlur={(e) => {
-                if (e.target.value === "") {
-                  e.target.value = "0";
+              onKeyDown={handleNumericKeyDown}
+              onPaste={(e) => {
+                const pasteData = e.clipboardData.getData("text");
+                if (pasteData && !/^\d+$/.test(pasteData.trim())) {
+                  e.preventDefault();
+                  const sanitized = sanitizeInteger(pasteData);
+                  setChildren(sanitized);
+                  const { error } = validateChildren(sanitized);
+                  setChildrenError(error || (sanitized === "" ? "Only non-negative whole numbers (0 to 10) are allowed." : null));
                 }
               }}
+              className={cn(
+                "rounded-2xl py-6", 
+                childrenError ? "border-red-500 focus-visible:ring-red-500" : ""
+              )} 
             />
+            {childrenError && (
+              <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
+                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                {childrenError}
+              </p>
+            )}
           </div>
         </div>
 
@@ -609,7 +649,7 @@ export function ResumeStep({ onNext, isSaving }: ResumeStepProps) {
       <div className="p-4 bg-white mt-auto mb-4">
         <Button 
           onClick={handleFinishLocal}
-          disabled={isSaving}
+          disabled={isSaving || !!childrenError || !!dobError || !!emailError}
           className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-full py-6 text-lg font-semibold"
         >
           {isSaving ? (
