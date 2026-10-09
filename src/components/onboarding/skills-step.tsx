@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ChevronLeft, Search, Plus, Check, X } from "lucide-react";
+import { ChevronLeft, Search, Plus, Check, X, AlertCircle, CheckCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { Input } from "@/components/ui/input";
@@ -51,6 +51,13 @@ export function SkillsStep({ onNext, onBack }: SkillsStepProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: "error" | "success" } | null>(null);
+
+  useEffect(() => {
+    if (!toast) return;
+    const timer = setTimeout(() => setToast(null), 4000);
+    return () => clearTimeout(timer);
+  }, [toast]);
 
   useEffect(() => {
     let mounted = true;
@@ -133,10 +140,18 @@ export function SkillsStep({ onNext, onBack }: SkillsStepProps) {
     if (!trimmed) return;
 
     const exists = selectedSkills.some((s) => s.toLowerCase() === trimmed.toLowerCase());
-    if (!exists && selectedSkills.length < MAX_SKILLS) {
-      setSelectedSkills((prev) => [...prev, trimmed]);
-      setSearchQuery("");
+    if (exists) {
+      setToast({ message: "This item is already in your list", type: "error" });
+      return;
     }
+
+    if (selectedSkills.length >= MAX_SKILLS) {
+      setToast({ message: `Maximum ${MAX_SKILLS} skills allowed`, type: "error" });
+      return;
+    }
+
+    setSelectedSkills((prev) => [...prev, trimmed]);
+    setSearchQuery("");
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -198,7 +213,27 @@ export function SkillsStep({ onNext, onBack }: SkillsStepProps) {
   };
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-white relative">
+      {/* FIX-08 Toast Feedback Notification */}
+      {toast && (
+        <div
+          role="alert"
+          className={cn(
+            "fixed top-4 left-1/2 -translate-x-1/2 z-50 p-3.5 px-5 rounded-2xl border text-sm font-semibold flex items-center gap-2.5 shadow-lg transition-all animate-in fade-in slide-in-from-top-4",
+            toast.type === "error"
+              ? "bg-red-50 text-red-700 border-red-200"
+              : "bg-emerald-50 text-emerald-700 border-emerald-200"
+          )}
+        >
+          {toast.type === "error" ? (
+            <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+          ) : (
+            <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
+          )}
+          <span>{toast.message}</span>
+        </div>
+      )}
+
       <div className="flex flex-col mx-auto max-w-xl min-h-[100dvh] px-6 py-6">
 
         {/* 1. Top Bar: Left Back Button + Centered Prominent Logo */}

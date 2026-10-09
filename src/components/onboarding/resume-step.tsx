@@ -17,7 +17,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
-import { Loader2, AlertCircle } from "lucide-react";
+import { Loader2, AlertCircle, CheckCircle } from "lucide-react";
 import {
   isValidStrictUrl,
   sanitizeUrl,
@@ -195,7 +195,19 @@ export function ResumeStep({ onNext, isSaving }: ResumeStepProps) {
     "Stress tolerance"
   ];
 
-  const availableSkills = ALL_PREDEFINED_SKILLS.filter(skill => !skills.includes(skill));
+  // FIX-08 Toast notification state
+  const [toast, setToast] = useState<{ message: string; type: "error" | "success" } | null>(null);
+
+  useEffect(() => {
+    if (!toast) return;
+    const timer = setTimeout(() => setToast(null), 4000);
+    return () => clearTimeout(timer);
+  }, [toast]);
+
+  // FIX-08 UI Filtering: Case-insensitive filter of already added skills
+  const availableSkills = ALL_PREDEFINED_SKILLS.filter(
+    skill => !skills.some(s => s.trim().toLowerCase() === skill.trim().toLowerCase())
+  );
 
   const [isLangModalOpen, setIsLangModalOpen] = useState(false);
   const [langName, setLangName] = useState("");
@@ -295,8 +307,34 @@ export function ResumeStep({ onNext, isSaving }: ResumeStepProps) {
     "Swedish", "Tajik", "Tatar", "Telugu", "Thai", "Turkmen", "Ukrainian", "Uyghur", "Uzbek", "Welsh", "Xhosa",
     "Yiddish", "Yoruba", "Zulu"
   ];
+
+  // FIX-08 UI Filtering: Filter out already added languages from selection dropdown
+  const availableLanguageOptions = languageOptions.filter(
+    lang => !languages.some(l => l.name.trim().toLowerCase() === lang.trim().toLowerCase())
+  );
+
   return (
-    <div className="flex-1 flex flex-col mt-4 min-h-0">
+    <div className="flex-1 flex flex-col mt-4 min-h-0 relative">
+      {/* FIX-08 Toast Feedback Notification */}
+      {toast && (
+        <div
+          role="alert"
+          className={cn(
+            "fixed top-4 left-1/2 -translate-x-1/2 z-50 p-3.5 px-5 rounded-2xl border text-sm font-semibold flex items-center gap-2.5 shadow-lg transition-all animate-in fade-in slide-in-from-top-4",
+            toast.type === "error"
+              ? "bg-red-50 text-red-700 border-red-200"
+              : "bg-emerald-50 text-emerald-700 border-emerald-200"
+          )}
+        >
+          {toast.type === "error" ? (
+            <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+          ) : (
+            <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
+          )}
+          <span>{toast.message}</span>
+        </div>
+      )}
+
       <div ref={scrollContainerRef} className="flex-1 overflow-y-auto px-4 pb-20 space-y-6 min-h-0">
         
         {/* Contact Section */}
@@ -816,6 +854,11 @@ export function ResumeStep({ onNext, isSaving }: ResumeStepProps) {
                   key={skill}
                   type="button"
                   onClick={() => {
+                    const isDuplicate = skills.some(s => s.trim().toLowerCase() === skill.trim().toLowerCase());
+                    if (isDuplicate) {
+                      setToast({ message: "This item is already in your list", type: "error" });
+                      return;
+                    }
                     setSkillText(skill);
                   }}
                   className="w-full text-left px-4 py-3 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors"
@@ -842,11 +885,19 @@ export function ResumeStep({ onNext, isSaving }: ResumeStepProps) {
               type="button"
               className="flex-1 rounded-full py-6 bg-blue-600 hover:bg-blue-700 text-white text-base"
               onClick={() => {
-                if (skillText.trim()) {
-                  setSkills([...skills, skillText.trim()]);
-                  setSkillText("");
-                  setIsSkillModalOpen(false);
+                const trimmed = skillText.trim();
+                if (!trimmed) return;
+
+                // FIX-08 Uniqueness Check: Validate that skill does not already exist
+                const isDuplicate = skills.some(s => s.trim().toLowerCase() === trimmed.toLowerCase());
+                if (isDuplicate) {
+                  setToast({ message: "This item is already in your list", type: "error" });
+                  return;
                 }
+
+                setSkills([...skills, trimmed]);
+                setSkillText("");
+                setIsSkillModalOpen(false);
               }}
             >
               Add
@@ -871,7 +922,8 @@ export function ResumeStep({ onNext, isSaving }: ResumeStepProps) {
                   <SelectValue placeholder="Select an Item" />
                 </SelectTrigger>
                 <SelectContent>
-                  {languageOptions.map(lang => (
+                  {/* FIX-08 UI Filtering: Filter out already added languages */}
+                  {availableLanguageOptions.map(lang => (
                     <SelectItem key={lang} value={lang}>{lang}</SelectItem>
                   ))}
                 </SelectContent>
@@ -912,7 +964,17 @@ export function ResumeStep({ onNext, isSaving }: ResumeStepProps) {
                 className="flex-1 rounded-full py-6 bg-blue-600 hover:bg-blue-700 text-white text-base"
                 onClick={() => {
                   if (langName && langProficiency) {
-                    setLanguages([...languages, { name: langName, proficiency: langProficiency }]);
+                    const trimmed = langName.trim();
+                    // FIX-08 Uniqueness Check: Validate that language does not already exist
+                    const isDuplicate = languages.some(
+                      l => l.name.trim().toLowerCase() === trimmed.toLowerCase()
+                    );
+                    if (isDuplicate) {
+                      setToast({ message: "This item is already in your list", type: "error" });
+                      return;
+                    }
+
+                    setLanguages([...languages, { name: trimmed, proficiency: langProficiency }]);
                     setLangName("");
                     setLangProficiency("");
                     setIsLangModalOpen(false);

@@ -60,7 +60,9 @@ export default function UITestPage() {
           <div className="flex items-center justify-between pt-2">
             <div>
               <h2 className="text-xl font-semibold">6. Career Modal (Perfil - Career)</h2>
-              <p className="text-sm text-muted-foreground">Chronological dates: End Date &gt;= Start Date, Start Date &lt;= Today, Nullable End Date for current job.</p>
+              <p className="text-sm text-muted-foreground">
+                Chronological dates, Experience, Add Skill &amp; Add Language deduplication with uniqueness validation, UI dropdown filtering, and Toast notifications.
+              </p>
             </div>
             <CareerModal />
           </div>

@@ -315,9 +315,25 @@ function OnboardingContent() {
           ? Number(rawChildren)
           : null;
 
+      const finalLanguages =
+        Array.isArray(resumeData?.languages) && resumeData.languages.length > 0
+          ? resumeData.languages.map((l: any) => (typeof l === "string" ? l : l.name))
+          : Array.isArray(personalData?.languages)
+          ? personalData.languages
+          : [];
+
+      const finalSkills =
+        Array.isArray(resumeData?.skills) && resumeData.skills.length > 0
+          ? resumeData.skills
+          : Array.isArray(personalData?.skills)
+          ? personalData.skills
+          : [];
+
       const crewData = {
         personal: {
           ...personalData,
+          languages: finalLanguages,
+          skills: finalSkills,
           ...(parsedChildren !== null ? { children: parsedChildren } : {}),
           ...(parsedIndustryYears !== null ? { industryYears: parsedIndustryYears } : {}),
         },
@@ -325,7 +341,7 @@ function OnboardingContent() {
         ratings: ratingsRaw ? JSON.parse(ratingsRaw) : [],
         work: workRaw ? JSON.parse(workRaw) : personalData.workExperiences || [],
         resume: resumeData,
-        skills: personalData.skills || [],
+        skills: finalSkills,
       };
 
       // Fetch existing user to avoid overwriting previously selected roles with null
@@ -477,8 +493,12 @@ function OnboardingContent() {
         userProfilePayload.flightAttendantStripe = personalData?.flightAttendantStripe || null;
       } else if (isAviationPro && validProfessionalTitleKey) {
         userProfilePayload.professionalCredentials = personalData?.professionalCredentials || [];
-        userProfilePayload.spokenLanguages = personalData?.languages || [];
+        userProfilePayload.spokenLanguages = finalLanguages.length > 0 ? finalLanguages : personalData?.languages || [];
         userProfilePayload.professionalWorkExperiences = personalData?.workExperiences || [];
+      }
+
+      if (!userProfilePayload.spokenLanguages && finalLanguages.length > 0) {
+        userProfilePayload.spokenLanguages = finalLanguages;
       }
 
       const { error: userProfilesError } = await supabase

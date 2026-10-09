@@ -441,6 +441,21 @@ export async function saveSkillsAction(
       };
     }
 
+    // FIX-08: Check for duplicates in submitted skills list
+    const seenSkills = new Set<string>();
+    for (const raw of skills || []) {
+      if (typeof raw === "string" && raw.trim()) {
+        const norm = raw.trim().toLowerCase();
+        if (seenSkills.has(norm)) {
+          return {
+            success: false,
+            error: "This item is already in your list",
+          };
+        }
+        seenSkills.add(norm);
+      }
+    }
+
     const cleanedSkills = (Array.isArray(skills) ? skills : [])
       .map((s) => (typeof s === "string" ? sanitizeAndClampText(s, TEXT_LIMITS.SKILL_NAME) : ""))
       .filter((s) => Boolean(s) && !hasScriptInjection(s));
@@ -511,6 +526,118 @@ export async function saveSkillsAction(
     return {
       success: false,
       error: err?.message || "An unexpected error occurred while saving skills.",
+    };
+  }
+}
+
+export interface LanguageItemInput {
+  name: string;
+  proficiency?: string;
+}
+
+export interface SaveLanguagesResponse {
+  success: boolean;
+  error?: string;
+}
+
+/**
+ * [Web] FIX-08: Save Languages Action with Uniqueness Validation & State Sync
+ * Enforces server-side uniqueness check without silent unification loss.
+ */
+export async function saveLanguagesAction(
+  languages: Array<LanguageItemInput | string>
+): Promise<SaveLanguagesResponse> {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return {
+        success: false,
+        error: "Authentication required to update languages.",
+      };
+    }
+
+    // FIX-08: Backend Uniqueness Validation
+    const seenLangs = new Set<string>();
+    const normalizedLanguages: Array<{ name: string; proficiency: string }> = [];
+
+    for (const item of languages || []) {
+      const rawName = typeof item === "string" ? item : item?.name;
+      const proficiency = typeof item === "string" ? "Conversational" : item?.proficiency || "Conversational";
+      if (!rawName || typeof rawName !== "string" || !rawName.trim()) continue;
+
+      const trimmedName = rawName.trim();
+      const norm = trimmedName.toLowerCase();
+      if (seenLangs.has(norm)) {
+        return {
+          success: false,
+          error: "This item is already in your list",
+        };
+      }
+      seenLangs.add(norm);
+      normalizedLanguages.push({
+        name: sanitizeAndClampText(trimmedName, 60),
+        proficiency: sanitizeAndClampText(proficiency, 40),
+      });
+    }
+
+    // 1. Update resumes table
+    const { data: currentResume } = await supabase
+      .from("resumes")
+      .select("data")
+      .eq("userId", user.id)
+      .maybeSingle();
+
+    const resumeData = (currentResume?.data as any) || {};
+    const updatedPersonal = {
+      ...(resumeData.personal || {}),
+      languages: normalizedLanguages.map((l) => l.name),
+      structuredLanguages: normalizedLanguages,
+    };
+
+    const { error: upsertErr } = await supabase.from("resumes").upsert(
+      {
+        userId: user.id,
+        data: {
+          ...resumeData,
+          personal: updatedPersonal,
+          languages: normalizedLanguages,
+        },
+      },
+      { onConflict: "userId" }
+    );
+
+    if (upsertErr) {
+      console.error("[saveLanguagesAction] Error updating resumes table:", upsertErr);
+      return { success: false, error: upsertErr.message };
+    }
+
+    // 2. Update user_profiles table if spokenLanguages or languages exists
+    try {
+      await supabase
+        .from("user_profiles")
+        .update({
+          spokenLanguages: normalizedLanguages.map((l) => l.name),
+        })
+        .eq("user_id", user.id);
+    } catch (e) {
+      console.warn("[saveLanguagesAction] user_profiles update notice:", e);
+    }
+
+    revalidatePath("/", "layout");
+    revalidatePath("/profile");
+    revalidatePath("/onboarding");
+
+    return { success: true };
+  } catch (err: any) {
+    console.error("[saveLanguagesAction] Unexpected exception:", err);
+    return {
+      success: false,
+      error: err?.message || "An unexpected error occurred while saving languages.",
     };
   }
 }
