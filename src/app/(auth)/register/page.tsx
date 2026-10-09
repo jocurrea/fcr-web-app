@@ -179,6 +179,12 @@ function RegisterForm() {
     setError(null);
     setIsDuplicateEmail(false);
 
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters long.");
+      setIsLoading(false);
+      return;
+    }
+
     if (password !== confirmPassword) {
       setError("Passwords do not match. Please ensure both passwords are identical.");
       setIsLoading(false);
@@ -215,13 +221,41 @@ function RegisterForm() {
       });
 
       if (authError) {
-        const msg = authError.message.toLowerCase();
-        if (msg.includes("already registered") || msg.includes("already exists") || authError.status === 422) {
+        const msg = authError.message?.toLowerCase() || "";
+
+        // Check if error is due to weak password
+        if (
+          authError.code === "weak_password" ||
+          authError.name === "AuthWeakPasswordError" ||
+          msg.includes("weak_password") ||
+          msg.includes("weak password") ||
+          msg.includes("password should be")
+        ) {
+          setError(authError.message || "Password must be at least 8 characters long and contain a mix of uppercase, lowercase, numbers, and symbols.");
+          return;
+        }
+
+        // Check if error is duplicate user / email already registered
+        const isDuplicate =
+          authError.code === "user_already_exists" ||
+          msg.includes("already registered") ||
+          msg.includes("already exists") ||
+          (authError.status === 422 && !authError.code?.includes("password") && !msg.includes("password"));
+
+        if (isDuplicate) {
           setIsDuplicateEmail(true);
           setError("This email address is already registered in our platform.");
           return;
         }
+
         throw authError;
+      }
+
+      // Check for Supabase email enumeration prevention (empty identities means already registered)
+      if (data?.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+        setIsDuplicateEmail(true);
+        setError("This email address is already registered in our platform.");
+        return;
       }
 
       // If email confirmation is required (no session returned immediately)
@@ -484,6 +518,7 @@ function RegisterForm() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••" 
+              minLength={8}
               className="w-full pl-12 pr-12 py-3 border border-gray-300 rounded-full text-sm text-gray-900 focus:outline-none focus:border-[#2d73f5] focus:ring-1 focus:ring-[#2d73f5] bg-white"
               required
             />
@@ -499,6 +534,7 @@ function RegisterForm() {
               )}
             </button>
           </div>
+          <span className="text-[11px] text-gray-400 mt-1 ml-2">Must be at least 8 characters (letters, numbers, symbols)</span>
         </div>
 
         {/* Confirm Password */}
@@ -513,6 +549,7 @@ function RegisterForm() {
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               placeholder="••••••••" 
+              minLength={8}
               className="w-full pl-12 pr-12 py-3 border border-gray-300 rounded-full text-sm text-gray-900 focus:outline-none focus:border-[#2d73f5] focus:ring-1 focus:ring-[#2d73f5] bg-white"
               required
             />
