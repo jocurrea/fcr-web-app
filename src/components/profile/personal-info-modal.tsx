@@ -26,10 +26,24 @@ import {
   sanitizeInteger,
   validateChildren,
 } from "@/lib/validation/numeric-rules";
+import {
+  getMinAgeDateString,
+  validateDateOfBirth,
+} from "@/lib/validation/date-rules";
 
 export function PersonalInfoModal() {
   const [children, setChildren] = useState("");
   const [childrenError, setChildrenError] = useState<string | null>(null);
+  const [dateOfBirth, setDateOfBirth] = useState("");
+  const [dobError, setDobError] = useState<string | null>(null);
+  const maxDate18YearsAgo = getMinAgeDateString(18);
+
+  const handleDobChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setDateOfBirth(val);
+    const { error } = validateDateOfBirth(val, false);
+    setDobError(error);
+  };
 
   const handleChildrenChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = sanitizeInteger(e.target.value);
@@ -90,6 +104,28 @@ export function PersonalInfoModal() {
 
           <div className="space-y-1">
             <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="dob" className="text-right">
+                Date of Birth
+              </Label>
+              <Input
+                id="dob"
+                type="date"
+                max={maxDate18YearsAgo}
+                value={dateOfBirth}
+                onChange={handleDobChange}
+                className={`col-span-3 ${dobError ? "border-red-500 focus-visible:ring-red-500" : ""}`}
+              />
+            </div>
+            {dobError && (
+              <div className="grid grid-cols-4 gap-4">
+                <div />
+                <p className="col-span-3 text-red-500 text-xs mt-0.5">{dobError}</p>
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-1">
+            <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="children" className="text-right">
                 Children
               </Label>
@@ -127,7 +163,7 @@ export function PersonalInfoModal() {
           <DialogClose render={<Button type="button" variant="secondary" />}>
             Close
           </DialogClose>
-          <Button type="button" disabled={!!childrenError}>Save changes</Button>
+          <Button type="button" disabled={!!childrenError || !!dobError}>Save changes</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

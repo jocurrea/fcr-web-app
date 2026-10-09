@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { hasInvalidCharacters } from "@/lib/validation/input-restrictions";
 import { hasScriptInjection, TEXT_LIMITS, sanitizeAndClampText } from "@/lib/validation/text-limits";
 import { validateContactInfo } from "@/lib/validation/contact-rules";
+import { validateExperienceDates } from "@/lib/validation/date-rules";
 
 const MAX_SUMMARY_LENGTH = TEXT_LIMITS.SUMMARY;
 
@@ -296,6 +297,16 @@ export async function saveComplementaryInfoAction(input: SaveComplementaryInfoIn
 
     if (authError || !user) {
       return { success: false, error: "Authentication required to update profile details." };
+    }
+
+    // Chronological date validation for any provided experiences
+    for (const exp of workExperiences) {
+      if (exp.startDate) {
+        const dateRes = validateExperienceDates(exp.startDate, exp.endDate, false);
+        if (!dateRes.isValid && dateRes.error) {
+          return { success: false, error: dateRes.error };
+        }
+      }
     }
 
     const trimmedCity = typeof city === "string" ? city.trim().slice(0, TEXT_LIMITS.EXP_CITY) : "";
@@ -740,6 +751,83 @@ export async function saveContactInfoAction(input: SaveContactInfoInput) {
     return {
       success: false,
       error: err?.message || "An unexpected error occurred while saving contact information.",
+    };
+  }
+}
+
+export interface SaveCareerExperienceInput {
+  company: string;
+  role: string;
+  startDate: string;
+  endDate?: string | null;
+}
+
+/**
+ * Server Action to validate and persist Pilot/Crew career experiences.
+ * FIX-06: Enforces chronological alignment (Start_Date <= Today, End_Date >= Start_Date).
+ * Handles nullable End_Date for current employment without breaking chronology.
+ */
+export async function saveCareerExperienceAction(input: SaveCareerExperienceInput) {
+  try {
+    const { company, role, startDate, endDate } = input;
+    if (!company.trim() || !role.trim()) {
+      return { success: false, error: "Company name and role title are required." };
+    }
+
+    const dateRes = validateExperienceDates(startDate, endDate, true);
+    if (!dateRes.isValid) {
+      return { success: false, error: dateRes.error || "Invalid experience dates." };
+    }
+
+    const supabase = await createClient();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return { success: false, error: "Authentication required to update career experience." };
+    }
+
+    const { data: currentResume } = await supabase
+      .from("resumes")
+      .select("data")
+      .eq("userId", user.id)
+      .maybeSingle();
+
+    const resumeData = (currentResume?.data as any) || {};
+    const existingWork = Array.isArray(resumeData.work) ? resumeData.work : [];
+
+    const newExperience = {
+      id: `work-${Date.now()}`,
+      company: sanitizeAndClampText(company, TEXT_LIMITS.EXP_COMPANY),
+      role: sanitizeAndClampText(role, TEXT_LIMITS.EXP_TITLE),
+      startDate,
+      endDate: endDate || null,
+    };
+
+    const updatedWork = [...existingWork, newExperience];
+
+    await supabase.from("resumes").upsert(
+      {
+        userId: user.id,
+        data: {
+          ...resumeData,
+          work: updatedWork,
+        },
+      },
+      { onConflict: "userId" }
+    );
+
+    revalidatePath("/", "layout");
+    revalidatePath("/profile");
+
+    return { success: true };
+  } catch (err: any) {
+    console.error("[saveCareerExperienceAction] Error:", err);
+    return {
+      success: false,
+      error: err?.message || "An unexpected error occurred while saving career experience.",
     };
   }
 }

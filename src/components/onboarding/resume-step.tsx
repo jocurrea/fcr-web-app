@@ -34,6 +34,12 @@ import {
   validateEmail,
   validatePhone,
 } from "@/lib/validation/contact-rules";
+import {
+  getTodayDateString,
+  getMinAgeDateString,
+  validateDateOfBirth,
+  validateExperienceDates,
+} from "@/lib/validation/date-rules";
 
 interface ResumeStepProps {
   onNext: () => void;
@@ -162,24 +168,8 @@ export function ResumeStep({ onNext, isSaving }: ResumeStepProps) {
   const handleDobChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
     setDateOfBirth(val);
-    if (!val) {
-      setDobError("");
-      return;
-    }
-
-    const birthDate = new Date(val);
-    const today = new Date();
-    let age = today.getFullYear() - birthDate.getFullYear();
-    const monthDiff = today.getMonth() - birthDate.getMonth();
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-      age--;
-    }
-
-    if (age < 18) {
-      setDobError("You must be at least 18 years old.");
-    } else {
-      setDobError("");
-    }
+    const res = validateDateOfBirth(val, false);
+    setDobError(res.error || "");
   };
 
   const [isSkillModalOpen, setIsSkillModalOpen] = useState(false);
@@ -1260,10 +1250,17 @@ export function ResumeStep({ onNext, isSaving }: ResumeStepProps) {
               <Label className="text-gray-700 font-normal">Start Date</Label>
               <Input 
                 type="date"
-                className="rounded-2xl py-6"
+                max={getTodayDateString()}
+                className={cn("rounded-2xl py-6", expError && !expEndDate ? "border-red-500" : "")}
                 value={expStartDate}
-                onChange={(e) => setExpStartDate(e.target.value)}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setExpStartDate(val);
+                  const res = validateExperienceDates(val, expEndDate, false);
+                  setExpError(res.error);
+                }}
               />
+              <span className="text-gray-400 text-xs">Cannot exceed current date</span>
             </div>
 
             <div className="space-y-2">
@@ -1273,9 +1270,15 @@ export function ResumeStep({ onNext, isSaving }: ResumeStepProps) {
               </Label>
               <Input 
                 type="date"
-                className="rounded-2xl py-6"
+                min={expStartDate || undefined}
+                className={cn("rounded-2xl py-6", expError ? "border-red-500" : "")}
                 value={expEndDate}
-                onChange={(e) => setExpEndDate(e.target.value)}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setExpEndDate(val);
+                  const res = validateExperienceDates(expStartDate, val, false);
+                  setExpError(res.error);
+                }}
               />
             </div>
 
@@ -1301,7 +1304,8 @@ export function ResumeStep({ onNext, isSaving }: ResumeStepProps) {
             </Button>
             <Button 
               type="button"
-              className="flex-1 rounded-full py-6 bg-blue-600 hover:bg-blue-700 text-white text-base"
+              disabled={!!expError}
+              className="flex-1 rounded-full py-6 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white text-base"
               onClick={() => {
                 setExpError(null);
                 if (!expCompany.trim() || !expTitle.trim()) {
@@ -1310,19 +1314,10 @@ export function ResumeStep({ onNext, isSaving }: ResumeStepProps) {
                 }
 
                 if (expStartDate) {
-                  const startObj = new Date(expStartDate);
-                  const today = new Date();
-                  today.setHours(23, 59, 59, 999);
-                  if (startObj > today) {
-                    setExpError("Start date cannot be in the future.");
+                  const dateRes = validateExperienceDates(expStartDate, expEndDate, true);
+                  if (!dateRes.isValid) {
+                    setExpError(dateRes.error);
                     return;
-                  }
-                  if (expEndDate) {
-                    const endObj = new Date(expEndDate);
-                    if (endObj < startObj) {
-                      setExpError("End date cannot be earlier than start date.");
-                      return;
-                    }
                   }
                 }
 

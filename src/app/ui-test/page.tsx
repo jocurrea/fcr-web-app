@@ -3,6 +3,7 @@ import { FlightsModal } from "@/components/profile/flights-modal";
 import { ContactModal } from "@/components/profile/contact-modal";
 import { PersonalInfoModal } from "@/components/profile/personal-info-modal";
 import { WorkModal } from "@/components/profile/work-modal";
+import { CareerModal } from "@/components/profile/career-modal";
 
 export default function UITestPage() {
   return (
@@ -42,18 +43,26 @@ export default function UITestPage() {
 
           <div className="flex items-center justify-between border-b pb-4">
             <div>
-              <h2 className="text-xl font-semibold">4. Personal Info Modal</h2>
-              <p className="text-sm text-muted-foreground">Children validation and visual spacing correction on Selectors.</p>
+              <h2 className="text-xl font-semibold">4. Personal Info Modal (Perfil - Personal)</h2>
+              <p className="text-sm text-muted-foreground">Children validation (0-10) and Date of Birth (minimum 18 years age check & block future dates).</p>
             </div>
             <PersonalInfoModal />
           </div>
 
-          <div className="flex items-center justify-between pt-2">
+          <div className="flex items-center justify-between border-b pb-4">
             <div>
-              <h2 className="text-xl font-semibold">5. Work Info Modal</h2>
+              <h2 className="text-xl font-semibold">5. Work Info Modal (Perfil - Work)</h2>
               <p className="text-sm text-muted-foreground">Years in Industry: Positive integer constraint (0-65) and keypress blocking.</p>
             </div>
             <WorkModal />
+          </div>
+
+          <div className="flex items-center justify-between pt-2">
+            <div>
+              <h2 className="text-xl font-semibold">6. Career Modal (Perfil - Career)</h2>
+              <p className="text-sm text-muted-foreground">Chronological dates: End Date &gt;= Start Date, Start Date &lt;= Today, Nullable End Date for current job.</p>
+            </div>
+            <CareerModal />
           </div>
         </div>
       </div>
