@@ -30,6 +30,10 @@ import {
   sanitizeInteger,
   validateChildren,
 } from "@/lib/validation/numeric-rules";
+import {
+  validateEmail,
+  validatePhone,
+} from "@/lib/validation/contact-rules";
 
 interface ResumeStepProps {
   onNext: () => void;
@@ -74,6 +78,7 @@ export function ResumeStep({ onNext, isSaving }: ResumeStepProps) {
     return "";
   });
   const [emailError, setEmailError] = useState("");
+  const [phoneError, setPhoneError] = useState("");
 
   const [address, setAddress] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -104,20 +109,38 @@ export function ResumeStep({ onNext, isSaving }: ResumeStepProps) {
   const [childrenError, setChildrenError] = useState<string | null>(null);
 
   const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setEmail(e.target.value);
+    const val = e.target.value;
+    setEmail(val);
     if (emailError) {
-      const isValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.target.value);
-      if (isValid || e.target.value === "") {
-        setEmailError("");
-      }
+      const res = validateEmail(val, false);
+      if (res.isValid) setEmailError("");
     }
   };
 
   const handleEmailBlur = () => {
-    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      setEmailError("Please enter a valid email address");
+    if (email.trim()) {
+      const res = validateEmail(email, false);
+      setEmailError(res.error || "");
     } else {
       setEmailError("");
+    }
+  };
+
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setPhone(val);
+    if (phoneError) {
+      const res = validatePhone(val, false);
+      if (res.isValid) setPhoneError("");
+    }
+  };
+
+  const handlePhoneBlur = () => {
+    if (phone.trim()) {
+      const res = validatePhone(phone, false);
+      setPhoneError(res.error || "");
+    } else {
+      setPhoneError("");
     }
   };
 
@@ -246,6 +269,20 @@ export function ResumeStep({ onNext, isSaving }: ResumeStepProps) {
   }, [phone, email, dateOfBirth, websites, skills, languages, awards, trainingFacilities, experiences, address, summary, children]);
 
   const handleFinishLocal = () => {
+    if (phone.trim()) {
+      const pRes = validatePhone(phone, false);
+      if (!pRes.isValid && pRes.error) {
+        setPhoneError(pRes.error);
+        return;
+      }
+    }
+    if (email.trim()) {
+      const eRes = validateEmail(email, false);
+      if (!eRes.isValid && eRes.error) {
+        setEmailError(eRes.error);
+        return;
+      }
+    }
     const { error } = validateChildren(children);
     if (error) {
       setChildrenError(error);
@@ -279,13 +316,18 @@ export function ResumeStep({ onNext, isSaving }: ResumeStepProps) {
           <div className="space-y-2">
             <Label className="text-gray-700">Phone</Label>
             <Input 
-              className="rounded-2xl py-6" 
+              className={cn("rounded-2xl py-6", phoneError ? "border-red-500 focus-visible:ring-red-500" : "")} 
               value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              onInput={(e) => {
-                e.currentTarget.value = e.currentTarget.value.replace(/\D/g, "");
-              }}
+              onChange={handlePhoneChange}
+              onBlur={handlePhoneBlur}
+              placeholder="+1 234 567 8900"
             />
+            {phoneError && (
+              <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
+                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                {phoneError}
+              </p>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -296,8 +338,14 @@ export function ResumeStep({ onNext, isSaving }: ResumeStepProps) {
               value={email}
               onChange={handleEmailChange}
               onBlur={handleEmailBlur}
+              placeholder="pilot@flightcrew.com"
             />
-            {emailError && <p className="text-red-500 text-sm mt-1">{emailError}</p>}
+            {emailError && (
+              <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
+                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                {emailError}
+              </p>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -649,7 +697,7 @@ export function ResumeStep({ onNext, isSaving }: ResumeStepProps) {
       <div className="p-4 bg-white mt-auto mb-4">
         <Button 
           onClick={handleFinishLocal}
-          disabled={isSaving || !!childrenError || !!dobError || !!emailError}
+          disabled={isSaving || !!childrenError || !!dobError || !!emailError || !!phoneError}
           className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-full py-6 text-lg font-semibold"
         >
           {isSaving ? (

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { hasInvalidCharacters } from "@/lib/validation/input-restrictions";
 import { hasScriptInjection, TEXT_LIMITS, sanitizeAndClampText } from "@/lib/validation/text-limits";
+import { validateContactInfo } from "@/lib/validation/contact-rules";
 
 const MAX_SUMMARY_LENGTH = TEXT_LIMITS.SUMMARY;
 
@@ -632,6 +633,113 @@ export async function saveAvailabilityStatusAction(
     return {
       success: false,
       error: err?.message || "An unexpected error occurred while saving availability status.",
+    };
+  }
+}
+
+export interface SaveContactInfoInput {
+  phone: string;
+  email: string;
+  workCountry?: string;
+}
+
+/**
+ * Server Action to validate and persist Pilot/Crew contact info (Phone & Email).
+ * FIX-05: Prevents silent failure by actively validating format on backend.
+ */
+export async function saveContactInfoAction(input: SaveContactInfoInput) {
+  try {
+    const { phone, email, workCountry } = input;
+
+    // Backend validation using contact rules
+    const { isValid, phoneError, emailError } = validateContactInfo(phone, email, true);
+    if (!isValid) {
+      return {
+        success: false,
+        error: phoneError || emailError || "Invalid contact details.",
+      };
+    }
+
+    const trimmedPhone = phone.trim();
+    const trimmedEmail = email.trim();
+
+    const supabase = await createClient();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return { success: false, error: "Authentication required to update contact information." };
+    }
+
+    // 1. Update user_profiles
+    const userProfilePayload: Record<string, any> = {
+      contactEmail: trimmedEmail,
+      contactPhone: trimmedPhone,
+    };
+    if (workCountry) {
+      userProfilePayload.workCountry = workCountry;
+    }
+
+    try {
+      const { data: upData, error: upError } = await supabase
+        .from("user_profiles")
+        .update(userProfilePayload)
+        .eq("user_id", user.id)
+        .select();
+
+      if (!upError && (!upData || upData.length === 0)) {
+        await supabase
+          .from("user_profiles")
+          .update(userProfilePayload)
+          .eq("userId", user.id);
+      }
+    } catch (e) {
+      console.warn("[saveContactInfoAction] user_profiles update notice:", e);
+    }
+
+    // 2. Update resumes table
+    try {
+      const { data: currentResume } = await supabase
+        .from("resumes")
+        .select("data")
+        .eq("userId", user.id)
+        .maybeSingle();
+
+      const resumeData = (currentResume?.data as any) || {};
+      const updatedPersonal = {
+        ...(resumeData.personal || {}),
+        email: trimmedEmail,
+        phone: trimmedPhone,
+        contactEmail: trimmedEmail,
+        contactPhone: trimmedPhone,
+        ...(workCountry ? { workCountry } : {}),
+      };
+
+      await supabase.from("resumes").upsert(
+        {
+          userId: user.id,
+          data: {
+            ...resumeData,
+            personal: updatedPersonal,
+          },
+        },
+        { onConflict: "userId" }
+      );
+    } catch (e) {
+      console.warn("[saveContactInfoAction] resumes update notice:", e);
+    }
+
+    revalidatePath("/", "layout");
+    revalidatePath("/profile");
+
+    return { success: true };
+  } catch (err: any) {
+    console.error("[saveContactInfoAction] Unexpected error:", err);
+    return {
+      success: false,
+      error: err?.message || "An unexpected error occurred while saving contact information.",
     };
   }
 }

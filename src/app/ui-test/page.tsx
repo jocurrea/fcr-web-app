@@ -34,8 +34,8 @@ export default function UITestPage() {
 
           <div className="flex items-center justify-between border-b pb-4">
             <div>
-              <h2 className="text-xl font-semibold">3. Contact Modal</h2>
-              <p className="text-sm text-muted-foreground">Validation of phone, email, and country list (including Venezuela).</p>
+              <h2 className="text-xl font-semibold">3. Contact Modal (Perfil - Professional)</h2>
+              <p className="text-sm text-muted-foreground">Validation of phone and email (Anti-silent failure: Toast alerts, regex checks & navigation block).</p>
             </div>
             <ContactModal />
           </div>
