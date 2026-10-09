@@ -13,7 +13,6 @@ export default function LoginPage() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [termsAccepted, setTermsAccepted] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -381,26 +380,12 @@ export default function LoginPage() {
           </Link>
         </div>
 
-        {/* Terms */}
-        <div className="mt-6 flex items-start gap-2">
-          <input 
-            type="checkbox" 
-            id="terms" 
-            checked={termsAccepted}
-            onChange={(e) => setTermsAccepted(e.target.checked)}
-            className="mt-1 w-4 h-4 rounded border-gray-300 text-[#2d73f5] focus:ring-[#2d73f5]" 
-          />
-          <label htmlFor="terms" className="text-[10px] text-gray-600">
-            I agree to the <Link href="#" className="text-[#2d73f5] hover:underline">Terms & Conditions</Link>, <Link href="#" className="text-[#2d73f5] hover:underline">Community Guidelines</Link> and <Link href="#" className="text-[#2d73f5] hover:underline">Privacy Policy</Link>
-          </label>
-        </div>
-
         {/* Buttons */}
-        <div className="mt-2 w-full">
+        <div className="mt-6 w-full">
           <button 
             type="submit"
-            disabled={isLoading || !termsAccepted}
-            className={`w-full text-white font-bold text-lg py-3.5 rounded-full transition-colors ${(isLoading || !termsAccepted) ? 'bg-[#85b0fa] cursor-not-allowed' : 'bg-[#2d73f5] hover:bg-[#2d73f5]/90'}`}
+            disabled={isLoading}
+            className={`w-full text-white font-bold text-lg py-3.5 rounded-full transition-colors ${isLoading ? 'bg-[#85b0fa] cursor-not-allowed' : 'bg-[#2d73f5] hover:bg-[#2d73f5]/90'}`}
           >
             {isLoading ? 'Logging in...' : 'Login'}
           </button>
