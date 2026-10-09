@@ -17,7 +17,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
-import { Loader2, AlertCircle, CheckCircle } from "lucide-react";
+import { Loader2, AlertCircle, CheckCircle, Plus } from "lucide-react";
 import {
   isValidStrictUrl,
   sanitizeUrl,
@@ -269,6 +269,34 @@ export function ResumeStep({ onNext, isSaving }: ResumeStepProps) {
       phone, email, dateOfBirth, websites, skills, languages, awards, trainingFacilities, experiences, address, summary, children
     }));
   }, [phone, email, dateOfBirth, websites, skills, languages, awards, trainingFacilities, experiences, address, summary, children]);
+
+  // FIX-09: Nested Scrolling Resolution - Lock background view body scrolling when any modal is open
+  useEffect(() => {
+    const isAnyModalOpen =
+      isExpModalOpen ||
+      isSkillModalOpen ||
+      isLangModalOpen ||
+      isAwardModalOpen ||
+      isTrainingModalOpen ||
+      isWebsiteModalOpen ||
+      isAddingPlane;
+
+    if (isAnyModalOpen) {
+      const original = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+      return () => {
+        document.body.style.overflow = original;
+      };
+    }
+  }, [
+    isExpModalOpen,
+    isSkillModalOpen,
+    isLangModalOpen,
+    isAwardModalOpen,
+    isTrainingModalOpen,
+    isWebsiteModalOpen,
+    isAddingPlane,
+  ]);
 
   const handleFinishLocal = () => {
     if (phone.trim()) {
@@ -1131,13 +1159,19 @@ export function ResumeStep({ onNext, isSaving }: ResumeStepProps) {
       </Dialog>
 
       <Dialog open={isExpModalOpen} onOpenChange={setIsExpModalOpen}>
-        <DialogContent className="sm:max-w-[500px] bg-white p-6 rounded-3xl max-h-[90vh] flex flex-col">
-          <DialogHeader className="mb-2 shrink-0">
+        <DialogContent
+          className="sm:max-w-[540px] w-full max-h-[85vh] sm:max-h-[88vh] flex flex-col min-h-0 p-6 rounded-3xl bg-white overscroll-contain touch-pan-y overflow-hidden shadow-2xl"
+          style={{ overscrollBehavior: "contain" }}
+        >
+          <DialogHeader className="mb-1 shrink-0">
             <DialogTitle className="text-xl font-bold text-gray-900 text-left">
               Add Experience
             </DialogTitle>
           </DialogHeader>
-          <div className="flex-1 overflow-y-auto px-2 space-y-6 pb-6">
+          <div
+            className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-2 space-y-5 py-2 pr-1"
+            style={{ overscrollBehavior: "contain", WebkitOverflowScrolling: "touch" }}
+          >
             
             <div className="space-y-2">
               <div className="flex items-center justify-between">
@@ -1275,29 +1309,61 @@ export function ResumeStep({ onNext, isSaving }: ResumeStepProps) {
               </div>
             </div>
 
-            <div className="space-y-2">
+            {/* FIX-09: Planes Flown Dynamic Sub-items with Presets & Responsive Height */}
+            <div className="space-y-2 pt-1 border-t border-gray-100">
               <div className="flex items-center justify-between">
                 <Label className="text-gray-700 font-bold">Planes Flown</Label>
-                <button 
-                  type="button" 
-                  onClick={() => setIsAddingPlane(true)}
-                  className="text-blue-600 font-medium text-sm hover:text-blue-700"
-                >
-                  + Add
-                </button>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-gray-400 font-mono">{expPlanes.length} tags added</span>
+                  <button 
+                    type="button" 
+                    onClick={() => setIsAddingPlane(true)}
+                    className="text-blue-600 font-medium text-sm hover:text-blue-700 cursor-pointer"
+                  >
+                    + Add
+                  </button>
+                </div>
+              </div>
+
+              {/* Quick aircraft presets */}
+              <div className="flex flex-wrap gap-1.5 pt-0.5">
+                {["B737", "A320", "B777", "B787", "A350", "E190", "CRJ900", "C172"].map((preset) => {
+                  const isAdded = expPlanes.some((p) => p.trim().toLowerCase() === preset.toLowerCase());
+                  return (
+                    <button
+                      key={preset}
+                      type="button"
+                      disabled={isAdded}
+                      onClick={() => {
+                        if (!isAdded) {
+                          setExpPlanes([...expPlanes, preset]);
+                        }
+                      }}
+                      className={cn(
+                        "text-xs px-2.5 py-1 rounded-full border transition-all cursor-pointer flex items-center gap-1 shadow-2xs",
+                        isAdded
+                          ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed"
+                          : "bg-white text-gray-700 border-gray-200 hover:border-blue-400 hover:bg-blue-50 hover:text-blue-700"
+                      )}
+                    >
+                      <Plus className="w-3 h-3" />
+                      <span>{preset}</span>
+                    </button>
+                  );
+                })}
               </div>
 
               {expPlanes.length === 0 ? (
-                <p className="text-sm text-gray-500 mt-1">No plans added yet</p>
+                <p className="text-sm text-gray-500 mt-1 italic">No planes added yet</p>
               ) : (
-                <div className="flex flex-wrap gap-2 mt-2">
+                <div className="flex flex-wrap gap-2 mt-2 p-2 rounded-xl bg-gray-50/70 border border-gray-100">
                   {expPlanes.map((plane, i) => (
-                    <div key={i} className="px-4 py-2 bg-gray-100 text-gray-700 rounded-full text-sm flex items-center gap-2 max-w-full overflow-hidden shadow-xs">
+                    <div key={i} className="px-3 py-1.5 bg-white border border-blue-200 text-blue-700 rounded-full text-xs font-semibold flex items-center gap-1.5 max-w-full overflow-hidden shadow-2xs">
                       <span className="truncate max-w-[200px]">{plane}</span>
                       <button 
                         type="button" 
                         onClick={() => setExpPlanes(expPlanes.filter((_, index) => index !== i))}
-                        className="hover:text-red-500 transition-colors shrink-0 w-4 h-4 flex items-center justify-center font-bold"
+                        className="hover:text-red-500 transition-colors shrink-0 w-4 h-4 flex items-center justify-center font-bold cursor-pointer"
                         aria-label={`Remove ${plane}`}
                       >
                         ×
@@ -1352,9 +1418,10 @@ export function ResumeStep({ onNext, isSaving }: ResumeStepProps) {
 
           </div>
 
-          <div className="flex gap-4 pt-4 shrink-0 border-t mt-4">
+          {/* Sticky footer ensures Add and close buttons remain fully visible and clickable */}
+          <div className="flex gap-4 pt-3 shrink-0 border-t bg-white sticky bottom-0 z-10 mt-2">
             <Button 
-              type="button"
+              type="button" 
               variant="outline" 
               className="flex-1 rounded-full py-6 text-blue-600 border-blue-600 hover:bg-blue-50 text-base"
               onClick={() => {
@@ -1365,7 +1432,7 @@ export function ResumeStep({ onNext, isSaving }: ResumeStepProps) {
               close
             </Button>
             <Button 
-              type="button"
+              type="button" 
               disabled={!!expError}
               className="flex-1 rounded-full py-6 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white text-base"
               onClick={() => {
@@ -1398,7 +1465,6 @@ export function ResumeStep({ onNext, isSaving }: ResumeStepProps) {
                 ]);
                 setExpCompany("");
                 setExpCountry("");
-                setExpCountry("");
                 setExpCity("");
                 setExpTitle("");
                 setExpRole("");
@@ -1416,7 +1482,7 @@ export function ResumeStep({ onNext, isSaving }: ResumeStepProps) {
       </Dialog>
 
       <Dialog open={isAddingPlane} onOpenChange={setIsAddingPlane}>
-        <DialogContent className="sm:max-w-[500px] bg-white p-6 rounded-3xl z-[100]">
+        <DialogContent className="sm:max-w-[500px] bg-white p-6 rounded-3xl z-[100] overscroll-contain">
           <DialogHeader className="mb-2">
             <DialogTitle className="text-xl font-bold text-gray-900 text-left">
               Add Plane
@@ -1433,12 +1499,27 @@ export function ResumeStep({ onNext, isSaving }: ResumeStepProps) {
                 className="rounded-2xl py-6"
                 value={expPlaneInput}
                 onChange={(e) => setExpPlaneInput(e.target.value.slice(0, 50))}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    if (expPlaneInput.trim()) {
+                      const trimmed = expPlaneInput.trim();
+                      if (expPlanes.some(p => p.trim().toLowerCase() === trimmed.toLowerCase())) {
+                        setToast({ message: "This item is already in your list", type: "error" });
+                        return;
+                      }
+                      setExpPlanes([...expPlanes, trimmed]);
+                      setExpPlaneInput("");
+                      setIsAddingPlane(false);
+                    }
+                  }
+                }}
               />
             </div>
 
             <div className="flex gap-4">
               <Button 
-                type="button"
+                type="button" 
                 variant="outline" 
                 className="flex-1 rounded-full py-6 text-blue-600 border-blue-600 hover:bg-blue-50 text-base"
                 onClick={() => {
@@ -1449,11 +1530,16 @@ export function ResumeStep({ onNext, isSaving }: ResumeStepProps) {
                 close
               </Button>
               <Button 
-                type="button"
+                type="button" 
                 className="flex-1 rounded-full py-6 bg-blue-600 hover:bg-blue-700 text-white text-base"
                 onClick={() => {
                   if (expPlaneInput.trim()) {
-                    setExpPlanes([...expPlanes, expPlaneInput.trim()]);
+                    const trimmed = expPlaneInput.trim();
+                    if (expPlanes.some(p => p.trim().toLowerCase() === trimmed.toLowerCase())) {
+                      setToast({ message: "This item is already in your list", type: "error" });
+                      return;
+                    }
+                    setExpPlanes([...expPlanes, trimmed]);
                     setExpPlaneInput("");
                     setIsAddingPlane(false);
                   }

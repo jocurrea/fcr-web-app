@@ -61,7 +61,8 @@ export default function UITestPage() {
             <div>
               <h2 className="text-xl font-semibold">6. Career Modal (Perfil - Career)</h2>
               <p className="text-sm text-muted-foreground">
-                Chronological dates, Experience, Add Skill &amp; Add Language deduplication with uniqueness validation, UI dropdown filtering, and Toast notifications.
+                FIX-09: Nested scroll freeze resolution, dynamic modal height recalculation upon adding 5+ &quot;Planes Flown&quot; tags or long descriptions.
+                FIX-08: Add Skill &amp; Add Language deduplication, uniqueness check, UI dropdown filtering, and Toast notifications.
               </p>
             </div>
             <CareerModal />

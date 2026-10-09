@@ -887,6 +887,8 @@ export interface SaveCareerExperienceInput {
   role: string;
   startDate: string;
   endDate?: string | null;
+  planes?: string[];
+  description?: string;
 }
 
 /**
@@ -896,7 +898,7 @@ export interface SaveCareerExperienceInput {
  */
 export async function saveCareerExperienceAction(input: SaveCareerExperienceInput) {
   try {
-    const { company, role, startDate, endDate } = input;
+    const { company, role, startDate, endDate, planes = [], description = "" } = input;
     if (!company.trim() || !role.trim()) {
       return { success: false, error: "Company name and role title are required." };
     }
@@ -931,6 +933,10 @@ export async function saveCareerExperienceAction(input: SaveCareerExperienceInpu
       role: sanitizeAndClampText(role, TEXT_LIMITS.EXP_TITLE),
       startDate,
       endDate: endDate || null,
+      planes: Array.isArray(planes)
+        ? planes.map((p) => sanitizeAndClampText(p, TEXT_LIMITS.EXP_PLANE)).filter(Boolean)
+        : [],
+      description: description ? sanitizeAndClampText(description, 1000) : null,
     };
 
     const updatedWork = [...existingWork, newExperience];

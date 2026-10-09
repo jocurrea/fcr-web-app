@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Dialog,
   DialogContent,
@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -20,7 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { AlertCircle, CheckCircle, Plus, X, Globe, Briefcase, Award } from "lucide-react";
+import { AlertCircle, CheckCircle, Plus, X, Globe, Plane, Briefcase } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   getTodayDateString,
@@ -66,17 +67,26 @@ export const PREDEFINED_LANGUAGES = [
   "Yiddish", "Yoruba", "Zulu"
 ];
 
+export const PREDEFINED_PLANES = [
+  "B737", "A320", "B777", "B787", "A350", "E190", "CRJ900", "C172", "B747", "A330"
+];
+
 export function CareerModal() {
   const [isOpen, setIsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"experience" | "skills" | "languages">("experience");
 
-  // Experience state
+  // Experience state (Perfil - Career)
   const [company, setCompany] = useState("");
   const [role, setRole] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [isCurrentJob, setIsCurrentJob] = useState(false);
   const [dateError, setDateError] = useState<string | null>(null);
+
+  // FIX-09: Dynamic Sub-items - Planes Flown tags & Long Text String support
+  const [expPlanes, setExpPlanes] = useState<string[]>([]);
+  const [expPlaneInput, setExpPlaneInput] = useState("");
+  const [description, setDescription] = useState("");
 
   // Skills state (Add Skill: Pilot/Crew | Perfil - Career)
   const [skills, setSkills] = useState<string[]>([]);
@@ -93,7 +103,27 @@ export function CareerModal() {
   const [generalError, setGeneralError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
   const todayStr = getTodayDateString();
+
+  // FIX-09: Nested Scrolling Resolution - Lock background view body scrolling when modal is active
+  useEffect(() => {
+    if (isOpen) {
+      const originalOverflow = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+      return () => {
+        document.body.style.overflow = originalOverflow;
+      };
+    }
+  }, [isOpen]);
+
+  // FIX-09: Dynamic Height Calculation - Trigger smooth recalculation when sub-items are added/removed
+  useEffect(() => {
+    if (scrollAreaRef.current) {
+      // Force layout height recalculation and smooth scroll update
+      const _ = scrollAreaRef.current.scrollHeight;
+    }
+  }, [expPlanes.length, skills.length, languages.length, activeTab]);
 
   // Hydrate data on open
   useEffect(() => {
@@ -116,6 +146,18 @@ export function CareerModal() {
             typeof l === "string" ? { name: l, proficiency: "Conversational" } : l
           );
           setLanguages(normalized);
+        }
+      }
+
+      const savedWork = localStorage.getItem("onboarding_work");
+      if (savedWork) {
+        const parsedWork = JSON.parse(savedWork);
+        const experiences = Array.isArray(parsedWork.experiences) ? parsedWork.experiences : [];
+        if (experiences.length > 0) {
+          const latest = experiences[experiences.length - 1];
+          if (Array.isArray(latest.planes) && latest.planes.length > 0 && expPlanes.length === 0) {
+            setExpPlanes(latest.planes);
+          }
         }
       }
     } catch (e) {
@@ -148,6 +190,14 @@ export function CareerModal() {
             typeof l === "string" ? { name: l, proficiency: "Conversational" } : l
           );
           setLanguages(normalized);
+        }
+
+        const workList = resumeData.work || resumeData.personal?.workExperiences;
+        if (Array.isArray(workList) && workList.length > 0) {
+          const latest = workList[workList.length - 1];
+          if (Array.isArray(latest.planes) && latest.planes.length > 0 && expPlanes.length === 0) {
+            setExpPlanes(latest.planes);
+          }
         }
       } catch (err) {
         console.warn("Could not load remote career details:", err);
@@ -209,14 +259,41 @@ export function CareerModal() {
   };
 
   // =========================================================================
-  // FIX-08: Add Skill Handler with Uniqueness Check & Toast Feedback
+  // FIX-09: Add / Remove Dynamic "Planes Flown" Tags with Uniqueness Check
+  // =========================================================================
+  const handleAddPlane = (planeCandidate?: string) => {
+    const raw = planeCandidate !== undefined ? planeCandidate : expPlaneInput;
+    const trimmed = raw.trim();
+    if (!trimmed) return;
+
+    const isDuplicate = expPlanes.some(
+      (p) => p.trim().toLowerCase() === trimmed.toLowerCase()
+    );
+
+    if (isDuplicate) {
+      setToastError("This item is already in your list");
+      return;
+    }
+
+    setExpPlanes((prev) => [...prev, trimmed]);
+    setExpPlaneInput("");
+    setToastError(null);
+  };
+
+  const handleRemovePlane = (planeToRemove: string) => {
+    setExpPlanes((prev) =>
+      prev.filter((p) => p.trim().toLowerCase() !== planeToRemove.trim().toLowerCase())
+    );
+  };
+
+  // =========================================================================
+  // FIX-08: Add / Remove Skill Handlers with Uniqueness Check & Toast Feedback
   // =========================================================================
   const handleAddSkill = (skillCandidate?: string) => {
     const raw = skillCandidate !== undefined ? skillCandidate : newSkillInput;
     const trimmed = raw.trim();
     if (!trimmed) return;
 
-    // 1. Uniqueness Check: Case-insensitive check against active list
     const isDuplicate = skills.some(
       (s) => s.trim().toLowerCase() === trimmed.toLowerCase()
     );
@@ -238,13 +315,12 @@ export function CareerModal() {
   };
 
   // =========================================================================
-  // FIX-08: Add Language Handler with Uniqueness Check & Toast Feedback
+  // FIX-08: Add / Remove Language Handlers with Uniqueness Check & Toast Feedback
   // =========================================================================
   const handleAddLanguage = () => {
     const trimmed = selectedLangName.trim();
     if (!trimmed) return;
 
-    // 1. Uniqueness Check: Case-insensitive check against active list
     const isDuplicate = languages.some(
       (l) => l.name.trim().toLowerCase() === trimmed.toLowerCase()
     );
@@ -278,7 +354,7 @@ export function CareerModal() {
 
     try {
       // 1. Validate Experience if fields are filled
-      if (company.trim() || role.trim() || startDate) {
+      if (company.trim() || role.trim() || startDate || expPlanes.length > 0) {
         if (!company.trim() || !role.trim()) {
           setGeneralError("Company name and role title are required.");
           setIsSaving(false);
@@ -298,7 +374,7 @@ export function CareerModal() {
           return;
         }
 
-        // Persist experience draft locally
+        // Persist experience draft locally including dynamic sub-items (Planes Flown)
         try {
           const existingWork = localStorage.getItem("onboarding_work");
           const parsed = existingWork ? JSON.parse(existingWork) : {};
@@ -309,6 +385,8 @@ export function CareerModal() {
             startDate,
             endDate: isCurrentJob ? null : (endDate || null),
             isCurrent: isCurrentJob,
+            planes: expPlanes,
+            description: description.trim(),
           });
           localStorage.setItem("onboarding_work", JSON.stringify({ ...parsed, experiences }));
         } catch (e) {
@@ -320,6 +398,8 @@ export function CareerModal() {
           role: role.trim(),
           startDate,
           endDate: isCurrentJob ? null : (endDate || null),
+          planes: expPlanes,
+          description: description.trim(),
         });
 
         if (!resServer.success) {
@@ -380,6 +460,8 @@ export function CareerModal() {
         setStartDate("");
         setEndDate("");
         setIsCurrentJob(false);
+        setExpPlanes([]);
+        setDescription("");
         setDateError(null);
       }, 1200);
     } catch (err: any) {
@@ -396,14 +478,18 @@ export function CareerModal() {
         <DialogTrigger render={<Button variant="outline" />}>
           Edit Career Experience
         </DialogTrigger>
-        <DialogContent className="sm:max-w-[520px] max-h-[90vh] flex flex-col p-6 rounded-3xl bg-white overflow-hidden">
-          <DialogHeader className="shrink-0 mb-2">
+        <DialogContent
+          className="sm:max-w-[540px] w-full max-h-[85vh] sm:max-h-[88vh] flex flex-col min-h-0 p-6 rounded-3xl bg-white overscroll-contain touch-pan-y overflow-hidden shadow-2xl"
+          style={{ overscrollBehavior: "contain" }}
+        >
+          {/* Header (Shrink-0 to protect against scroll pushes) */}
+          <DialogHeader className="shrink-0 mb-1">
             <DialogTitle className="text-xl font-bold text-gray-900 text-left">
               Career &amp; Skills (Perfil - Career)
             </DialogTitle>
           </DialogHeader>
 
-          {/* Toast Notification Banner (FIX-08 Uniqueness Feedback) */}
+          {/* Toast Notification Banner (Uniqueness Feedback) */}
           {toastError && (
             <div
               role="alert"
@@ -438,7 +524,7 @@ export function CareerModal() {
             </div>
           )}
 
-          {/* Navigation Tabs */}
+          {/* Navigation Tabs (Shrink-0) */}
           <div className="flex border-b border-gray-100 shrink-0 gap-2 mt-1">
             <button
               type="button"
@@ -484,14 +570,20 @@ export function CareerModal() {
             </button>
           </div>
 
-          <div className="overflow-y-auto flex-1 py-3 pr-1 space-y-4">
+          {/* FIX-09: Nested Scrolling Resolution & Dynamic Height Calculation
+              Dedicated flex-1 min-h-0 overflow-y-auto container with overscroll-contain */}
+          <div
+            ref={scrollAreaRef}
+            className="flex-1 min-h-0 overflow-y-auto overscroll-contain pr-1.5 space-y-4 py-2"
+            style={{ overscrollBehavior: "contain", WebkitOverflowScrolling: "touch" }}
+          >
             {/* =========================================================================
-                TAB 1: WORK EXPERIENCE
+                TAB 1: WORK EXPERIENCE WITH PLANES FLOWN TAGS & LONG TEXT
                 ========================================================================= */}
             {activeTab === "experience" && (
               <div className="space-y-4 animate-in fade-in duration-150">
                 <div className="space-y-1">
-                  <Label htmlFor="companyName">Company</Label>
+                  <Label htmlFor="companyName" className="text-gray-700 font-medium">Company</Label>
                   <Input
                     id="companyName"
                     value={company}
@@ -502,18 +594,18 @@ export function CareerModal() {
                 </div>
 
                 <div className="space-y-1">
-                  <Label htmlFor="roleTitle">Role / Title</Label>
+                  <Label htmlFor="roleTitle" className="text-gray-700 font-medium">Role / Title</Label>
                   <Input
                     id="roleTitle"
                     value={role}
                     onChange={(e) => setRole(e.target.value)}
-                    placeholder="e.g. First Officer B737"
+                    placeholder="e.g. Captain B737-800"
                     className="rounded-xl"
                   />
                 </div>
 
                 <div className="space-y-1">
-                  <Label htmlFor="expStart">Start Date</Label>
+                  <Label htmlFor="expStart" className="text-gray-700 font-medium">Start Date</Label>
                   <Input
                     id="expStart"
                     type="date"
@@ -527,7 +619,7 @@ export function CareerModal() {
 
                 <div className="space-y-1">
                   <div className="flex items-center justify-between">
-                    <Label htmlFor="expEnd">End Date</Label>
+                    <Label htmlFor="expEnd" className="text-gray-700 font-medium">End Date</Label>
                     <label className="text-xs text-gray-500 flex items-center gap-1.5 cursor-pointer">
                       <input
                         type="checkbox"
@@ -559,6 +651,126 @@ export function CareerModal() {
                     <span>{dateError}</span>
                   </div>
                 )}
+
+                {/* =========================================================================
+                    FIX-09 TARGET COMPONENT: Dynamic Sub-items "Planes Flown"
+                    Test Case: Add 5+ "Planes Flown" tags inside Experience Modal and verify
+                    smooth scroll remains functional down to Save button.
+                    ========================================================================= */}
+                <div className="space-y-2 pt-2 border-t border-gray-100">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="planeInput" className="text-gray-800 font-semibold flex items-center gap-1.5">
+                      <Plane className="w-4 h-4 text-blue-600" />
+                      <span>Planes Flown</span>
+                    </Label>
+                    <span className="text-xs text-gray-500 font-mono">
+                      {expPlanes.length} tags added
+                    </span>
+                  </div>
+
+                  {/* Add Plane Input Field */}
+                  <div className="flex gap-2">
+                    <Input
+                      id="planeInput"
+                      placeholder="e.g. B737-800, A320, B787"
+                      value={expPlaneInput}
+                      onChange={(e) => setExpPlaneInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          handleAddPlane();
+                        }
+                      }}
+                      className="rounded-xl flex-1 text-sm"
+                    />
+                    <Button
+                      type="button"
+                      onClick={() => handleAddPlane()}
+                      className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-4 text-xs font-semibold cursor-pointer shrink-0"
+                    >
+                      <Plus className="w-3.5 h-3.5 mr-1" />
+                      Add
+                    </Button>
+                  </div>
+
+                  {/* Quick Preset Pills for 1-Click Addition */}
+                  <div className="space-y-1">
+                    <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
+                      Popular Aircraft Presets (Click to add)
+                    </span>
+                    <div className="flex flex-wrap gap-1.5 pt-0.5">
+                      {PREDEFINED_PLANES.map((preset) => {
+                        const isAdded = expPlanes.some(
+                          (p) => p.trim().toLowerCase() === preset.toLowerCase()
+                        );
+                        return (
+                          <button
+                            key={preset}
+                            type="button"
+                            disabled={isAdded}
+                            onClick={() => handleAddPlane(preset)}
+                            className={cn(
+                              "text-xs px-2.5 py-1 rounded-full border transition-all cursor-pointer flex items-center gap-1 shadow-2xs",
+                              isAdded
+                                ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed"
+                                : "bg-white text-gray-700 border-gray-200 hover:border-blue-400 hover:bg-blue-50 hover:text-blue-700"
+                            )}
+                          >
+                            <Plus className="w-3 h-3" />
+                            <span>{preset}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Dynamic Tags Container */}
+                  <div className="pt-1">
+                    {expPlanes.length === 0 ? (
+                      <p className="text-xs text-gray-400 italic">No planes added yet. Add tags above.</p>
+                    ) : (
+                      <div className="flex flex-wrap gap-2 p-2 rounded-xl bg-gray-50/70 border border-gray-100 min-h-[48px] items-center">
+                        {expPlanes.map((plane, idx) => (
+                          <span
+                            key={`${plane}-${idx}`}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white border border-blue-200 text-blue-700 text-xs font-semibold shadow-2xs animate-in zoom-in-95 duration-150"
+                          >
+                            <span>{plane}</span>
+                            <button
+                              type="button"
+                              onClick={() => handleRemovePlane(plane)}
+                              className="hover:bg-red-50 hover:text-red-600 rounded-full p-0.5 text-gray-400 transition-colors cursor-pointer"
+                              aria-label={`Remove ${plane}`}
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Long Text String Support: Description / Key Achievements */}
+                <div className="space-y-1.5 pt-2 border-t border-gray-100">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="expDesc" className="text-gray-800 font-semibold">
+                      Responsibilities &amp; Achievements
+                    </Label>
+                    <span className="text-xs text-gray-400 font-mono">
+                      {description.length}/1000
+                    </span>
+                  </div>
+                  <Textarea
+                    id="expDesc"
+                    rows={4}
+                    maxLength={1000}
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder="Enter detailed experience notes or flight operations responsibilities..."
+                    className="rounded-xl text-sm resize-none"
+                  />
+                </div>
               </div>
             )}
 
@@ -583,12 +795,12 @@ export function CareerModal() {
                           handleAddSkill();
                         }
                       }}
-                      className="rounded-xl flex-1"
+                      className="rounded-xl flex-1 text-sm"
                     />
                     <Button
                       type="button"
                       onClick={() => handleAddSkill()}
-                      className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-4 cursor-pointer"
+                      className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-4 cursor-pointer text-xs font-semibold"
                     >
                       <Plus className="w-4 h-4 mr-1" />
                       Add
@@ -698,7 +910,7 @@ export function CareerModal() {
                     type="button"
                     onClick={handleAddLanguage}
                     disabled={!selectedLangName}
-                    className="w-full mt-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl cursor-pointer"
+                    className="w-full mt-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl cursor-pointer text-xs font-semibold"
                   >
                     <Plus className="w-4 h-4 mr-1.5" />
                     Add Language
@@ -744,8 +956,9 @@ export function CareerModal() {
             )}
           </div>
 
-          <DialogFooter className="sm:justify-end gap-2 pt-3 border-t border-gray-100 shrink-0">
-            <DialogClose render={<Button type="button" variant="secondary" />}>
+          {/* Sticky Pinned Footer with Save Button (shrink-0 ensures it is always visible) */}
+          <DialogFooter className="shrink-0 pt-3 border-t border-gray-100 bg-white sticky bottom-0 z-10 sm:justify-end gap-2 mt-2">
+            <DialogClose render={<Button type="button" variant="secondary" className="rounded-xl" />}>
               Close
             </DialogClose>
             <Button
