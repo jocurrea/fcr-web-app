@@ -295,7 +295,7 @@ export default function LoginPage() {
       </div>
 
       {/* Form */}
-      <form className="flex flex-col gap-4 flex-1" onSubmit={handleLogin}>
+      <form className="flex flex-col gap-4 flex-1" noValidate onSubmit={handleLogin}>
         
         {/* Email */}
         <div className="flex flex-col">

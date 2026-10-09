@@ -6,6 +6,7 @@ import { ChevronLeft, Lock, EyeOff, Eye, AlertCircle, Building2, CheckCircle2, M
 import { useState, useEffect, Suspense } from "react";
 import { supabase } from "@/lib/supabase";
 import { validatePassword } from "@/lib/validation/password-rules";
+import { validateEmail } from "@/lib/validation/contact-rules";
 
 // Helper to thoroughly purge any stale session cache, tokens, and storage
 async function clearStaleSessionCache() {
@@ -180,6 +181,25 @@ function RegisterForm() {
     setError(null);
     setIsDuplicateEmail(false);
 
+    if (!email || !email.trim()) {
+      setError("Please enter your email address.");
+      setIsLoading(false);
+      return;
+    }
+
+    const emailValidation = validateEmail(email.trim(), true);
+    if (!emailValidation.isValid) {
+      setError(emailValidation.error || "Please enter a valid email address.");
+      setIsLoading(false);
+      return;
+    }
+
+    if (!password) {
+      setError("Please enter a password.");
+      setIsLoading(false);
+      return;
+    }
+
     const passwordValidation = validatePassword(password);
     if (!passwordValidation.isValid) {
       setError(passwordValidation.error || "Password does not meet security requirements.");
@@ -187,8 +207,20 @@ function RegisterForm() {
       return;
     }
 
+    if (!confirmPassword) {
+      setError("Please confirm your password.");
+      setIsLoading(false);
+      return;
+    }
+
     if (password !== confirmPassword) {
       setError("Passwords do not match. Please ensure both passwords are identical.");
+      setIsLoading(false);
+      return;
+    }
+
+    if (!termsAccepted) {
+      setError("Please agree to the Terms & Conditions and Privacy Policy to continue.");
       setIsLoading(false);
       return;
     }
@@ -482,7 +514,7 @@ function RegisterForm() {
       </div>
 
       {/* Form */}
-      <form className="flex flex-col gap-4 flex-1" onSubmit={handleRegister}>
+      <form className="flex flex-col gap-4 flex-1" noValidate onSubmit={handleRegister}>
         
         {/* Email */}
         <div className="flex flex-col">
@@ -503,7 +535,6 @@ function RegisterForm() {
               }}
               placeholder="email@example.com" 
               className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-full text-sm text-gray-900 focus:outline-none focus:border-[#2d73f5] focus:ring-1 focus:ring-[#2d73f5] bg-white"
-              required
             />
           </div>
         </div>
@@ -520,9 +551,7 @@ function RegisterForm() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••" 
-              minLength={8}
               className="w-full pl-12 pr-12 py-3 border border-gray-300 rounded-full text-sm text-gray-900 focus:outline-none focus:border-[#2d73f5] focus:ring-1 focus:ring-[#2d73f5] bg-white"
-              required
             />
             <button 
               type="button"
@@ -551,9 +580,7 @@ function RegisterForm() {
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               placeholder="••••••••" 
-              minLength={8}
               className="w-full pl-12 pr-12 py-3 border border-gray-300 rounded-full text-sm text-gray-900 focus:outline-none focus:border-[#2d73f5] focus:ring-1 focus:ring-[#2d73f5] bg-white"
-              required
             />
             <button 
               type="button"
@@ -577,7 +604,6 @@ function RegisterForm() {
             checked={termsAccepted}
             onChange={(e) => setTermsAccepted(e.target.checked)}
             className="mt-1 w-4 h-4 rounded border-gray-300 text-[#2d73f5] focus:ring-[#2d73f5]" 
-            required
           />
           <label htmlFor="terms" className="text-[10px] text-gray-600">
             I agree to the <Link href="#" className="text-[#2d73f5] hover:underline">Terms & Conditions</Link>, <Link href="#" className="text-[#2d73f5] hover:underline">Community Guidelines</Link> and <Link href="#" className="text-[#2d73f5] hover:underline">Privacy Policy</Link>

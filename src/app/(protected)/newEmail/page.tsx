@@ -229,7 +229,7 @@ export default function NewEmailPage() {
             )}
 
             {/* Form */}
-            <form className="flex flex-col w-full flex-1" onSubmit={handleSubmit}>
+            <form className="flex flex-col w-full flex-1" noValidate onSubmit={handleSubmit}>
               <div className="space-y-4">
                 {/* Current Email (Read-Only) */}
                 <div className="flex flex-col">
