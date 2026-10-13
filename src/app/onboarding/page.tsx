@@ -462,8 +462,6 @@ function OnboardingContent() {
 
       const userProfilePayload: any = {
         userId,
-        // Strict: only 'active' or 'available_for_work' are accepted by the DB check constraint
-        workAvailabilityStatus: finalAvailabilityStatus,
         contactEmail: personalData?.email || session.user.email,
         contactPhone: personalData?.phone || null,
         locationCity: personalData?.city || personalData?.location || "Miami",
@@ -495,10 +493,14 @@ function OnboardingContent() {
           workData?.flightAttendantStripe ||
           workData?.crewRole ||
           null;
-      } else if (isAviationPro && validProfessionalTitleKey) {
-        userProfilePayload.professionalCredentials = personalData?.professionalCredentials || [];
-        userProfilePayload.spokenLanguages = finalLanguages.length > 0 ? finalLanguages : personalData?.languages || [];
-        userProfilePayload.professionalWorkExperiences = personalData?.workExperiences || [];
+      } else if (isAviationPro) {
+        // Strict: workAvailabilityStatus is only valid and allowed for Aviation Professionals in the database
+        userProfilePayload.workAvailabilityStatus = finalAvailabilityStatus;
+        if (validProfessionalTitleKey) {
+          userProfilePayload.professionalCredentials = personalData?.professionalCredentials || [];
+          userProfilePayload.spokenLanguages = finalLanguages.length > 0 ? finalLanguages : personalData?.languages || [];
+          userProfilePayload.professionalWorkExperiences = personalData?.workExperiences || [];
+        }
       }
 
       if (!userProfilePayload.spokenLanguages && finalLanguages.length > 0) {
