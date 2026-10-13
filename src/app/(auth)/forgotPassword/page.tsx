@@ -2,29 +2,76 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, Lock, Mail } from "lucide-react";
+import { ChevronLeft, Lock, Mail, Loader2 } from "lucide-react";
 import Link from "next/link";
+import { supabase } from "@/lib/supabase";
 
 export default function ForgotPasswordPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [resendStatus, setResendStatus] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSubmitted(true);
-    const successMsg = "A verification link has been sent to your email. Please check your inbox.";
-    if (typeof window !== "undefined" && typeof window.alert === "function") {
-      alert(successMsg);
+    if (!email.trim() || isLoading) return;
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const origin = typeof window !== "undefined" ? window.location.origin : "";
+      const redirectTo = `${origin}/auth/callback?next=/reset-password`;
+
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo,
+      });
+
+      if (resetError) {
+        setError(resetError.message);
+        setIsLoading(false);
+        return;
+      }
+
+      setIsSubmitted(true);
+    } catch (err: any) {
+      setError(err?.message || "Failed to send reset link. Please try again.");
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const handleResend = () => {
-    setResendStatus("Verification link resent successfully!");
-    setTimeout(() => {
-      setResendStatus(null);
-    }, 4000);
+  const handleResend = async () => {
+    if (!email.trim() || isLoading) return;
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const origin = typeof window !== "undefined" ? window.location.origin : "";
+      const redirectTo = `${origin}/auth/callback?next=/reset-password`;
+
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo,
+      });
+
+      if (resetError) {
+        setError(resetError.message);
+        setIsLoading(false);
+        return;
+      }
+
+      setResendStatus("Verification link resent successfully! Please check your inbox.");
+      setTimeout(() => {
+        setResendStatus(null);
+      }, 5000);
+    } catch (err: any) {
+      setError(err?.message || "Failed to resend reset link.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -57,6 +104,12 @@ export default function ForgotPasswordPage() {
             <p className="text-[11px] text-gray-500 mt-2">Please enter your email to continue</p>
           </div>
 
+          {error && (
+            <div className="mb-4 p-3 text-xs text-red-700 bg-red-50 border border-red-200 rounded-xl text-center">
+              {error}
+            </div>
+          )}
+
           {/* Form */}
           <form className="flex flex-col flex-1" onSubmit={handleSubmit}>
             {/* Email */}
@@ -83,9 +136,10 @@ export default function ForgotPasswordPage() {
             <div className="mt-auto pt-8 pb-4">
               <button 
                 type="submit"
-                className="w-full bg-[#1a73e8] hover:bg-[#1557b0] text-white font-semibold text-lg py-3.5 rounded-full transition-colors"
+                disabled={isLoading}
+                className="w-full bg-[#1a73e8] hover:bg-[#1557b0] text-white font-semibold text-lg py-3.5 rounded-full transition-colors flex items-center justify-center disabled:opacity-50"
               >
-                Submit
+                {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Submit"}
               </button>
             </div>
           </form>
@@ -112,6 +166,12 @@ export default function ForgotPasswordPage() {
             A verification link has been sent to your email. Please check your inbox.
           </div>
 
+          {error && (
+            <div className="mb-4 p-3 text-xs text-red-700 bg-red-50 border border-red-200 rounded-xl text-center">
+              {error}
+            </div>
+          )}
+
           {resendStatus && (
             <div className="mb-4 p-3 text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded-xl text-center">
               {resendStatus}
@@ -128,10 +188,11 @@ export default function ForgotPasswordPage() {
             </Link>
             <button 
               type="button"
+              disabled={isLoading}
               onClick={handleResend}
-              className="w-full bg-transparent hover:bg-gray-100 text-[#1a73e8] font-semibold text-base py-2.5 rounded-full transition-colors text-center"
+              className="w-full bg-transparent hover:bg-gray-100 text-[#1a73e8] font-semibold text-base py-2.5 rounded-full transition-colors text-center disabled:opacity-50"
             >
-              Resend email
+              {isLoading ? "Sending..." : "Resend email"}
             </button>
           </div>
         </div>
