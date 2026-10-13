@@ -1341,8 +1341,8 @@ export default function ProfilePage() {
                   <p className="text-[14px] text-gray-600 mb-1">Work experience</p>
                   <p className="text-[14px] text-gray-400">
                     {workExperiences.length > 0
-                      ? (workExperiences[0]?.roleTitle || workExperiences[0]?.jobTitle
-                          ? `${workExperiences[0].roleTitle || workExperiences[0].jobTitle}${workExperiences.length > 1 ? ` (+${workExperiences.length - 1})` : ""}`
+                      ? (workExperiences[0]?.roleTitle || workExperiences[0]?.jobTitle || workExperiences[0]?.role
+                          ? `${workExperiences[0].roleTitle || workExperiences[0].jobTitle || workExperiences[0].role}${workExperiences.length > 1 ? ` (+${workExperiences.length - 1})` : ""}`
                           : "Added")
                       : "Not added"}
                   </p>

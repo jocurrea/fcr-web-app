@@ -8,6 +8,7 @@ import { revalidateProfileLayout } from "@/actions/profile";
 import { sanitizeUrl } from "@/lib/validation/url-validation";
 import { sanitizeAndClampText, TEXT_LIMITS, hasScriptInjection } from "@/lib/validation/text-limits";
 import { validateChildren, validateYearsInIndustry } from "@/lib/validation/numeric-rules";
+import { normalizeProfessionalWorkExperiences } from "@/lib/validation/experience-normalizer";
 import { ChevronLeft } from "lucide-react";
 
 // Flight Crew Steps
@@ -499,7 +500,8 @@ function OnboardingContent() {
         if (validProfessionalTitleKey) {
           userProfilePayload.professionalCredentials = personalData?.professionalCredentials || [];
           userProfilePayload.spokenLanguages = finalLanguages.length > 0 ? finalLanguages : personalData?.languages || [];
-          userProfilePayload.professionalWorkExperiences = personalData?.workExperiences || [];
+          const rawWork = personalData?.workExperiences || (workRaw ? JSON.parse(workRaw) : []);
+          userProfilePayload.professionalWorkExperiences = normalizeProfessionalWorkExperiences(rawWork);
         }
       }
 
@@ -507,9 +509,19 @@ function OnboardingContent() {
         userProfilePayload.spokenLanguages = finalLanguages;
       }
 
-      const { error: userProfilesError } = await supabase
+      let { error: userProfilesError } = await supabase
         .from("user_profiles")
         .upsert(userProfilePayload, { onConflict: "userId" });
+
+      // Fallback: If check constraint on professionalWorkExperiences still failed, retry with empty array []
+      if (userProfilesError && userProfilesError.message?.includes("user_profiles_professional_work_experiences_check")) {
+        console.warn("[Onboarding] Retrying user_profiles upsert with empty professionalWorkExperiences fallback...");
+        userProfilePayload.professionalWorkExperiences = [];
+        const retryRes = await supabase
+          .from("user_profiles")
+          .upsert(userProfilePayload, { onConflict: "userId" });
+        userProfilesError = retryRes.error;
+      }
 
       if (userProfilesError) {
         console.error("[Onboarding] STEP 2 – user_profiles upsert FAILED:", userProfilesError);

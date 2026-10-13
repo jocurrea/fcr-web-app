@@ -1070,10 +1070,10 @@ export function ComplementaryInfoStep({ onNext, onBack, onSkip }: ComplementaryI
                       </div>
                       <div className="flex flex-col min-w-0">
                         <span className="text-xs sm:text-sm font-bold text-gray-900 truncate">
-                          {exp.roleTitle || "Aviation Role"}
+                          {exp.roleTitle || (exp as any).role || "Aviation Role"}
                         </span>
                         <span className="text-xs text-gray-500 truncate">
-                          {exp.companyName} {exp.startDate ? `(${exp.startDate} - ${exp.endDate || "Present"})` : ""}
+                          {exp.companyName || (exp as any).company} {exp.startDate ? `(${exp.startDate} - ${exp.endDate || "Present"})` : ""}
                         </span>
                       </div>
                     </div>

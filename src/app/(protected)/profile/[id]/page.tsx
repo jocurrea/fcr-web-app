@@ -236,7 +236,7 @@ export default function PublicProfilePage() {
   let experienceValue = "7+ years • Senior Operations Officer at Global Airways";
   if (workExperiences.length > 0) {
     const firstExp = workExperiences[0];
-    const expParts = [firstExp.roleTitle, firstExp.companyName].filter(Boolean);
+    const expParts = [firstExp.roleTitle || firstExp.role, firstExp.companyName || firstExp.company].filter(Boolean);
     if (expParts.length > 0) {
       const dateRange = [firstExp.startDate, firstExp.endDate].filter(Boolean).join(" - ");
       experienceValue = `${expParts.join(" at ")}${dateRange ? ` (${dateRange})` : ""}`;
