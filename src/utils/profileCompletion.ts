@@ -319,21 +319,21 @@ export function computeProfileAreas(data: ProfileAreasInput) {
       label: "Work and qualifications",
       desc: "Complete your work location, experience, and role details.",
       isDone: isWorkQualificationsDone,
-      step: 2,
+      step: 4,
     },
     {
       key: "professional_profile",
       label: "Professional profile",
       desc: "Complete your contact details, summary, and English proficiency.",
       isDone: isProfessionalDone,
-      step: 1,
+      step: 5,
     },
     {
       key: "career_skills",
       label: "Career and skills",
       desc: "Add experience, training, languages, and at least one skill.",
       isDone: isCareerSkillsDone,
-      step: 4,
+      step: 5,
     },
   ];
 

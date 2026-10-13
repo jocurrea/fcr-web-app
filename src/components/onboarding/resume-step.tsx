@@ -50,11 +50,35 @@ export function ResumeStep({ onNext, isSaving }: ResumeStepProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // Scroll to top of the container
+    // Check if deep-link section query param or hash exists
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      const section = urlParams.get("section") || (typeof window !== "undefined" ? window.location.hash.replace("#", "") : "");
+      if (section === "career" || section === "skills" || section === "experience") {
+        setTimeout(() => {
+          const el = document.getElementById("skills-section") || document.getElementById("experience-section");
+          if (el) {
+            el.scrollIntoView({ behavior: "smooth", block: "start" });
+          }
+        }, 300);
+        return;
+      } else if (section === "professional" || section === "summary" || section === "contact") {
+        setTimeout(() => {
+          const el = document.getElementById("summary-section") || document.getElementById("contact-section");
+          if (el) {
+            el.scrollIntoView({ behavior: "smooth", block: "start" });
+          }
+        }, 300);
+        return;
+      }
+    } catch (e) {
+      console.error("Error parsing section param in ResumeStep:", e);
+    }
+
+    // Default: Scroll to top of the container
     if (scrollContainerRef.current) {
       scrollContainerRef.current.scrollTop = 0;
     }
-    // Also scroll the window just in case
     window.scrollTo(0, 0);
   }, []);
 
@@ -366,7 +390,7 @@ export function ResumeStep({ onNext, isSaving }: ResumeStepProps) {
       <div ref={scrollContainerRef} className="flex-1 overflow-y-auto px-4 pb-20 space-y-6 min-h-0">
         
         {/* Contact Section */}
-        <div className="space-y-4">
+        <div id="contact-section" className="space-y-4">
           <h2 className="text-xl font-bold text-gray-900">Contact</h2>
           
           <div className="space-y-2">
@@ -442,7 +466,7 @@ export function ResumeStep({ onNext, isSaving }: ResumeStepProps) {
         </div>
 
         {/* Summary Section */}
-        <div className="space-y-4 pt-2">
+        <div id="summary-section" className="space-y-4 pt-2">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-bold text-gray-900">Summary</h2>
             <span className="text-xs text-gray-400 font-mono">{summary.length}/1000</span>
@@ -457,7 +481,7 @@ export function ResumeStep({ onNext, isSaving }: ResumeStepProps) {
         </div>
 
         {/* Top Skills Section */}
-        <div className="space-y-4 pt-2">
+        <div id="skills-section" className="space-y-4 pt-2">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-bold text-gray-900">Top Skills</h2>
             <button 
@@ -684,7 +708,7 @@ export function ResumeStep({ onNext, isSaving }: ResumeStepProps) {
         </div>
 
         {/* Experience Section */}
-        <div className="space-y-4 pt-2">
+        <div id="experience-section" className="space-y-4 pt-2">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-bold text-gray-900">Experience</h2>
             <button 

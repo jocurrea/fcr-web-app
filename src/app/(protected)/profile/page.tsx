@@ -260,22 +260,23 @@ export default function ProfilePage() {
     if (isFlightCrew) {
       switch (key) {
         case "personal_profile":
-        case "professional_profile":
         case "photo":
         case "location":
           return 1;
-        case "work_qualifications":
         case "licenses":
           return 2;
         case "aircraft_ratings":
         case "ratings":
           return 3;
-        case "career_skills":
+        case "work_qualifications":
         case "work":
           return 4;
+        case "professional_profile":
+          return "5&section=professional";
+        case "career_skills":
         case "languages":
         case "skills":
-          return 5;
+          return "5&section=career";
         case "company_affiliation":
           return 5;
         default:
@@ -293,29 +294,32 @@ export default function ProfilePage() {
       case "about_me":
       case "professional_profile":
         return 3;
-      case "work_availability":
-        return 1;
       case "contact_credentials":
-      case "work_qualifications":
       case "licenses":
         return 4;
       case "location":
         return "5&section=location";
       case "languages":
         return "5&section=languages";
+      case "work_qualifications":
       case "work_experience":
       case "work":
         return "5&section=work";
+      case "career_skills":
       case "skills":
       case "skills_expertise":
         return 6;
+      case "work_availability":
+        return 7;
       default:
         return 5;
     }
   };
 
   const getMissingAreaLink = (item: any) => {
-    return `/onboarding?edit=true&step=${getOnboardingStep(item.key)}`;
+    const stepParam = getOnboardingStep(item.key);
+    const cat = isFlightCrew ? "flight_crew" : "aviation_professional";
+    return `/onboarding?edit=true&step=${stepParam}&category=${cat}`;
   };
 
   const PENDING_AREA_SUBTITLES: Record<string, string> = {
@@ -1453,7 +1457,7 @@ export default function ProfilePage() {
             {/* PILOT BADGE / WINGS CARD */}
             <div className="bg-white rounded-[20px] p-5 shadow-sm border border-gray-100 mb-4 relative">
               <button 
-                onClick={() => router.push("/onboarding?edit=true&step=1")}
+                onClick={() => router.push("/onboarding?edit=true&step=1&category=flight_crew")}
                 className="absolute top-4 right-4 text-blue-600 font-semibold text-sm cursor-pointer"
               >
                 Edit
@@ -1481,7 +1485,7 @@ export default function ProfilePage() {
               <div className="flex justify-between items-start mb-6">
                 <h3 className="text-lg font-bold text-gray-900">Licenses</h3>
                 <button 
-                  onClick={() => router.push("/onboarding?edit=true&step=2")}
+                  onClick={() => router.push("/onboarding?edit=true&step=2&category=flight_crew")}
                   className="text-blue-600 font-semibold text-sm cursor-pointer"
                 >
                   Manage
