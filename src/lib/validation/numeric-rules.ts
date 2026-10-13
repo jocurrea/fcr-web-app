@@ -12,7 +12,7 @@ export const NUMERIC_LIMITS = {
   CHILDREN: { min: 0, max: 10 },
   YEARS_IN_INDUSTRY: { min: 0, max: 65 },
   FOUNDED_YEAR: {
-    min: 0,
+    min: 1900,
     get max() {
       return new Date().getFullYear();
     },
