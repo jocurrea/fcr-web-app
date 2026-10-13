@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronLeft, Lock, Eye, EyeOff, CheckCircle2, Loader2 } from "lucide-react";
 import Link from "next/link";
@@ -16,6 +16,40 @@ export default function ResetPasswordPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSuccess, setIsSuccess] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    // Handle hash fragments from Supabase recovery redirect
+    const hash = window.location.hash;
+    if (hash && hash.includes("access_token")) {
+      const hashParams = new URLSearchParams(hash.replace(/^#/, ""));
+      const accessToken = hashParams.get("access_token");
+      const refreshToken = hashParams.get("refresh_token");
+      if (accessToken && refreshToken) {
+        supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken,
+        }).catch((err) => {
+          console.warn("Session set notice:", err);
+        });
+      }
+    }
+
+    // Handle code query param
+    const searchParams = new URLSearchParams(window.location.search);
+    const code = searchParams.get("code");
+    if (code) {
+      supabase.auth.exchangeCodeForSession(code).catch((err) => {
+        console.warn("Code exchange notice:", err);
+      });
+    }
+
+    const errorDesc = searchParams.get("error_description");
+    if (errorDesc) {
+      setError(errorDesc.replace(/\+/g, " "));
+    }
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
