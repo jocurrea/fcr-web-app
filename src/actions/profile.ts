@@ -60,6 +60,14 @@ export async function saveProfessionalSummaryAction(summary: string) {
       };
     }
 
+    // 4. Backend validation: Emoji & special character restrictions
+    if (hasInvalidCharacters(trimmed)) {
+      return {
+        success: false,
+        error: "Only letters, numbers, spaces, and standard punctuation are allowed. Emojis and special characters are not permitted.",
+      };
+    }
+
     // 3. User authentication check
     const supabase = await createClient();
     const {

@@ -32,6 +32,10 @@ import {
   saveSkillsAction,
   saveLanguagesAction,
 } from "@/actions/profile";
+import {
+  hasInvalidCharacters,
+  RESTRICTED_INPUT_ERROR_MSG,
+} from "@/lib/validation/input-restrictions";
 import { supabase } from "@/lib/supabase";
 
 export const PREDEFINED_SKILLS = [
@@ -266,6 +270,11 @@ export function CareerModal() {
     const trimmed = raw.trim();
     if (!trimmed) return;
 
+    if (hasInvalidCharacters(trimmed)) {
+      setToastError(RESTRICTED_INPUT_ERROR_MSG);
+      return;
+    }
+
     const isDuplicate = expPlanes.some(
       (p) => p.trim().toLowerCase() === trimmed.toLowerCase()
     );
@@ -293,6 +302,11 @@ export function CareerModal() {
     const raw = skillCandidate !== undefined ? skillCandidate : newSkillInput;
     const trimmed = raw.trim();
     if (!trimmed) return;
+
+    if (hasInvalidCharacters(trimmed)) {
+      setToastError(RESTRICTED_INPUT_ERROR_MSG);
+      return;
+    }
 
     const isDuplicate = skills.some(
       (s) => s.trim().toLowerCase() === trimmed.toLowerCase()
@@ -357,6 +371,24 @@ export function CareerModal() {
       if (company.trim() || role.trim() || startDate || expPlanes.length > 0) {
         if (!company.trim() || !role.trim()) {
           setGeneralError("Company name and role title are required.");
+          setIsSaving(false);
+          return;
+        }
+
+        if (hasInvalidCharacters(company.trim())) {
+          setGeneralError("Only letters, numbers, spaces, and standard punctuation are allowed. Emojis and special characters are not permitted in company name.");
+          setIsSaving(false);
+          return;
+        }
+
+        if (hasInvalidCharacters(role.trim())) {
+          setGeneralError("Only letters, numbers, spaces, and standard punctuation are allowed. Emojis and special characters are not permitted in role.");
+          setIsSaving(false);
+          return;
+        }
+
+        if (description.trim() && hasInvalidCharacters(description.trim())) {
+          setGeneralError("Only letters, numbers, spaces, and standard punctuation are allowed. Emojis and special characters are not permitted in description.");
           setIsSaving(false);
           return;
         }

@@ -127,6 +127,7 @@ export default function ResetPasswordPage() {
           )}
 
           {/* Form */}
+          {/* Form */}
           <form className="flex flex-col flex-1" onSubmit={handleSubmit}>
             {/* New Password */}
             <div className="flex flex-col mb-4">
@@ -151,9 +152,44 @@ export default function ResetPasswordPage() {
                   {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
               </div>
-              <p className="text-[11px] text-gray-400 mt-1 ml-2">
-                Min 8 characters, with 1 uppercase, 1 lowercase, 1 number, and 1 special char.
-              </p>
+
+              {/* Password Requirements Checklist */}
+              {password.length > 0 && (() => {
+                const val = validatePassword(password);
+                return (
+                  <div className="mt-3 p-3 bg-gray-50 border border-gray-200 rounded-2xl space-y-1.5 text-xs animate-in fade-in">
+                    <p className="font-semibold text-gray-700 mb-1 text-[11px]">
+                      Password Security Requirements:
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-[11px]">
+                      <div className={`flex items-center gap-1.5 ${val.reasons.length ? "text-emerald-600 font-medium" : "text-gray-500"}`}>
+                        <CheckCircle2 className={`w-3.5 h-3.5 shrink-0 ${val.reasons.length ? "text-emerald-500" : "text-gray-300"}`} />
+                        <span>At least 8 characters</span>
+                      </div>
+                      <div className={`flex items-center gap-1.5 ${val.reasons.uppercase ? "text-emerald-600 font-medium" : "text-gray-500"}`}>
+                        <CheckCircle2 className={`w-3.5 h-3.5 shrink-0 ${val.reasons.uppercase ? "text-emerald-500" : "text-gray-300"}`} />
+                        <span>1 uppercase letter (A-Z)</span>
+                      </div>
+                      <div className={`flex items-center gap-1.5 ${val.reasons.lowercase ? "text-emerald-600 font-medium" : "text-gray-500"}`}>
+                        <CheckCircle2 className={`w-3.5 h-3.5 shrink-0 ${val.reasons.lowercase ? "text-emerald-500" : "text-gray-300"}`} />
+                        <span>1 lowercase letter (a-z)</span>
+                      </div>
+                      <div className={`flex items-center gap-1.5 ${val.reasons.number ? "text-emerald-600 font-medium" : "text-gray-500"}`}>
+                        <CheckCircle2 className={`w-3.5 h-3.5 shrink-0 ${val.reasons.number ? "text-emerald-500" : "text-gray-300"}`} />
+                        <span>1 number (0-9)</span>
+                      </div>
+                      <div className={`flex items-center gap-1.5 ${val.reasons.specialChar ? "text-emerald-600 font-medium" : "text-gray-500"}`}>
+                        <CheckCircle2 className={`w-3.5 h-3.5 shrink-0 ${val.reasons.specialChar ? "text-emerald-500" : "text-gray-300"}`} />
+                        <span>1 special character</span>
+                      </div>
+                      <div className={`flex items-center gap-1.5 ${val.reasons.notOnlySpaces ? "text-emerald-600 font-medium" : "text-gray-500"}`}>
+                        <CheckCircle2 className={`w-3.5 h-3.5 shrink-0 ${val.reasons.notOnlySpaces ? "text-emerald-500" : "text-gray-300"}`} />
+                        <span>No whitespace-only</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Confirm Password */}
@@ -179,14 +215,17 @@ export default function ResetPasswordPage() {
                   {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
               </div>
+              {confirmPassword.length > 0 && password !== confirmPassword && (
+                <p className="text-[11px] text-red-500 mt-1 ml-2">Passwords do not match</p>
+              )}
             </div>
 
             {/* Submit Button */}
             <div className="mt-auto pt-8 pb-4">
               <button
                 type="submit"
-                disabled={isLoading}
-                className="w-full bg-[#1a73e8] hover:bg-[#1557b0] text-white font-semibold text-lg py-3.5 rounded-full transition-colors flex items-center justify-center disabled:opacity-50"
+                disabled={isLoading || !validatePassword(password).isValid || password !== confirmPassword}
+                className="w-full bg-[#1a73e8] hover:bg-[#1557b0] text-white font-semibold text-lg py-3.5 rounded-full transition-colors flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Update Password"}
               </button>

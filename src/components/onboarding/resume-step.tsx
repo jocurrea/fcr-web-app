@@ -40,6 +40,10 @@ import {
   validateDateOfBirth,
   validateExperienceDates,
 } from "@/lib/validation/date-rules";
+import {
+  hasInvalidCharacters,
+  RESTRICTED_INPUT_ERROR_MSG,
+} from "@/lib/validation/input-restrictions";
 
 interface ResumeStepProps {
   onNext: () => void;
@@ -826,7 +830,15 @@ export function ResumeStep({ onNext, isSaving }: ResumeStepProps) {
                   } else if (!isValidStrictUrl(val)) {
                     setWebsiteError(INVALID_URL_ERROR_MSG);
                   } else {
-                    setWebsiteError(null);
+                    const clean = sanitizeUrl(val.trim());
+                    const isDuplicate = websites.some(
+                      w => (clean && w.toLowerCase() === clean.toLowerCase()) || w.toLowerCase() === val.trim().toLowerCase()
+                    );
+                    if (isDuplicate) {
+                      setWebsiteError("This website has already been added.");
+                    } else {
+                      setWebsiteError(null);
+                    }
                   }
                 }}
               />
@@ -861,12 +873,20 @@ export function ResumeStep({ onNext, isSaving }: ResumeStepProps) {
                     return;
                   }
                   const clean = sanitizeUrl(trimmed);
-                  if (clean) {
-                    setWebsites([...websites, clean]);
-                    setWebsiteUrl("");
-                    setWebsiteError(null);
-                    setIsWebsiteModalOpen(false);
+                  if (!clean) return;
+
+                  const isDuplicate = websites.some(
+                    w => w.toLowerCase() === clean.toLowerCase() || w.toLowerCase() === trimmed.toLowerCase()
+                  );
+                  if (isDuplicate) {
+                    setWebsiteError("This website has already been added.");
+                    return;
                   }
+
+                  setWebsites([...websites, clean]);
+                  setWebsiteUrl("");
+                  setWebsiteError(null);
+                  setIsWebsiteModalOpen(false);
                 }}
               >
                 Add
@@ -895,6 +915,13 @@ export function ResumeStep({ onNext, isSaving }: ResumeStepProps) {
                 className="rounded-2xl py-6"
                 value={skillText}
                 onChange={(e) => setSkillText(e.target.value.slice(0, 60))}
+                onPaste={(e) => {
+                  const pasted = e.clipboardData.getData("text");
+                  if (hasInvalidCharacters(pasted)) {
+                    e.preventDefault();
+                    setToast({ message: RESTRICTED_INPUT_ERROR_MSG, type: "error" });
+                  }
+                }}
               />
             </div>
             
@@ -923,7 +950,7 @@ export function ResumeStep({ onNext, isSaving }: ResumeStepProps) {
 
           <div className="flex gap-4 mt-6 shrink-0">
             <Button 
-              type="button"
+              type="button" 
               variant="outline" 
               className="flex-1 rounded-full py-6 text-blue-600 border-blue-600 hover:bg-blue-50 text-base"
               onClick={() => {
@@ -934,11 +961,16 @@ export function ResumeStep({ onNext, isSaving }: ResumeStepProps) {
               close
             </Button>
             <Button 
-              type="button"
+              type="button" 
               className="flex-1 rounded-full py-6 bg-blue-600 hover:bg-blue-700 text-white text-base"
               onClick={() => {
                 const trimmed = skillText.trim();
                 if (!trimmed) return;
+
+                if (hasInvalidCharacters(trimmed)) {
+                  setToast({ message: RESTRICTED_INPUT_ERROR_MSG, type: "error" });
+                  return;
+                }
 
                 // FIX-08 Uniqueness Check: Validate that skill does not already exist
                 const isDuplicate = skills.some(s => s.trim().toLowerCase() === trimmed.toLowerCase());
@@ -1059,12 +1091,19 @@ export function ResumeStep({ onNext, isSaving }: ResumeStepProps) {
                 className="rounded-2xl py-6"
                 value={awardText}
                 onChange={(e) => setAwardText(e.target.value.slice(0, 100))}
+                onPaste={(e) => {
+                  const pasted = e.clipboardData.getData("text");
+                  if (hasInvalidCharacters(pasted)) {
+                    e.preventDefault();
+                    setToast({ message: RESTRICTED_INPUT_ERROR_MSG, type: "error" });
+                  }
+                }}
               />
             </div>
 
             <div className="flex gap-4">
               <Button 
-                type="button"
+                type="button" 
                 variant="outline" 
                 className="flex-1 rounded-full py-6 text-blue-600 border-blue-600 hover:bg-blue-50 text-base"
                 onClick={() => {
@@ -1075,14 +1114,18 @@ export function ResumeStep({ onNext, isSaving }: ResumeStepProps) {
                 close
               </Button>
               <Button 
-                type="button"
+                type="button" 
                 className="flex-1 rounded-full py-6 bg-blue-600 hover:bg-blue-700 text-white text-base"
                 onClick={() => {
-                  if (awardText.trim()) {
-                    setAwards([...awards, awardText.trim()]);
-                    setAwardText("");
-                    setIsAwardModalOpen(false);
+                  const trimmed = awardText.trim();
+                  if (!trimmed) return;
+                  if (hasInvalidCharacters(trimmed)) {
+                    setToast({ message: RESTRICTED_INPUT_ERROR_MSG, type: "error" });
+                    return;
                   }
+                  setAwards([...awards, trimmed]);
+                  setAwardText("");
+                  setIsAwardModalOpen(false);
                 }}
               >
                 Add
@@ -1111,6 +1154,13 @@ export function ResumeStep({ onNext, isSaving }: ResumeStepProps) {
                 className="rounded-2xl py-6"
                 value={trainingFacility}
                 onChange={(e) => setTrainingFacility(e.target.value.slice(0, 100))}
+                onPaste={(e) => {
+                  const pasted = e.clipboardData.getData("text");
+                  if (hasInvalidCharacters(pasted)) {
+                    e.preventDefault();
+                    setToast({ message: RESTRICTED_INPUT_ERROR_MSG, type: "error" });
+                  }
+                }}
               />
             </div>
 
@@ -1124,6 +1174,13 @@ export function ResumeStep({ onNext, isSaving }: ResumeStepProps) {
                 className="rounded-2xl py-6"
                 value={trainingType}
                 onChange={(e) => setTrainingType(e.target.value.slice(0, 100))}
+                onPaste={(e) => {
+                  const pasted = e.clipboardData.getData("text");
+                  if (hasInvalidCharacters(pasted)) {
+                    e.preventDefault();
+                    setToast({ message: RESTRICTED_INPUT_ERROR_MSG, type: "error" });
+                  }
+                }}
               />
             </div>
 
@@ -1137,13 +1194,20 @@ export function ResumeStep({ onNext, isSaving }: ResumeStepProps) {
                 className="rounded-2xl py-4 min-h-[100px]"
                 value={trainingDetails}
                 onChange={(e) => setTrainingDetails(e.target.value.slice(0, 500))}
+                onPaste={(e) => {
+                  const pasted = e.clipboardData.getData("text");
+                  if (hasInvalidCharacters(pasted)) {
+                    e.preventDefault();
+                    setToast({ message: RESTRICTED_INPUT_ERROR_MSG, type: "error" });
+                  }
+                }}
                 placeholder="Enter training details..."
               />
             </div>
 
             <div className="flex gap-4 pt-2">
               <Button 
-                type="button"
+                type="button" 
                 variant="outline" 
                 className="flex-1 rounded-full py-6 text-blue-600 border-blue-600 hover:bg-blue-50 text-base"
                 onClick={() => {
@@ -1156,23 +1220,31 @@ export function ResumeStep({ onNext, isSaving }: ResumeStepProps) {
                 close
               </Button>
               <Button 
-                type="button"
+                type="button" 
                 className="flex-1 rounded-full py-6 bg-blue-600 hover:bg-blue-700 text-white text-base"
                 onClick={() => {
-                  if (trainingFacility.trim()) {
-                    setTrainingFacilities([
-                      ...trainingFacilities, 
-                      { 
-                        facility: trainingFacility.trim(), 
-                        type: trainingType.trim(), 
-                        details: trainingDetails.trim() 
-                      }
-                    ]);
-                    setTrainingFacility("");
-                    setTrainingType("");
-                    setTrainingDetails("");
-                    setIsTrainingModalOpen(false);
+                  const fac = trainingFacility.trim();
+                  const typ = trainingType.trim();
+                  const det = trainingDetails.trim();
+                  if (!fac) return;
+
+                  if (hasInvalidCharacters(fac) || (typ && hasInvalidCharacters(typ)) || (det && hasInvalidCharacters(det))) {
+                    setToast({ message: RESTRICTED_INPUT_ERROR_MSG, type: "error" });
+                    return;
                   }
+
+                  setTrainingFacilities([
+                    ...trainingFacilities, 
+                    { 
+                      facility: fac, 
+                      type: typ, 
+                      details: det 
+                    }
+                  ]);
+                  setTrainingFacility("");
+                  setTrainingType("");
+                  setTrainingDetails("");
+                  setIsTrainingModalOpen(false);
                 }}
               >
                 Add
@@ -1206,7 +1278,17 @@ export function ResumeStep({ onNext, isSaving }: ResumeStepProps) {
                 maxLength={100}
                 className="rounded-2xl py-6"
                 value={expCompany}
-                onChange={(e) => setExpCompany(e.target.value.slice(0, 100))}
+                onChange={(e) => {
+                  setExpCompany(e.target.value.slice(0, 100));
+                  if (expError) setExpError(null);
+                }}
+                onPaste={(e) => {
+                  const pasted = e.clipboardData.getData("text");
+                  if (hasInvalidCharacters(pasted)) {
+                    e.preventDefault();
+                    setExpError(RESTRICTED_INPUT_ERROR_MSG);
+                  }
+                }}
               />
             </div>
 
@@ -1288,7 +1370,17 @@ export function ResumeStep({ onNext, isSaving }: ResumeStepProps) {
                 maxLength={100}
                 className="rounded-2xl py-6"
                 value={expCity}
-                onChange={(e) => setExpCity(e.target.value.slice(0, 100))}
+                onChange={(e) => {
+                  setExpCity(e.target.value.slice(0, 100));
+                  if (expError) setExpError(null);
+                }}
+                onPaste={(e) => {
+                  const pasted = e.clipboardData.getData("text");
+                  if (hasInvalidCharacters(pasted)) {
+                    e.preventDefault();
+                    setExpError(RESTRICTED_INPUT_ERROR_MSG);
+                  }
+                }}
               />
             </div>
 
@@ -1301,7 +1393,17 @@ export function ResumeStep({ onNext, isSaving }: ResumeStepProps) {
                 maxLength={100}
                 className="rounded-2xl py-6"
                 value={expTitle}
-                onChange={(e) => setExpTitle(e.target.value.slice(0, 100))}
+                onChange={(e) => {
+                  setExpTitle(e.target.value.slice(0, 100));
+                  if (expError) setExpError(null);
+                }}
+                onPaste={(e) => {
+                  const pasted = e.clipboardData.getData("text");
+                  if (hasInvalidCharacters(pasted)) {
+                    e.preventDefault();
+                    setExpError(RESTRICTED_INPUT_ERROR_MSG);
+                  }
+                }}
               />
             </div>
 
@@ -1469,8 +1571,17 @@ export function ResumeStep({ onNext, isSaving }: ResumeStepProps) {
               className="flex-1 rounded-full py-6 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white text-base"
               onClick={() => {
                 setExpError(null);
-                if (!expCompany.trim() || !expTitle.trim()) {
+                const comp = expCompany.trim();
+                const title = expTitle.trim();
+                const city = expCity.trim();
+
+                if (!comp || !title) {
                   setExpError("Company and Title are required.");
+                  return;
+                }
+
+                if (hasInvalidCharacters(comp) || hasInvalidCharacters(title) || (city && hasInvalidCharacters(city))) {
+                  setExpError(RESTRICTED_INPUT_ERROR_MSG);
                   return;
                 }
 
@@ -1485,10 +1596,10 @@ export function ResumeStep({ onNext, isSaving }: ResumeStepProps) {
                 setExperiences([
                   ...experiences, 
                   { 
-                    company: expCompany, 
+                    company: comp, 
                     country: expCountry, 
-                    city: expCity, 
-                    title: expTitle, 
+                    city: city, 
+                    title: title, 
                     role: expRole, 
                     planes: expPlanes, 
                     startDate: expStartDate, 
@@ -1531,11 +1642,22 @@ export function ResumeStep({ onNext, isSaving }: ResumeStepProps) {
                 className="rounded-2xl py-6"
                 value={expPlaneInput}
                 onChange={(e) => setExpPlaneInput(e.target.value.slice(0, 50))}
+                onPaste={(e) => {
+                  const pasted = e.clipboardData.getData("text");
+                  if (hasInvalidCharacters(pasted)) {
+                    e.preventDefault();
+                    setToast({ message: RESTRICTED_INPUT_ERROR_MSG, type: "error" });
+                  }
+                }}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
                     e.preventDefault();
                     if (expPlaneInput.trim()) {
                       const trimmed = expPlaneInput.trim();
+                      if (hasInvalidCharacters(trimmed)) {
+                        setToast({ message: RESTRICTED_INPUT_ERROR_MSG, type: "error" });
+                        return;
+                      }
                       if (expPlanes.some(p => p.trim().toLowerCase() === trimmed.toLowerCase())) {
                         setToast({ message: "This item is already in your list", type: "error" });
                         return;
@@ -1567,6 +1689,10 @@ export function ResumeStep({ onNext, isSaving }: ResumeStepProps) {
                 onClick={() => {
                   if (expPlaneInput.trim()) {
                     const trimmed = expPlaneInput.trim();
+                    if (hasInvalidCharacters(trimmed)) {
+                      setToast({ message: RESTRICTED_INPUT_ERROR_MSG, type: "error" });
+                      return;
+                    }
                     if (expPlanes.some(p => p.trim().toLowerCase() === trimmed.toLowerCase())) {
                       setToast({ message: "This item is already in your list", type: "error" });
                       return;

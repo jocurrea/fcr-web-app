@@ -43,6 +43,8 @@ export function CompanyProfileStep({ onNext }: CompanyProfileStepProps) {
   const [fleetTypes, setFleetTypes] = useState<string[]>([]);
   const [logo, setLogo] = useState<string | null>(null);
 
+  const [companyNameError, setCompanyNameError] = useState<string | null>(null);
+  const [descriptionError, setDescriptionError] = useState<string | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
   const [websiteError, setWebsiteError] = useState<string | null>(null);
   const [foundedYearError, setFoundedYearError] = useState<string | null>(null);
@@ -75,6 +77,14 @@ export function CompanyProfileStep({ onNext }: CompanyProfileStepProps) {
   }, [onboarding?.company]);
 
   const handleNext = async () => {
+    if (hasInvalidCharacters(companyName)) {
+      setCompanyNameError(RESTRICTED_INPUT_ERROR_MSG);
+      return;
+    }
+    if (hasInvalidCharacters(description)) {
+      setDescriptionError(RESTRICTED_INPUT_ERROR_MSG);
+      return;
+    }
     if (hasInvalidCharacters(location)) {
       setLocationError(RESTRICTED_INPUT_ERROR_MSG);
       return;
@@ -142,6 +152,10 @@ export function CompanyProfileStep({ onNext }: CompanyProfileStepProps) {
   const isPhoneValid = (val: string) => !val || /^\+?\d+$/.test(val);
   const isFormValid =
     companyName.trim() !== "" &&
+    !companyNameError &&
+    !hasInvalidCharacters(companyName) &&
+    !descriptionError &&
+    !hasInvalidCharacters(description) &&
     !!logo &&
     location.trim() !== "" &&
     !locationError &&
@@ -300,10 +314,35 @@ export function CompanyProfileStep({ onNext }: CompanyProfileStepProps) {
               <input
                 type="text"
                 value={companyName}
-                onChange={(e) => setCompanyName(e.target.value)}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setCompanyName(val);
+                  if (hasInvalidCharacters(val)) {
+                    setCompanyNameError(RESTRICTED_INPUT_ERROR_MSG);
+                  } else if (companyNameError) {
+                    setCompanyNameError(null);
+                  }
+                }}
+                onPaste={(e) => {
+                  const pasted = e.clipboardData.getData("text");
+                  if (!isPasteAllowed(pasted)) {
+                    e.preventDefault();
+                    setCompanyNameError(CLIPBOARD_RESTRICTED_ERROR_MSG);
+                  }
+                }}
                 placeholder="Pilot Insight Aviation"
-                className="w-full px-5 py-[14px] bg-white border border-gray-300 rounded-[24px] text-[15px] placeholder-gray-400 focus:outline-none focus:border-[#2d73f5] focus:ring-1 focus:ring-[#2d73f5] transition-shadow"
+                className={`w-full px-5 py-[14px] bg-white border rounded-[24px] text-[15px] placeholder-gray-400 focus:outline-none focus:ring-1 transition-shadow ${
+                  companyNameError
+                    ? "border-red-500 focus:border-red-500 focus:ring-red-500"
+                    : "border-gray-300 focus:border-[#2d73f5] focus:ring-[#2d73f5]"
+                }`}
               />
+              {companyNameError && (
+                <p className="text-red-500 text-xs mt-1.5 ml-2 flex items-center gap-1">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                  <span>{companyNameError}</span>
+                </p>
+              )}
             </div>
 
             <div>
@@ -455,12 +494,37 @@ export function CompanyProfileStep({ onNext }: CompanyProfileStepProps) {
               <textarea
                 value={description}
                 onChange={(e) => {
-                  if (e.target.value.length <= 500) setDescription(e.target.value);
+                  const val = e.target.value;
+                  if (val.length <= 500) {
+                    setDescription(val);
+                    if (hasInvalidCharacters(val)) {
+                      setDescriptionError(RESTRICTED_INPUT_ERROR_MSG);
+                    } else if (descriptionError) {
+                      setDescriptionError(null);
+                    }
+                  }
+                }}
+                onPaste={(e) => {
+                  const pasted = e.clipboardData.getData("text");
+                  if (!isPasteAllowed(pasted)) {
+                    e.preventDefault();
+                    setDescriptionError(CLIPBOARD_RESTRICTED_ERROR_MSG);
+                  }
                 }}
                 placeholder="Describe your company"
                 rows={5}
-                className="w-full px-5 py-4 bg-white border border-gray-300 rounded-[24px] text-[15px] placeholder-gray-400 focus:outline-none focus:border-[#2d73f5] focus:ring-1 focus:ring-[#2d73f5] transition-shadow resize-none"
+                className={`w-full px-5 py-4 bg-white border rounded-[24px] text-[15px] placeholder-gray-400 focus:outline-none focus:ring-1 transition-shadow resize-none ${
+                  descriptionError
+                    ? "border-red-500 focus:border-red-500 focus:ring-red-500"
+                    : "border-gray-300 focus:border-[#2d73f5] focus:ring-[#2d73f5]"
+                }`}
               />
+              {descriptionError && (
+                <p className="text-red-500 text-xs mt-1.5 ml-2 flex items-center gap-1">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                  <span>{descriptionError}</span>
+                </p>
+              )}
             </div>
 
             <div>

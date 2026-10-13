@@ -1,22 +1,60 @@
 import { NextResponse, type NextRequest } from "next/server";
-
+import { type EmailOtpType } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 
 export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get("code");
+  const token_hash = requestUrl.searchParams.get("token_hash");
+  const type = requestUrl.searchParams.get("type") as EmailOtpType | null;
   const next = requestUrl.searchParams.get("next");
+  const errorParam = requestUrl.searchParams.get("error");
+  const errorDesc = requestUrl.searchParams.get("error_description");
 
-  if (code) {
-    const supabase = await createClient();
-    const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+  if (errorParam || errorDesc) {
+    const errorMsg = errorDesc || errorParam || "Authentication error";
+    return NextResponse.redirect(
+      new URL(`/login?error=${encodeURIComponent(errorMsg)}`, request.url)
+    );
+  }
 
+  const supabase = await createClient();
+  let userSessionData: any = null;
+
+  if (token_hash && type) {
+    const { data, error } = await supabase.auth.verifyOtp({
+      token_hash,
+      type,
+    });
     if (!error && data?.user) {
-      if (next && next.startsWith("/")) {
-        return NextResponse.redirect(new URL(next, request.url));
-      }
+      userSessionData = data;
+    }
+  } else if (code) {
+    const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+    if (!error && data?.user) {
+      userSessionData = data;
+    }
+  }
 
-      const userId = data.user.id;
+  if (userSessionData?.user) {
+    const user = userSessionData.user;
+    const userId = user.id;
+
+    // FIX-B.3 (Item #24): Sync verified new email to public.users table
+    if (user.email) {
+      try {
+        await supabase
+          .from("users")
+          .update({ email: user.email })
+          .eq("id", userId);
+      } catch (syncErr) {
+        console.error("[auth/callback] Error syncing email to users table:", syncErr);
+      }
+    }
+
+    if (next && next.startsWith("/")) {
+      return NextResponse.redirect(new URL(next, request.url));
+    }
 
       // 1. Check user profile in Supabase
       const { data: userRecord } = await supabase
@@ -40,7 +78,7 @@ export async function GET(request: NextRequest) {
         dbOnboardedVal === null ||
         dbOnboardedVal === undefined;
 
-      const metaOnboardedVal = data.user.user_metadata?.onboarded;
+      const metaOnboardedVal = user.user_metadata?.onboarded;
       const isMetaOnboarded =
         metaOnboardedVal === true ||
         String(metaOnboardedVal) === "1" ||
@@ -63,8 +101,8 @@ export async function GET(request: NextRequest) {
       const effectiveRole =
         userRecord?.accountType ||
         userRecord?.role ||
-        data.user.user_metadata?.accountType ||
-        data.user.user_metadata?.role ||
+        user.user_metadata?.accountType ||
+        user.user_metadata?.role ||
         "";
 
       let hasRole = Boolean(
@@ -99,12 +137,34 @@ export async function GET(request: NextRequest) {
 
       // 3. New users: redirect strictly to /role-selection (or /onboarding-business)
       if (effectiveRole === "business") {
-        return NextResponse.redirect(new URL("/onboarding-business", request.url));
-      }
-
-      return NextResponse.redirect(new URL("/role-selection", request.url));
+      return NextResponse.redirect(new URL("/onboarding-business", request.url));
     }
+
+    return NextResponse.redirect(new URL("/role-selection", request.url));
   }
 
-  return NextResponse.redirect(new URL("/login?error=Authentication failed", request.url));
+  // Fallback for implicit hash fragments (e.g. #access_token=...&type=email_change)
+  const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Verifying Authentication...</title>
+  <script>
+    if (window.location.hash && window.location.hash.includes('access_token')) {
+      var next = new URLSearchParams(window.location.search).get('next') || '/profile';
+      window.location.href = next + window.location.hash;
+    } else {
+      window.location.href = '/login?error=Authentication failed';
+    }
+  </script>
+</head>
+<body style="font-family:system-ui,-apple-system,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;">
+  <p style="color:#666;font-size:14px;">Completing authentication, please wait...</p>
+</body>
+</html>`;
+
+  return new NextResponse(html, {
+    status: 200,
+    headers: { "Content-Type": "text/html; charset=utf-8" },
+  });
 }

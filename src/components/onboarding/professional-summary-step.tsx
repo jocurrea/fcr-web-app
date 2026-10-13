@@ -8,6 +8,12 @@ import { saveProfessionalSummaryAction } from "@/actions/profile";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import {
+  hasInvalidCharacters,
+  isPasteAllowed,
+  RESTRICTED_INPUT_ERROR_MSG,
+  CLIPBOARD_RESTRICTED_ERROR_MSG,
+} from "@/lib/validation/input-restrictions";
 
 interface ProfessionalSummaryStepProps {
   onNext?: (summary: string) => void;
@@ -45,13 +51,23 @@ export function ProfessionalSummaryStep({ onNext, onBack }: ProfessionalSummaryS
     const value = rawValue.length > MAX_CHARACTERS ? rawValue.slice(0, MAX_CHARACTERS) : rawValue;
     setAboutMe(value);
     if (!touched) setTouched(true);
-    if (submitError) setSubmitError(null);
+    if (hasInvalidCharacters(value)) {
+      setSubmitError(RESTRICTED_INPUT_ERROR_MSG);
+    } else if (submitError) {
+      setSubmitError(null);
+    }
   };
 
   // UI enforces strict maximum character limit on pasting
   const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
     const pastedText = e.clipboardData.getData("text");
     if (!pastedText) return;
+
+    if (!isPasteAllowed(pastedText)) {
+      e.preventDefault();
+      setSubmitError(CLIPBOARD_RESTRICTED_ERROR_MSG);
+      return;
+    }
 
     const currentLen = aboutMe.length;
     if (currentLen + pastedText.length > MAX_CHARACTERS) {
@@ -65,13 +81,20 @@ export function ProfessionalSummaryStep({ onNext, onBack }: ProfessionalSummaryS
     }
   };
 
-  const isAboutMeValid = aboutMe.trim().length > 0 && aboutMe.length <= MAX_CHARACTERS;
+  const isAboutMeValid = aboutMe.trim().length > 0 && aboutMe.length <= MAX_CHARACTERS && !hasInvalidCharacters(aboutMe.trim());
 
   const handleNextClick = async () => {
     setTouched(true);
     setSubmitError(null);
 
     // Scenario 1: Field is required. If empty or invalid, block and show inline error
+    if (!aboutMe.trim()) return;
+
+    if (hasInvalidCharacters(aboutMe.trim())) {
+      setSubmitError(RESTRICTED_INPUT_ERROR_MSG);
+      return;
+    }
+
     if (!isAboutMeValid || isSaving) return;
 
     setIsSaving(true);
