@@ -115,6 +115,16 @@ export async function saveProfessionalSummaryAction(summary: string) {
       return { success: false, error: upsertErr.message };
     }
 
+    // Migration 066: Also sync to flight_crew_profiles."resumeSummary" if profile exists
+    try {
+      await supabase
+        .from("flight_crew_profiles")
+        .update({ resumeSummary: trimmed })
+        .eq("userId", user.id);
+    } catch (fcErr) {
+      console.warn("[saveProfessionalSummaryAction] flight_crew_profiles notice:", fcErr);
+    }
+
     revalidatePath("/", "layout");
     revalidatePath("/profile");
     revalidatePath("/onboarding");
@@ -128,6 +138,130 @@ export async function saveProfessionalSummaryAction(summary: string) {
     };
   }
 }
+
+/**
+ * Server Action to validate and persist Personal Description (Bio).
+ * Migration 066:
+ * - Read and update Personal Description through public.user_profiles.bio
+ * - Sync to users.bio for legacy compatibility
+ * - Does NOT overwrite flight_crew_profiles."resumeSummary" or resumes.data.summary
+ */
+export async function savePersonalDescriptionAction(description: string) {
+  try {
+    if (typeof description !== "string") {
+      return { success: false, error: "Invalid description format." };
+    }
+    const trimmed = description.trim();
+    if (hasScriptInjection(trimmed)) {
+      return { success: false, error: "Security alert: Potentially malicious script injection detected in description." };
+    }
+    if (trimmed.length > MAX_SUMMARY_LENGTH) {
+      return { success: false, error: `Personal description exceeds maximum limit of ${MAX_SUMMARY_LENGTH} characters.` };
+    }
+    if (trimmed.length > 0 && hasInvalidCharacters(trimmed)) {
+      return { success: false, error: "Only letters, numbers, spaces, and standard punctuation are allowed. Emojis and special characters are not permitted." };
+    }
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return { success: false, error: "Authentication required to update personal description." };
+    }
+
+    // 1. Update public.user_profiles.bio (canonical)
+    const { error: upErr } = await supabase
+      .from("user_profiles")
+      .update({ bio: trimmed || null })
+      .eq("userId", user.id);
+
+    if (upErr) {
+      console.warn("[savePersonalDescriptionAction] user_profiles.bio update warning:", upErr);
+    }
+
+    // 2. Update public.users.bio (legacy compatibility)
+    try {
+      await supabase
+        .from("users")
+        .update({ bio: trimmed || null })
+        .eq("id", user.id);
+    } catch (usersErr) {
+      console.warn("[savePersonalDescriptionAction] users.bio sync notice:", usersErr);
+    }
+
+    revalidatePath("/", "layout");
+    revalidatePath("/profile");
+    return { success: true };
+  } catch (err: any) {
+    console.error("[savePersonalDescriptionAction] Error:", err);
+    return { success: false, error: err?.message || "Failed to save personal description." };
+  }
+}
+
+/**
+ * Server Action to validate and persist Resume Summary.
+ * Migration 066:
+ * - Pilot/Crew: read/update Resume Summary through public.flight_crew_profiles."resumeSummary"
+ * - Sync to resumes.data.summary for legacy compatibility
+ * - Does NOT overwrite user_profiles.bio or users.bio
+ */
+export async function saveResumeSummaryAction(summary: string) {
+  try {
+    if (typeof summary !== "string" || summary.trim().length === 0) {
+      return { success: false, error: "Resume Summary is required." };
+    }
+    const trimmed = summary.trim();
+    if (hasScriptInjection(trimmed)) {
+      return { success: false, error: "Security alert: Potentially malicious script injection detected in summary." };
+    }
+    if (trimmed.length > MAX_SUMMARY_LENGTH) {
+      return { success: false, error: `Resume summary exceeds maximum limit of ${MAX_SUMMARY_LENGTH} characters.` };
+    }
+    if (hasInvalidCharacters(trimmed)) {
+      return { success: false, error: "Only letters, numbers, spaces, and standard punctuation are allowed. Emojis and special characters are not permitted." };
+    }
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return { success: false, error: "Authentication required to update resume summary." };
+    }
+
+    // 1. Update public.flight_crew_profiles."resumeSummary"
+    try {
+      await supabase
+        .from("flight_crew_profiles")
+        .update({ resumeSummary: trimmed })
+        .eq("userId", user.id);
+    } catch (fcErr) {
+      console.warn("[saveResumeSummaryAction] flight_crew_profiles notice:", fcErr);
+    }
+
+    // 2. Update resumes.data.summary (legacy compatibility)
+    const { data: currentResume } = await supabase
+      .from("resumes")
+      .select("data")
+      .eq("userId", user.id)
+      .maybeSingle();
+
+    const resumeData = (currentResume?.data as any) || {};
+    await supabase.from("resumes").upsert(
+      {
+        userId: user.id,
+        data: {
+          ...resumeData,
+          summary: trimmed,
+        },
+      },
+      { onConflict: "userId" }
+    );
+
+    revalidatePath("/", "layout");
+    revalidatePath("/profile");
+    return { success: true };
+  } catch (err: any) {
+    console.error("[saveResumeSummaryAction] Error:", err);
+    return { success: false, error: err?.message || "Failed to save resume summary." };
+  }
+}
+
 
 export interface SaveContactCredentialsInput {
   phone: string;
@@ -935,12 +1069,14 @@ export async function saveCareerExperienceAction(input: SaveCareerExperienceInpu
     const resumeData = (currentResume?.data as any) || {};
     const existingWork = Array.isArray(resumeData.work) ? resumeData.work : [];
 
+    const isCurrent = !endDate || String(endDate).trim().toLowerCase() === "present";
     const newExperience = {
       id: `work-${Date.now()}`,
       company: sanitizeAndClampText(company, TEXT_LIMITS.EXP_COMPANY),
       role: sanitizeAndClampText(role, TEXT_LIMITS.EXP_TITLE),
       startDate,
-      endDate: endDate || null,
+      endDate: isCurrent ? null : (endDate || null),
+      isCurrent,
       planes: Array.isArray(planes)
         ? planes.map((p) => sanitizeAndClampText(p, TEXT_LIMITS.EXP_PLANE)).filter(Boolean)
         : [],
@@ -987,6 +1123,7 @@ export interface SavePersonalInfoInput {
  * Enforces safeguards when switching from Pilot to Crew:
  * Purges incompatible licenses and flight hour metrics to prevent DB inconsistencies
  * and ensure pilot licenses never appear on cabin crew profiles.
+ * Migration 064: Completed Pilot/Crew accounts have locked roles.
  */
 export async function savePersonalInfoAction(input: SavePersonalInfoInput) {
   try {
@@ -1010,6 +1147,31 @@ export async function savePersonalInfoAction(input: SavePersonalInfoInput) {
     }
 
     const isCrew = role === "crew";
+
+    // Migration 064 check: Pilot/Crew roles lock after onboarding
+    if (role) {
+      const { data: userRecord } = await supabase
+        .from("users")
+        .select("onboarded, role, accountType")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      const isOnboarded =
+        userRecord?.onboarded === 1 ||
+        userRecord?.onboarded === true ||
+        String(userRecord?.onboarded) === "1" ||
+        String(userRecord?.onboarded).toLowerCase() === "true";
+
+      const currentRole = userRecord?.role || userRecord?.accountType;
+      const isPilotOrCrew = currentRole === "pilot" || currentRole === "crew" || currentRole === "flight_crew";
+
+      if (isOnboarded && isPilotOrCrew && currentRole !== (isCrew ? "crew" : "pilot")) {
+        return {
+          success: false,
+          error: "Pilot/Crew roles lock after onboarding (Migration 064). Changes to role or account type are disabled for completed accounts. Someone needing both roles must use separate accounts with different emails.",
+        };
+      }
+    }
 
     // 1. Update users table if role provided
     if (role) {

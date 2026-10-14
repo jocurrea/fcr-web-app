@@ -12,6 +12,7 @@ export default function RoleSelectionPage() {
   const [isContinuing, setIsContinuing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isCheckingAccess, setIsCheckingAccess] = useState(true);
+  const [isRoleLocked, setIsRoleLocked] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -56,6 +57,19 @@ export default function RoleSelectionPage() {
         session.user.user_metadata?.professionalRole ||
         session.user.user_metadata?.professional_role ||
         "";
+
+      const isPilotOrCrew =
+        effectiveRole === "pilot" ||
+        effectiveRole === "crew" ||
+        effectiveRole === "flight_crew" ||
+        userRecord?.role === "pilot" ||
+        userRecord?.role === "crew";
+
+      // Migration 064: Completed Pilot/Crew accounts have locked roles
+      if (isDbOnboarded && isPilotOrCrew) {
+        setIsRoleLocked(true);
+        setSelectedType("flight_crew");
+      }
 
       const hasRole = Boolean(
         effectiveRole &&
@@ -159,6 +173,13 @@ export default function RoleSelectionPage() {
   }, [router]);
 
   const handleSelectType = async (type: "flight_crew" | "business" | "aviation_professional") => {
+    if (isRoleLocked) {
+      setError(
+        "Pilot/Crew roles are locked after onboarding (Migration 064). Changes to role or account type are disabled. If you need both roles, please register a separate account with a different email."
+      );
+      return;
+    }
+
     setSelectedType(type);
 
     try {
@@ -224,6 +245,11 @@ export default function RoleSelectionPage() {
   };
 
   const handleContinue = async () => {
+    if (isRoleLocked) {
+      router.push("/profile");
+      return;
+    }
+
     if (!selectedType || isContinuing) return;
 
     setIsContinuing(true);
@@ -385,13 +411,27 @@ export default function RoleSelectionPage() {
           </p>
         </div>
 
+        {/* Migration 064 Locked Warning */}
+        {isRoleLocked && (
+          <div className="mb-6 p-4 rounded-2xl border border-amber-200 bg-amber-50 text-amber-900 text-sm leading-relaxed">
+            <p className="font-semibold mb-1">Role Locked (Migration 064)</p>
+            <p className="text-xs text-amber-800">
+              Your Pilot/Crew account role is locked because onboarding is completed.
+              Migration 064 rejects changes to the role or account type. Someone needing both roles must use separate accounts with different emails.
+            </p>
+          </div>
+        )}
+
         {/* Options */}
         <div className="flex flex-col gap-4 flex-1">
           {/* 1. Flight Crew Option */}
           <button
             type="button"
             onClick={() => handleSelectType("flight_crew")}
-            className={`flex items-center p-5 rounded-2xl border transition-all text-left group cursor-pointer ${
+            disabled={isRoleLocked}
+            className={`flex items-center p-5 rounded-2xl border transition-all text-left group ${
+              isRoleLocked ? "cursor-default opacity-90" : "cursor-pointer"
+            } ${
               selectedType === "flight_crew" 
                 ? "border-[#1d4ed8] bg-[#f0f5ff] ring-2 ring-[#1d4ed8]/20 shadow-sm" 
                 : "border-gray-100 hover:border-gray-200 bg-white shadow-xs"
@@ -403,6 +443,11 @@ export default function RoleSelectionPage() {
             <div className="flex-1 min-w-0 pr-2">
               <div className="flex items-center gap-2">
                 <h2 className="text-lg font-bold text-gray-900">Flight Crew</h2>
+                {isRoleLocked && (
+                  <span className="text-[11px] font-semibold bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
+                    Current Role
+                  </span>
+                )}
               </div>
               <p className="text-xs text-gray-500 leading-snug mt-0.5">
                 For pilots and cabin crew members.
@@ -421,7 +466,10 @@ export default function RoleSelectionPage() {
           <button
             type="button"
             onClick={() => handleSelectType("business")}
-            className={`flex items-center p-5 rounded-2xl border transition-all text-left group cursor-pointer ${
+            disabled={isRoleLocked}
+            className={`flex items-center p-5 rounded-2xl border transition-all text-left group ${
+              isRoleLocked ? "cursor-not-allowed opacity-50" : "cursor-pointer"
+            } ${
               selectedType === "business" 
                 ? "border-[#1d4ed8] bg-[#f0f5ff] ring-2 ring-[#1d4ed8]/20 shadow-sm" 
                 : "border-gray-100 hover:border-gray-200 bg-white shadow-xs"
@@ -453,7 +501,10 @@ export default function RoleSelectionPage() {
           <button
             type="button"
             onClick={() => handleSelectType("aviation_professional")}
-            className={`flex items-center p-5 rounded-2xl border transition-all text-left group cursor-pointer ${
+            disabled={isRoleLocked}
+            className={`flex items-center p-5 rounded-2xl border transition-all text-left group ${
+              isRoleLocked ? "cursor-not-allowed opacity-50" : "cursor-pointer"
+            } ${
               selectedType === "aviation_professional" 
                 ? "border-[#1d4ed8] bg-[#f0f5ff] ring-2 ring-[#1d4ed8]/20 shadow-sm" 
                 : "border-gray-100 hover:border-gray-200 bg-white shadow-xs"
@@ -491,14 +542,14 @@ export default function RoleSelectionPage() {
           <button
             type="button"
             onClick={handleContinue}
-            disabled={!selectedType || isContinuing}
+            disabled={(!selectedType && !isRoleLocked) || isContinuing}
             className={`w-full py-4 rounded-full font-bold transition-all shadow-md ${
-              selectedType && !isContinuing
+              isRoleLocked || (selectedType && !isContinuing)
                 ? "bg-blue-600 hover:bg-blue-700 text-white cursor-pointer" 
                 : "bg-gray-300 text-gray-500 cursor-not-allowed"
             }`}
           >
-            {isContinuing ? "Please wait..." : "Next"}
+            {isContinuing ? "Please wait..." : isRoleLocked ? "Return to Profile" : "Next"}
           </button>
         </div>
       </div>

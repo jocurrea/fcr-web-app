@@ -266,15 +266,23 @@ function OnboardingContent() {
         }));
       }
       if (Array.isArray(resumeData.experiences)) {
-        resumeData.experiences = resumeData.experiences.map((exp: any) => ({
-          ...exp,
-          company: sanitizeAndClampText(exp?.company, TEXT_LIMITS.EXP_COMPANY),
-          city: sanitizeAndClampText(exp?.city, TEXT_LIMITS.EXP_CITY),
-          title: sanitizeAndClampText(exp?.title, TEXT_LIMITS.EXP_TITLE),
-          planes: Array.isArray(exp?.planes)
-            ? exp.planes.map((p: string) => sanitizeAndClampText(p, TEXT_LIMITS.EXP_PLANE))
-            : [],
-        }));
+        resumeData.experiences = resumeData.experiences.map((exp: any) => {
+          const isCurrent =
+            exp?.isCurrent === true ||
+            !exp?.endDate ||
+            String(exp?.endDate).trim().toLowerCase() === "present";
+          return {
+            ...exp,
+            company: sanitizeAndClampText(exp?.company, TEXT_LIMITS.EXP_COMPANY),
+            city: sanitizeAndClampText(exp?.city, TEXT_LIMITS.EXP_CITY),
+            title: sanitizeAndClampText(exp?.title, TEXT_LIMITS.EXP_TITLE),
+            planes: Array.isArray(exp?.planes)
+              ? exp.planes.map((p: string) => sanitizeAndClampText(p, TEXT_LIMITS.EXP_PLANE))
+              : [],
+            endDate: isCurrent ? null : (exp?.endDate || null),
+            isCurrent,
+          };
+        });
       }
       if (workData.adminDescription) {
         workData.adminDescription = sanitizeAndClampText(workData.adminDescription, TEXT_LIMITS.ADMIN_ROLE_DESCRIPTION);
@@ -651,6 +659,7 @@ function OnboardingContent() {
           adminRole: personalData?.adminRole || workData?.adminRole || null,
           adminRoleDescription: finalAdminDescription,
           englishProficiency: personalData?.englishProficiency || null,
+          resumeSummary: resumeData?.summary || null,
         };
 
         if (isPilot) {

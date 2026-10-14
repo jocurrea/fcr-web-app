@@ -225,8 +225,8 @@ export function UserProfileProvider({
         localStorage.setItem("current_user_id", userId);
       }
 
-      // 1. Unified parallel fetch for canonical get_my_profile() RPC, users, resumes, user_profiles, companies, and affiliations
-      const [myProfileRes, userRes, resumeRes, userProfileRes, companyRes, affiliationsRes] =
+      // 1. Unified parallel fetch for canonical get_my_profile() RPC, users, resumes, user_profiles, companies, affiliations, and flight_crew_profiles
+      const [myProfileRes, userRes, resumeRes, userProfileRes, companyRes, affiliationsRes, flightCrewRes] =
         await Promise.allSettled([
           supabase.rpc("get_my_profile"),
           supabase.from("users").select("*").eq("id", userId).maybeSingle(),
@@ -247,8 +247,12 @@ export function UserProfileProvider({
             .order("created_at", { ascending: false })
             .limit(1)
             .maybeSingle(),
+          supabase
+            .from("flight_crew_profiles")
+            .select("*")
+            .eq("userId", userId)
+            .maybeSingle(),
         ]);
-
 
       const myProfileData =
         myProfileRes.status === "fulfilled" ? myProfileRes.value?.data : null;
@@ -268,6 +272,10 @@ export function UserProfileProvider({
       const explicitAffiliationData =
         affiliationsRes.status === "fulfilled"
           ? (affiliationsRes.value as any)?.data
+          : null;
+      const flightCrewData =
+        flightCrewRes.status === "fulfilled"
+          ? (flightCrewRes.value as any)?.data
           : null;
 
 
@@ -456,6 +464,12 @@ export function UserProfileProvider({
           localPersonal?.availabilityStatus ||
           crewData?.personal?.availabilityStatus ||
           "active",
+        // Migration 066: Personal Description is read from user_profiles.bio (with fallback to users.bio)
+        bio: userProfileData?.bio || userData?.bio || localPersonal?.bio || localPersonal?.description || null,
+        description: userProfileData?.bio || userData?.bio || localPersonal?.bio || localPersonal?.description || null,
+        // Migration 066: For Pilot/Crew, Resume Summary is read from flight_crew_profiles."resumeSummary"
+        resumeSummary: flightCrewData?.resumeSummary || crewData?.summary || localResume?.summary || localPersonal?.resumeSummary || localPersonal?.summary || null,
+        summary: flightCrewData?.resumeSummary || crewData?.summary || localResume?.summary || localPersonal?.resumeSummary || localPersonal?.summary || null,
       };
       setPersonal(mergedPersonal);
 
