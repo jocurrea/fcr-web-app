@@ -637,8 +637,16 @@ export function ComplementaryInfoStep({ onNext, onBack, onSkip }: ComplementaryI
       setExpModalError("Company name is required.");
       return;
     }
+    if (hasInvalidCharacters(comp)) {
+      setExpModalError("Emojis and special symbols are not allowed in Company name.");
+      return;
+    }
     if (!role) {
       setExpModalError("Role title is required.");
+      return;
+    }
+    if (hasInvalidCharacters(role)) {
+      setExpModalError("Emojis and special symbols are not allowed in Role.");
       return;
     }
     if (!start) {
@@ -1264,7 +1272,17 @@ export function ComplementaryInfoStep({ onNext, onBack, onSkip }: ComplementaryI
                 id="modalCompanyName"
                 type="text"
                 value={expCompanyName}
-                onChange={(e) => setExpCompanyName(e.target.value)}
+                onChange={(e) => {
+                  setExpCompanyName(e.target.value);
+                  if (expModalError) setExpModalError(null);
+                }}
+                onPaste={(e) => {
+                  const pasted = e.clipboardData.getData("text");
+                  if (hasInvalidCharacters(pasted)) {
+                    e.preventDefault();
+                    setExpModalError("Emojis and special symbols are not allowed in Company name.");
+                  }
+                }}
                 placeholder="e.g. Flight Crew Ranked"
                 className="w-full rounded-2xl py-6 px-4 text-sm bg-white border border-gray-200 focus:border-[#1d4ed8] focus:ring-2 focus:ring-[#1d4ed8]/20 transition-all"
                 autoFocus
@@ -1280,7 +1298,17 @@ export function ComplementaryInfoStep({ onNext, onBack, onSkip }: ComplementaryI
                 id="modalRole"
                 type="text"
                 value={expRole}
-                onChange={(e) => setExpRole(e.target.value)}
+                onChange={(e) => {
+                  setExpRole(e.target.value);
+                  if (expModalError) setExpModalError(null);
+                }}
+                onPaste={(e) => {
+                  const pasted = e.clipboardData.getData("text");
+                  if (hasInvalidCharacters(pasted)) {
+                    e.preventDefault();
+                    setExpModalError("Emojis and special symbols are not allowed in Role.");
+                  }
+                }}
                 placeholder="e.g. Aircraft Technician"
                 className="w-full rounded-2xl py-6 px-4 text-sm bg-white border border-gray-200 focus:border-[#1d4ed8] focus:ring-2 focus:ring-[#1d4ed8]/20 transition-all"
               />

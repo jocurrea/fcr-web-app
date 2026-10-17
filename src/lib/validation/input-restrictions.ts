@@ -57,3 +57,11 @@ export function isPasteAllowed(pastedText: string): boolean {
   if (hasEmoji(pastedText)) return false;
   return ALLOWED_INPUT_REGEX.test(pastedText);
 }
+
+/**
+ * Strips all emojis from a given string.
+ */
+export function stripEmojis(text?: string | null): string {
+  if (!text) return "";
+  return text.replace(/\p{Extended_Pictographic}/gu, "");
+}

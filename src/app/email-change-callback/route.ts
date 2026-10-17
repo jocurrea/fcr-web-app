@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { type EmailOtpType } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url);
@@ -44,15 +45,15 @@ export async function GET(request: NextRequest) {
     // Sync newly confirmed email to public.users and public.user_profiles
     if (user.email) {
       try {
+        let adminClient: any = null;
+        try {
+          adminClient = createAdminClient();
+        } catch {}
+
+        const dbClient = adminClient || supabase;
         await Promise.allSettled([
-          supabase
-            .from("users")
-            .update({ email: user.email })
-            .eq("id", userId),
-          supabase
-            .from("user_profiles")
-            .update({ contactEmail: user.email })
-            .eq("userId", userId),
+          dbClient.from("users").update({ email: user.email }).eq("id", userId),
+          dbClient.from("user_profiles").update({ contactEmail: user.email }).eq("userId", userId),
         ]);
       } catch (syncErr) {
         console.error("[email-change-callback] Error syncing email:", syncErr);

@@ -22,6 +22,7 @@ import { Search, Check, ChevronDown, Upload, X, Camera, Image as ImageIcon, User
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
 import { ConfirmationModal } from "@/components/ui/confirmation-modal";
+import { hasInvalidCharacters, stripEmojis, RESTRICTED_INPUT_ERROR_MSG } from "@/lib/validation/input-restrictions";
 
 const COUNTRIES = [
   { id: "ar", label: "Argentina" },
@@ -178,6 +179,7 @@ export function PersonalInfoForm({ onNext }: PersonalInfoFormProps) {
   const [lastName, setLastName] = useState("");
   const [description, setDescription] = useState("");
   const [currentEmployer, setCurrentEmployer] = useState("");
+  const [employerError, setEmployerError] = useState<string | null>(null);
   const [totalFlightHours, setTotalFlightHours] = useState("");
 
   const sanitizeName = (val: string) => val.replace(/[^a-zA-ZÀ-ÿ\s]/g, '');
@@ -269,6 +271,10 @@ export function PersonalInfoForm({ onNext }: PersonalInfoFormProps) {
   }, []);
 
   const handleSave = async () => {
+    if (hasInvalidCharacters(currentEmployer)) {
+      setEmployerError(RESTRICTED_INPUT_ERROR_MSG);
+      return;
+    }
     // We will save everything at the end of the onboarding flow
     onNext();
   };
@@ -407,11 +413,32 @@ export function PersonalInfoForm({ onNext }: PersonalInfoFormProps) {
             <Input 
               id="currentEmployer" 
               value={currentEmployer} 
-              onChange={(e) => setCurrentEmployer(e.target.value)} 
-              className="rounded-2xl py-6" 
+              onChange={(e) => {
+                const val = e.target.value;
+                if (hasInvalidCharacters(val)) {
+                  setEmployerError(RESTRICTED_INPUT_ERROR_MSG);
+                  setCurrentEmployer(stripEmojis(val));
+                } else {
+                  setEmployerError(null);
+                  setCurrentEmployer(val);
+                }
+              }} 
+              onPaste={(e) => {
+                const pasted = e.clipboardData.getData("text");
+                if (hasInvalidCharacters(pasted)) {
+                  e.preventDefault();
+                  const cleaned = stripEmojis(pasted);
+                  setEmployerError(RESTRICTED_INPUT_ERROR_MSG);
+                  setCurrentEmployer(cleaned);
+                }
+              }}
+              className={cn("rounded-2xl py-6", employerError ? "border-red-500 focus-visible:ring-red-500" : "")} 
               placeholder="E.g. Delta Airlines"
               required 
             />
+            {employerError && (
+              <p className="text-xs text-red-500 font-medium">{employerError}</p>
+            )}
           </div>
 
           <div className="space-y-2">

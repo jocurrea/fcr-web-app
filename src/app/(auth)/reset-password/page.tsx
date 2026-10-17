@@ -92,13 +92,15 @@ export default function ResetPasswordPage() {
     <div className="flex flex-col min-h-screen px-6 py-8">
       {/* Header */}
       <div className="flex w-full">
-        <button
-          onClick={() => (isSuccess ? router.push("/login") : router.back())}
-          className="w-10 h-10 bg-gray-100 hover:bg-gray-200 rounded-full flex items-center justify-center transition-colors"
-          aria-label="Back"
-        >
-          <ChevronLeft className="w-5 h-5 text-black" />
-        </button>
+        {!isSuccess && (
+          <button
+            onClick={() => router.back()}
+            className="w-10 h-10 bg-gray-100 hover:bg-gray-200 rounded-full flex items-center justify-center transition-colors"
+            aria-label="Back"
+          >
+            <ChevronLeft className="w-5 h-5 text-black" />
+          </button>
+        )}
       </div>
 
       {!isSuccess ? (
@@ -234,29 +236,20 @@ export default function ResetPasswordPage() {
         </>
       ) : (
         /* Success Screen */
-        <div className="flex flex-col flex-1">
-          <div className="mt-8 mb-6 flex justify-center">
-            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
-              <CheckCircle2 className="w-8 h-8 text-green-600" />
+        <div className="flex flex-col flex-1 items-center justify-center text-center my-auto px-2">
+          <div className="mb-6 flex justify-center">
+            <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center">
+              <CheckCircle2 className="w-10 h-10 text-green-600" />
             </div>
           </div>
 
-          <div className="text-center mb-6">
+          <div className="text-center max-w-sm">
             <h1 className="text-2xl font-bold text-gray-900 leading-tight">
               Password Updated!
             </h1>
-            <p className="text-sm text-gray-600 mt-2">
-              Your password has been changed successfully. You can now log in with your new password.
+            <p className="text-sm sm:text-base text-gray-600 mt-3 leading-relaxed">
+              Password updated successfully. You may close this window and return to the mobile app to log in.
             </p>
-          </div>
-
-          <div className="mt-auto pt-8 pb-4">
-            <Link
-              href="/login"
-              className="w-full bg-[#1a73e8] hover:bg-[#1557b0] text-white font-semibold text-lg py-3.5 rounded-full transition-colors text-center block shadow-sm"
-            >
-              Sign In
-            </Link>
           </div>
         </div>
       )}

@@ -262,6 +262,7 @@ export function ResumeStep({ onNext, isSaving }: ResumeStepProps) {
   const [trainingFacility, setTrainingFacility] = useState("");
   const [trainingType, setTrainingType] = useState("");
   const [trainingDetails, setTrainingDetails] = useState("");
+  const [trainingError, setTrainingError] = useState<string | null>(null);
   const [trainingFacilities, setTrainingFacilities] = useState<{facility: string, type: string, details: string}[]>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem("onboarding_resume");
@@ -376,7 +377,7 @@ export function ResumeStep({ onNext, isSaving }: ResumeStepProps) {
         <div
           role="alert"
           className={cn(
-            "fixed top-4 left-1/2 -translate-x-1/2 z-50 p-3.5 px-5 rounded-2xl border text-sm font-semibold flex items-center gap-2.5 shadow-lg transition-all animate-in fade-in slide-in-from-top-4",
+            "fixed top-4 left-1/2 -translate-x-1/2 z-[9999] p-3.5 px-5 rounded-2xl border text-sm font-semibold flex items-center gap-2.5 shadow-2xl transition-all animate-in fade-in slide-in-from-top-4",
             toast.type === "error"
               ? "bg-red-50 text-red-700 border-red-200"
               : "bg-emerald-50 text-emerald-700 border-emerald-200"
@@ -1143,6 +1144,13 @@ export function ResumeStep({ onNext, isSaving }: ResumeStepProps) {
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-6">
+            {/* Crisp error message inside the modal so it is never hidden or blurred */}
+            {trainingError && (
+              <div className="p-3.5 rounded-2xl bg-red-50 border border-red-200 text-red-700 text-xs font-semibold flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
+                <span>{trainingError}</span>
+              </div>
+            )}
             
             <div className="space-y-2">
               <div className="flex items-center justify-between">
@@ -1151,13 +1159,22 @@ export function ResumeStep({ onNext, isSaving }: ResumeStepProps) {
               </div>
               <Input 
                 maxLength={100}
-                className="rounded-2xl py-6"
+                className={cn("rounded-2xl py-6", trainingError && hasInvalidCharacters(trainingFacility) ? "border-red-500" : "")}
                 value={trainingFacility}
-                onChange={(e) => setTrainingFacility(e.target.value.slice(0, 100))}
+                onChange={(e) => {
+                  const val = e.target.value.slice(0, 100);
+                  if (hasInvalidCharacters(val)) {
+                    setTrainingError(RESTRICTED_INPUT_ERROR_MSG);
+                  } else if (trainingError) {
+                    setTrainingError(null);
+                  }
+                  setTrainingFacility(val);
+                }}
                 onPaste={(e) => {
                   const pasted = e.clipboardData.getData("text");
                   if (hasInvalidCharacters(pasted)) {
                     e.preventDefault();
+                    setTrainingError(RESTRICTED_INPUT_ERROR_MSG);
                     setToast({ message: RESTRICTED_INPUT_ERROR_MSG, type: "error" });
                   }
                 }}
@@ -1171,13 +1188,22 @@ export function ResumeStep({ onNext, isSaving }: ResumeStepProps) {
               </div>
               <Input 
                 maxLength={100}
-                className="rounded-2xl py-6"
+                className={cn("rounded-2xl py-6", trainingError && hasInvalidCharacters(trainingType) ? "border-red-500" : "")}
                 value={trainingType}
-                onChange={(e) => setTrainingType(e.target.value.slice(0, 100))}
+                onChange={(e) => {
+                  const val = e.target.value.slice(0, 100);
+                  if (hasInvalidCharacters(val)) {
+                    setTrainingError(RESTRICTED_INPUT_ERROR_MSG);
+                  } else if (trainingError) {
+                    setTrainingError(null);
+                  }
+                  setTrainingType(val);
+                }}
                 onPaste={(e) => {
                   const pasted = e.clipboardData.getData("text");
                   if (hasInvalidCharacters(pasted)) {
                     e.preventDefault();
+                    setTrainingError(RESTRICTED_INPUT_ERROR_MSG);
                     setToast({ message: RESTRICTED_INPUT_ERROR_MSG, type: "error" });
                   }
                 }}
@@ -1191,13 +1217,22 @@ export function ResumeStep({ onNext, isSaving }: ResumeStepProps) {
               </div>
               <Textarea 
                 maxLength={500}
-                className="rounded-2xl py-4 min-h-[100px]"
+                className={cn("rounded-2xl py-4 min-h-[100px]", trainingError && hasInvalidCharacters(trainingDetails) ? "border-red-500" : "")}
                 value={trainingDetails}
-                onChange={(e) => setTrainingDetails(e.target.value.slice(0, 500))}
+                onChange={(e) => {
+                  const val = e.target.value.slice(0, 500);
+                  if (hasInvalidCharacters(val)) {
+                    setTrainingError(RESTRICTED_INPUT_ERROR_MSG);
+                  } else if (trainingError) {
+                    setTrainingError(null);
+                  }
+                  setTrainingDetails(val);
+                }}
                 onPaste={(e) => {
                   const pasted = e.clipboardData.getData("text");
                   if (hasInvalidCharacters(pasted)) {
                     e.preventDefault();
+                    setTrainingError(RESTRICTED_INPUT_ERROR_MSG);
                     setToast({ message: RESTRICTED_INPUT_ERROR_MSG, type: "error" });
                   }
                 }}
@@ -1212,6 +1247,7 @@ export function ResumeStep({ onNext, isSaving }: ResumeStepProps) {
                 className="flex-1 rounded-full py-6 text-blue-600 border-blue-600 hover:bg-blue-50 text-base"
                 onClick={() => {
                   setIsTrainingModalOpen(false);
+                  setTrainingError(null);
                   setTrainingFacility("");
                   setTrainingType("");
                   setTrainingDetails("");
@@ -1223,12 +1259,14 @@ export function ResumeStep({ onNext, isSaving }: ResumeStepProps) {
                 type="button" 
                 className="flex-1 rounded-full py-6 bg-blue-600 hover:bg-blue-700 text-white text-base"
                 onClick={() => {
+                  setTrainingError(null);
                   const fac = trainingFacility.trim();
                   const typ = trainingType.trim();
                   const det = trainingDetails.trim();
                   if (!fac) return;
 
                   if (hasInvalidCharacters(fac) || (typ && hasInvalidCharacters(typ)) || (det && hasInvalidCharacters(det))) {
+                    setTrainingError(RESTRICTED_INPUT_ERROR_MSG);
                     setToast({ message: RESTRICTED_INPUT_ERROR_MSG, type: "error" });
                     return;
                   }
@@ -1279,8 +1317,13 @@ export function ResumeStep({ onNext, isSaving }: ResumeStepProps) {
                 className="rounded-2xl py-6"
                 value={expCompany}
                 onChange={(e) => {
-                  setExpCompany(e.target.value.slice(0, 100));
-                  if (expError) setExpError(null);
+                  const val = e.target.value.slice(0, 100);
+                  if (hasInvalidCharacters(val)) {
+                    setExpError(RESTRICTED_INPUT_ERROR_MSG);
+                  } else if (expError) {
+                    setExpError(null);
+                  }
+                  setExpCompany(val);
                 }}
                 onPaste={(e) => {
                   const pasted = e.clipboardData.getData("text");

@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { type EmailOtpType } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url);
@@ -40,16 +41,26 @@ export async function GET(request: NextRequest) {
     const user = userSessionData.user;
     const userId = user.id;
 
-    // FIX-B.3 (Item #24): Sync verified new email to public.users table
+    // FIX-B.3: Sync verified new email to public.users & public.user_profiles table (with admin client fallback for Backoffice sync)
     if (user.email) {
       try {
-        await supabase
-          .from("users")
-          .update({ email: user.email })
-          .eq("id", userId);
+        let adminClient: any = null;
+        try {
+          adminClient = createAdminClient();
+        } catch {}
+
+        const dbClient = adminClient || supabase;
+        await Promise.allSettled([
+          dbClient.from("users").update({ email: user.email }).eq("id", userId),
+          dbClient.from("user_profiles").update({ contactEmail: user.email }).eq("userId", userId),
+        ]);
       } catch (syncErr) {
         console.error("[auth/callback] Error syncing email to users table:", syncErr);
       }
+    }
+
+    if (type === "recovery" || next?.startsWith("/reset-password")) {
+      return NextResponse.redirect(new URL("/reset-password", request.url));
     }
 
     if (next && next.startsWith("/")) {
@@ -143,7 +154,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(new URL("/role-selection", request.url));
   }
 
-  // Fallback for implicit hash fragments (e.g. #access_token=...&type=email_change)
+  // Fallback for implicit hash fragments (e.g. #access_token=...&type=recovery or type=email_change)
   const html = `<!DOCTYPE html>
 <html>
 <head>
@@ -151,10 +162,18 @@ export async function GET(request: NextRequest) {
   <title>Verifying Authentication...</title>
   <script>
     if (window.location.hash && window.location.hash.includes('access_token')) {
-      var next = new URLSearchParams(window.location.search).get('next') || '/profile';
-      window.location.href = next + window.location.hash;
+      var hash = window.location.hash;
+      var hashParams = new URLSearchParams(hash.replace(/^#/, ''));
+      var isRecovery = hashParams.get('type') === 'recovery' || new URLSearchParams(window.location.search).get('type') === 'recovery';
+      var next = new URLSearchParams(window.location.search).get('next') || (isRecovery ? '/reset-password' : '/profile');
+      window.location.href = next + hash;
     } else {
-      window.location.href = '/login?error=Authentication failed';
+      var isRecoveryQuery = new URLSearchParams(window.location.search).get('type') === 'recovery';
+      if (isRecoveryQuery) {
+        window.location.href = '/reset-password' + window.location.search;
+      } else {
+        window.location.href = '/login?error=Authentication failed';
+      }
     }
   </script>
 </head>

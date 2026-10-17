@@ -61,7 +61,8 @@ export async function updateSession(request: NextRequest) {
     pathname === "/register" ||
     pathname === "/welcome" ||
     pathname === "/forgotPassword" ||
-    pathname === "/reset";
+    pathname === "/reset" ||
+    pathname === "/reset-password";
 
   const isInvitationRoute = pathname.startsWith("/invitations");
 
@@ -211,8 +212,8 @@ export async function updateSession(request: NextRequest) {
       return response;
     }
 
-    // If trying to access other public auth routes or welcome
-    if (isPublicAuthRoute || isRoot) {
+    // If trying to access other public auth routes or welcome (except /reset-password)
+    if ((isPublicAuthRoute && pathname !== "/reset-password") || isRoot) {
       return makeRedirect("/home");
     }
 
