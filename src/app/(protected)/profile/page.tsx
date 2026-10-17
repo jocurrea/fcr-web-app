@@ -406,7 +406,6 @@ export default function ProfilePage() {
 
   const completionPercentage = profileProgress;
 
-  // 3. Scroll to top on mount and clean up any residual invitation session tokens
   useEffect(() => {
     window.scrollTo(0, 0);
     if (typeof window !== "undefined") {
@@ -417,12 +416,6 @@ export default function ProfilePage() {
       } catch {}
     }
   }, []);
-
-  useEffect(() => {
-    if (!loading) {
-      window.scrollTo(0, 0);
-    }
-  }, [loading]);
 
   // Load user posts
   useEffect(() => {
@@ -887,7 +880,7 @@ export default function ProfilePage() {
         </div>
 
         {/* Main Info, Status, Interaction Buttons & Professional Summary Paragraph */}
-        <div className="pt-12 sm:pt-14 w-full max-w-full overflow-hidden flex flex-col items-center text-center px-4">
+        <div className="pt-12 sm:pt-14 w-full max-w-full flex flex-col items-center text-center px-4">
           {/* Full Name */}
           <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight leading-tight max-w-full break-words">
             {fullName}

@@ -123,13 +123,18 @@
   * {
     @apply border-border outline-ring/50;
   }
+  html {
+    @apply font-sans;
+    overflow-x: clip;
+    -webkit-overflow-scrolling: touch;
+  }
   body {
     @apply bg-background text-foreground;
+    overflow-x: clip;
+    min-height: 100%;
+    -webkit-overflow-scrolling: touch;
   }
   button:not(:disabled), [role="button"]:not(:disabled) {
     cursor: pointer;
-  }
-  html {
-    @apply font-sans;
   }
 }
