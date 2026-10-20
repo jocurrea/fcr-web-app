@@ -2,10 +2,18 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, Lock, EyeOff, Eye } from "lucide-react";
+import { ChevronLeft, Lock, EyeOff, Eye, Mail, CheckCircle2, ShieldCheck } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
+
+type EmailChangeNotice = {
+  step: "pending_second_email" | "email_change_success";
+  title: string;
+  subtitle: string;
+  message: string;
+  detail?: string;
+};
 
 export default function LoginPage() {
   const router = useRouter();
@@ -15,6 +23,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [emailChangeNotice, setEmailChangeNotice] = useState<EmailChangeNotice | null>(null);
 
   // Clean any residual parameters (like ?edit=true&from=onboarding) from the URL or session
   const cleanResidualParams = useCallback(() => {
@@ -193,8 +202,87 @@ export default function LoginPage() {
   }, [cleanResidualParams, router]);
 
   useEffect(() => {
-    // Capture invitation token and redirect if present in URL
+    let isEmailChangeAction = false;
+
     if (typeof window !== "undefined") {
+      const rawHash = window.location.hash || "";
+
+      if (rawHash) {
+        const hashParams = new URLSearchParams(rawHash.replace(/^#/, ""));
+        const hashMessage = hashParams.get("message") || "";
+        const hashType = hashParams.get("type") || "";
+        const accessToken = hashParams.get("access_token");
+        const refreshToken = hashParams.get("refresh_token");
+        const hashError = hashParams.get("error") || hashParams.get("error_description");
+
+        const normalizedMessage = hashMessage.toLowerCase();
+        const isFirstConfirmation =
+          normalizedMessage.includes("confirmation link accepted") ||
+          normalizedMessage.includes("confirm link sent to the other email") ||
+          (normalizedMessage.includes("confirmation") && normalizedMessage.includes("other email"));
+
+        // Case 1: First confirmation link clicked
+        if (isFirstConfirmation) {
+          isEmailChangeAction = true;
+          // Clean hash from URL immediately so raw message is hidden from address bar
+          window.history.replaceState(null, "", window.location.pathname);
+
+          setEmailChangeNotice({
+            step: "pending_second_email",
+            title: "Confirmation Accepted",
+            subtitle: "Please check your other inbox",
+            message:
+              "We have verified this confirmation link. To finalize your email change, please open the other inbox and click the confirmation link sent there.",
+            detail:
+              "For security, Supabase requires confirmation from both your current email and your new email address.",
+          });
+        }
+        // Case 2: Second confirmation link clicked (email change finalized)
+        else if (hashType === "email_change" || (accessToken && hashType === "email_change")) {
+          isEmailChangeAction = true;
+          // Clean hash immediately from URL to protect tokens
+          window.history.replaceState(null, "", window.location.pathname);
+
+          if (accessToken && refreshToken) {
+            supabase.auth
+              .setSession({ access_token: accessToken, refresh_token: refreshToken })
+              .then(async ({ data, error }) => {
+                if (!error && data?.user?.email) {
+                  const updatedEmail = data.user.email;
+                  setEmail(updatedEmail);
+                  try {
+                    await Promise.allSettled([
+                      supabase.from("users").update({ email: updatedEmail }).eq("id", data.user.id),
+                      supabase.from("user_profiles").update({ contactEmail: updatedEmail }).eq("userId", data.user.id),
+                    ]);
+                  } catch (e) {
+                    console.warn("Could not sync email update to database:", e);
+                  }
+                }
+              })
+              .catch((err) => {
+                console.error("Error setting session for email change:", err);
+              });
+          }
+
+          setEmailChangeNotice({
+            step: "email_change_success",
+            title: "Email Successfully Updated!",
+            subtitle: "Your new email is now active",
+            message:
+              "Your email address has been verified and updated. You can now use your new email address to sign in.",
+            detail:
+              "All notifications and account recovery messages will now be sent to your updated email address.",
+          });
+        }
+        // Case 3: Error in hash
+        else if (hashError) {
+          window.history.replaceState(null, "", window.location.pathname);
+          setError(hashError.replace(/\+/g, " "));
+        }
+      }
+
+      // Capture invitation token and redirect if present in URL
       const urlParams = new URLSearchParams(window.location.search);
       const tokenParam = urlParams.get("invite_id") || urlParams.get("token") || urlParams.get("invite");
       if (tokenParam) {
@@ -204,9 +292,18 @@ export default function LoginPage() {
       if (redirectParam) {
         sessionStorage.setItem("auth_redirect_url", redirectParam);
       }
+      const searchError = urlParams.get("error") || urlParams.get("error_description");
+      if (searchError) {
+        setError(searchError.replace(/\+/g, " "));
+      }
     }
 
     cleanResidualParams();
+
+    // Do not check session or auto-redirect if an email change action is being displayed
+    if (isEmailChangeAction) {
+      return;
+    }
 
     // If an existing session is already active, verify validity before redirecting
     async function checkExistingSession() {
@@ -265,6 +362,115 @@ export default function LoginPage() {
       setIsLoading(false);
     }
   };
+
+  if (emailChangeNotice) {
+    const isStep1 = emailChangeNotice.step === "pending_second_email";
+
+    return (
+      <div className="flex flex-col min-h-screen px-6 py-8 justify-between max-w-md mx-auto w-full">
+        {/* Header */}
+        <div className="flex w-full">
+          <button 
+            onClick={() => setEmailChangeNotice(null)}
+            className="w-10 h-10 bg-gray-100 hover:bg-gray-200 rounded-full flex items-center justify-center transition-colors cursor-pointer"
+            title="Back to login"
+          >
+            <ChevronLeft className="w-5 h-5 text-black" />
+          </button>
+        </div>
+
+        {/* Content Card */}
+        <div className="flex flex-col items-center text-center my-auto py-6">
+          {/* Badge Icon */}
+          <div className={`w-20 h-20 rounded-full flex items-center justify-center mb-6 transition-all ${
+            isStep1 
+              ? "bg-blue-50 text-[#2d73f5] ring-8 ring-blue-50/50" 
+              : "bg-emerald-50 text-emerald-600 ring-8 ring-emerald-50/50"
+          }`}>
+            {isStep1 ? (
+              <Mail className="w-10 h-10 animate-pulse" />
+            ) : (
+              <CheckCircle2 className="w-10 h-10" />
+            )}
+          </div>
+
+          {/* Progress / Status Tag */}
+          <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider mb-3 ${
+            isStep1 
+              ? "bg-blue-100/80 text-blue-700" 
+              : "bg-emerald-100/80 text-emerald-700"
+          }`}>
+            {isStep1 ? "Step 1 of 2 Complete" : "Email Change Completed"}
+          </span>
+
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 leading-tight mb-2">
+            {emailChangeNotice.title}
+          </h1>
+
+          <p className="text-sm font-semibold text-[#2d73f5] mb-4">
+            {emailChangeNotice.subtitle}
+          </p>
+
+          <p className="text-sm text-gray-600 mb-6 leading-relaxed max-w-sm">
+            {emailChangeNotice.message}
+          </p>
+
+          {emailChangeNotice.detail && (
+            <div className={`p-4 rounded-2xl text-xs text-left mb-6 w-full ${
+              isStep1 ? "bg-amber-50/80 border border-amber-200 text-amber-800" : "bg-gray-50 border border-gray-200 text-gray-600"
+            }`}>
+              <div className="flex items-start gap-2.5">
+                <ShieldCheck className="w-4 h-4 mt-0.5 shrink-0" />
+                <span>{emailChangeNotice.detail}</span>
+              </div>
+            </div>
+          )}
+
+          {/* Action Buttons */}
+          <div className="w-full flex flex-col gap-3 mt-2">
+            {isStep1 ? (
+              <button
+                type="button"
+                onClick={() => setEmailChangeNotice(null)}
+                className="w-full text-white font-bold text-base py-3.5 rounded-full bg-[#2d73f5] hover:bg-[#2d73f5]/90 transition-colors shadow-sm cursor-pointer"
+              >
+                Return to Login
+              </button>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setEmailChangeNotice(null)}
+                  className="w-full text-white font-bold text-base py-3.5 rounded-full bg-[#2d73f5] hover:bg-[#2d73f5]/90 transition-colors shadow-sm cursor-pointer"
+                >
+                  Sign In with New Email
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const { data: { session } } = await supabase.auth.getSession();
+                    if (session?.user) {
+                      await handlePostLoginRedirect(session.user.id, session);
+                    } else {
+                      setEmailChangeNotice(null);
+                    }
+                  }}
+                  className="w-full text-gray-700 font-semibold text-sm py-3 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors cursor-pointer"
+                >
+                  Continue to App
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Footer info */}
+        <div className="text-center py-2">
+          <p className="text-xs text-gray-400">FlightCrew &bull; Security &amp; Verification</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col min-h-screen px-6 py-8">

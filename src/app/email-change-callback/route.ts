@@ -74,11 +74,18 @@ export async function GET(request: NextRequest) {
   <script>
     (function() {
       var hash = window.location.hash || '';
-      if (hash.includes('access_token')) {
+      if (hash.includes('message=')) {
+        window.location.href = '/login' + hash;
+      } else if (hash.includes('access_token')) {
         var params = new URLSearchParams(hash.replace(/^#/, ''));
         var error = params.get('error') || params.get('error_description');
         if (error) {
           window.location.href = '/login?error=' + encodeURIComponent(error);
+          return;
+        }
+        var type = params.get('type');
+        if (type === 'email_change') {
+          window.location.href = '/login' + hash;
           return;
         }
         var next = new URLSearchParams(window.location.search).get('next') || '/profile?email_changed=true';
@@ -88,7 +95,7 @@ export async function GET(request: NextRequest) {
         var errorDesc = params.get('error_description') || params.get('error') || 'Email change failed';
         window.location.href = '/login?error=' + encodeURIComponent(errorDesc);
       } else {
-        window.location.href = '/profile?email_changed=true';
+        window.location.href = '/login';
       }
     })();
   </script>

@@ -161,11 +161,14 @@ export async function GET(request: NextRequest) {
   <meta charset="utf-8">
   <title>Verifying Authentication...</title>
   <script>
-    if (window.location.hash && window.location.hash.includes('access_token')) {
+    if (window.location.hash && window.location.hash.includes('message=')) {
+      window.location.href = '/login' + window.location.hash;
+    } else if (window.location.hash && window.location.hash.includes('access_token')) {
       var hash = window.location.hash;
       var hashParams = new URLSearchParams(hash.replace(/^#/, ''));
       var isRecovery = hashParams.get('type') === 'recovery' || new URLSearchParams(window.location.search).get('type') === 'recovery';
-      var next = new URLSearchParams(window.location.search).get('next') || (isRecovery ? '/reset-password' : '/profile');
+      var isEmailChange = hashParams.get('type') === 'email_change' || new URLSearchParams(window.location.search).get('type') === 'email_change';
+      var next = new URLSearchParams(window.location.search).get('next') || (isRecovery ? '/reset-password' : (isEmailChange ? '/login' : '/profile'));
       window.location.href = next + hash;
     } else {
       var isRecoveryQuery = new URLSearchParams(window.location.search).get('type') === 'recovery';
