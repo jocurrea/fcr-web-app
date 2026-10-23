@@ -334,22 +334,27 @@ export async function saveContactCredentialsAction(input: SaveContactCredentials
     }
 
     // 5. Update user_profiles
+    const digitsOnly = trimmedPhone.replace(/\D/g, "");
+    const cleanPhone = digitsOnly.length >= 7 
+      ? (trimmedPhone.startsWith("+") ? `+${digitsOnly}` : digitsOnly)
+      : null;
+
     const userProfilePayload = {
       contactEmail: trimmedEmail,
-      contactPhone: trimmedPhone,
+      contactPhone: cleanPhone,
       professionalCredentials: validLicenses,
     };
 
-    const { data: updateData, error: upError } = await supabase
+    let { data: updateData, error: upError } = await supabase
       .from("user_profiles")
       .update(userProfilePayload)
-      .eq("user_id", user.id)
+      .eq("userId", user.id)
       .select();
 
     if (!upError && (!updateData || updateData.length === 0)) {
       await supabase
         .from("user_profiles")
-        .insert({ user_id: user.id, ...userProfilePayload });
+        .upsert({ userId: user.id, ...userProfilePayload }, { onConflict: "userId" });
     }
 
     // 6. Update resumes

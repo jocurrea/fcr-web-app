@@ -168,14 +168,23 @@ export async function GET(request: NextRequest) {
       var hashParams = new URLSearchParams(hash.replace(/^#/, ''));
       var isRecovery = hashParams.get('type') === 'recovery' || new URLSearchParams(window.location.search).get('type') === 'recovery';
       var isEmailChange = hashParams.get('type') === 'email_change' || new URLSearchParams(window.location.search).get('type') === 'email_change';
-      var next = new URLSearchParams(window.location.search).get('next') || (isRecovery ? '/reset-password' : (isEmailChange ? '/login' : '/profile'));
+      var isSignup = hashParams.get('type') === 'signup' || new URLSearchParams(window.location.search).get('type') === 'signup';
+      var next = new URLSearchParams(window.location.search).get('next') || (isRecovery ? '/reset-password' : (isEmailChange ? '/login' : (isSignup ? '/login?confirmed=true' : '/profile')));
       window.location.href = next + hash;
     } else {
-      var isRecoveryQuery = new URLSearchParams(window.location.search).get('type') === 'recovery';
+      var search = new URLSearchParams(window.location.search);
+      var isRecoveryQuery = search.get('type') === 'recovery';
+      var isSignupQuery = search.get('type') === 'signup' || search.get('type') === 'email_confirmation' || search.get('confirmed') === 'true';
+      var err = search.get('error') || search.get('error_description');
+
       if (isRecoveryQuery) {
         window.location.href = '/reset-password' + window.location.search;
+      } else if (isSignupQuery) {
+        window.location.href = '/login?confirmed=true';
+      } else if (err) {
+        window.location.href = '/login?error=' + encodeURIComponent(err);
       } else {
-        window.location.href = '/login?error=Authentication failed';
+        window.location.href = '/login';
       }
     }
   </script>

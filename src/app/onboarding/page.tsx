@@ -469,10 +469,18 @@ function OnboardingContent() {
       const isPilot = validProfessionalRole === "pilot";
       const isCrewRole = validProfessionalRole === "crew";
 
+      // Normalize phone number to clean digits or leading + with digits (E.164-compatible)
+      const rawPhone = personalData?.contactPhone || personalData?.phone || "";
+      const digitsOnly = String(rawPhone).replace(/\D/g, "");
+      let normalizedPhone: string | null = null;
+      if (digitsOnly.length >= 7) {
+        normalizedPhone = String(rawPhone).trim().startsWith("+") ? `+${digitsOnly}` : digitsOnly;
+      }
+
       const userProfilePayload: any = {
         userId,
         contactEmail: personalData?.email || session.user.email,
-        contactPhone: personalData?.phone || null,
+        contactPhone: normalizedPhone,
         locationCity: personalData?.city || personalData?.location || "Miami",
         locationCountry: personalData?.country || "United States",
         locationCountryCode: personalData?.countryCode || "US",
@@ -521,7 +529,24 @@ function OnboardingContent() {
         .from("user_profiles")
         .upsert(userProfilePayload, { onConflict: "userId" });
 
-      // Fallback: If check constraint on professionalWorkExperiences still failed, retry with empty array []
+      // Fallback 1: If user_profiles_contact_phone_check fails, retry with digits-only or null
+      if (userProfilesError && userProfilesError.message?.includes("user_profiles_contact_phone_check")) {
+        console.warn("[Onboarding] Retrying user_profiles upsert with phone normalization fallback...");
+        userProfilePayload.contactPhone = digitsOnly.length >= 7 ? digitsOnly : null;
+        let retryPhone = await supabase
+          .from("user_profiles")
+          .upsert(userProfilePayload, { onConflict: "userId" });
+
+        if (retryPhone.error && retryPhone.error.message?.includes("user_profiles_contact_phone_check")) {
+          userProfilePayload.contactPhone = null;
+          retryPhone = await supabase
+            .from("user_profiles")
+            .upsert(userProfilePayload, { onConflict: "userId" });
+        }
+        userProfilesError = retryPhone.error;
+      }
+
+      // Fallback 2: If check constraint on professionalWorkExperiences still failed, retry with empty array []
       if (userProfilesError && userProfilesError.message?.includes("user_profiles_professional_work_experiences_check")) {
         console.warn("[Onboarding] Retrying user_profiles upsert with empty professionalWorkExperiences fallback...");
         userProfilePayload.professionalWorkExperiences = [];

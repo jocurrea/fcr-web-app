@@ -24,6 +24,7 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [emailChangeNotice, setEmailChangeNotice] = useState<EmailChangeNotice | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   // Clean any residual parameters (like ?edit=true&from=onboarding) from the URL or session
   const cleanResidualParams = useCallback(() => {
@@ -215,6 +216,18 @@ export default function LoginPage() {
         const refreshToken = hashParams.get("refresh_token");
         const hashError = hashParams.get("error") || hashParams.get("error_description");
 
+        // Case A: Password Recovery link arrives on /login
+        if (hashType === "recovery" || rawHash.includes("type=recovery")) {
+          router.replace(`/reset-password${window.location.search || ""}${rawHash}`);
+          return;
+        }
+
+        // Case B: Signup email confirmation
+        if (hashType === "signup" || rawHash.includes("type=signup")) {
+          setSuccessMessage("Your email address has been verified successfully! Please log in to continue.");
+          window.history.replaceState(null, "", window.location.pathname);
+        }
+
         const normalizedMessage = hashMessage.toLowerCase();
         const isFirstConfirmation =
           normalizedMessage.includes("confirmation link accepted") ||
@@ -278,12 +291,30 @@ export default function LoginPage() {
         // Case 3: Error in hash
         else if (hashError) {
           window.history.replaceState(null, "", window.location.pathname);
-          setError(hashError.replace(/\+/g, " "));
+          const decoded = hashError.replace(/\+/g, " ");
+          if (!decoded.toLowerCase().includes("authentication failed")) {
+            setError(decoded);
+          }
         }
       }
 
-      // Capture invitation token and redirect if present in URL
+      // Check search params for recovery
       const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get("type") === "recovery") {
+        router.replace(`/reset-password${window.location.search || ""}`);
+        return;
+      }
+
+      // Check search params for confirmation success
+      if (
+        urlParams.get("confirmed") === "true" ||
+        urlParams.get("email_confirmed") === "true" ||
+        urlParams.get("type") === "signup"
+      ) {
+        setSuccessMessage("Your email address has been verified successfully! Please log in to continue.");
+      }
+
+      // Capture invitation token and redirect if present in URL
       const tokenParam = urlParams.get("invite_id") || urlParams.get("token") || urlParams.get("invite");
       if (tokenParam) {
         sessionStorage.setItem("pending_invite_token", tokenParam);
@@ -294,7 +325,11 @@ export default function LoginPage() {
       }
       const searchError = urlParams.get("error") || urlParams.get("error_description");
       if (searchError) {
-        setError(searchError.replace(/\+/g, " "));
+        const decoded = searchError.replace(/\+/g, " ");
+        // Explicitly suppress default "Authentication failed" upon landing from an auth redirect
+        if (!decoded.toLowerCase().includes("authentication failed")) {
+          setError(decoded);
+        }
       }
     }
 
@@ -492,6 +527,13 @@ export default function LoginPage() {
         </h1>
         <p className="text-xs text-gray-500 mt-2">Please login to continue</p>
         
+        {successMessage && (
+          <div className="mt-4 p-3 bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm rounded-lg flex items-center gap-2">
+            <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+            <span>{successMessage}</span>
+          </div>
+        )}
+
         {error && (
           <div className="mt-4 p-3 bg-red-50 border border-red-200 text-red-600 text-sm rounded-lg">
             {error}
