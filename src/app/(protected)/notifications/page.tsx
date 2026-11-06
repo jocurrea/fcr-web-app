@@ -6,6 +6,7 @@ import Link from "next/link";
 import {
   ChevronLeft,
   User,
+  Users,
   CheckCircle2,
   AlertCircle,
   Trash2,
@@ -20,10 +21,18 @@ import {
   MoreVertical,
   Archive,
   ArchiveRestore,
+  Lock,
+  Globe,
+  XCircle,
+  ShieldCheck,
 } from "lucide-react";
 import { useNotifications, Notification } from "@/hooks/useNotifications";
 import { supabase } from "@/lib/supabase";
-import { joinFrequency } from "@/lib/api/frequencies";
+import {
+  joinFrequency,
+  respondFrequencyInvitation,
+  fetchFrequencyInvitation,
+} from "@/lib/api/frequencies";
 import { cn } from "@/lib/utils";
 
 interface PendingDeletion {
@@ -32,11 +41,24 @@ interface PendingDeletion {
   timeoutId: NodeJS.Timeout;
 }
 
+interface InviteModalDetails {
+  loading: boolean;
+  invitationId: string | number | null;
+  groupId: string | number | null;
+  status: "loading" | "pending" | "accepted" | "declined" | "revoked" | "unavailable" | "already_joined";
+  frequencyName?: string;
+  frequencyDescription?: string | null;
+  frequencyImage?: string | null;
+  isPublic?: boolean;
+}
+
 export default function NotificationsPage() {
   const router = useRouter();
   const [userId, setUserId] = useState<string | undefined>();
   const [selectedInvite, setSelectedInvite] = useState<Notification | null>(null);
   const [isJoining, setIsJoining] = useState(false);
+  const [isDeclining, setIsDeclining] = useState(false);
+  const [inviteModalInfo, setInviteModalInfo] = useState<InviteModalDetails | null>(null);
   const [toastMessage, setToastMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
 
   // Tabs state: Active vs Archived
@@ -357,14 +379,27 @@ export default function NotificationsPage() {
   };
 
   const isFrequencyInvite = (notification: Notification) => {
-    if (notification.type === "frequency_invite" || notification.type === "invite") return true;
+    if (
+      notification.type === "groupInvite" ||
+      notification.type === "frequency_invite" ||
+      notification.type === "invite"
+    )
+      return true;
     if (notification.title === "Frequency Invitation") return true;
     if (notification.data && typeof notification.data === "string") {
       if (notification.data.toLowerCase().includes("invited you to")) return true;
       if (notification.data.startsWith("{")) {
         try {
           const parsed = JSON.parse(notification.data);
-          if (parsed.groupId || parsed.frequencyId) return true;
+          if (
+            parsed.groupId ||
+            parsed.frequencyId ||
+            parsed.group_id ||
+            parsed.frequency_id ||
+            parsed.invitationId ||
+            parsed.invitation_id
+          )
+            return true;
         } catch (e) {}
       }
     }
@@ -375,7 +410,7 @@ export default function NotificationsPage() {
     if (notification.data && notification.data.startsWith("{")) {
       try {
         const parsed = JSON.parse(notification.data);
-        const id = parsed.frequencyId || parsed.groupId;
+        const id = parsed.frequencyId || parsed.groupId || parsed.frequency_id || parsed.group_id;
         if (id) return String(id);
       } catch (e) {}
     }
@@ -395,6 +430,157 @@ export default function NotificationsPage() {
 
     return null;
   };
+
+  // Sync invite details whenever an invitation is opened
+  useEffect(() => {
+    if (!selectedInvite) {
+      setInviteModalInfo(null);
+      return;
+    }
+
+    let isMounted = true;
+    async function loadInviteDetails() {
+      setInviteModalInfo({
+        loading: true,
+        invitationId: null,
+        groupId: null,
+        status: "loading",
+      });
+
+      // Extract payload
+      let payload: any = {};
+      if ((selectedInvite as any)?.payload) {
+        payload =
+          typeof (selectedInvite as any).payload === "string"
+            ? JSON.parse((selectedInvite as any).payload)
+            : (selectedInvite as any).payload;
+      } else if (selectedInvite?.data) {
+        if (typeof selectedInvite.data === "string" && selectedInvite.data.startsWith("{")) {
+          try {
+            payload = JSON.parse(selectedInvite.data);
+          } catch {}
+        } else if (typeof selectedInvite.data === "object") {
+          payload = selectedInvite.data;
+        }
+      }
+
+      const invId = payload.invitationId || payload.invitation_id || null;
+      let grpId =
+        payload.groupId || payload.group_id || payload.frequencyId || payload.frequency_id || null;
+
+      if (!grpId && selectedInvite) {
+        grpId = await getFrequencyId(selectedInvite);
+      }
+
+      const { data: authData } = await supabase.auth.getUser();
+      const currentUid = authData?.user?.id;
+
+      if (invId) {
+        const invRow = await fetchFrequencyInvitation(invId);
+        if (!invRow) {
+          if (isMounted) {
+            setInviteModalInfo({
+              loading: false,
+              invitationId: invId,
+              groupId: grpId,
+              status: "unavailable",
+            });
+          }
+          return;
+        }
+
+        const effectiveGroupId = invRow.group_id || grpId;
+
+        // Check current membership
+        let isMember = false;
+        if (currentUid && effectiveGroupId) {
+          const { data: memberData } = await supabase
+            .from("groupMembers")
+            .select("id")
+            .eq("groupId", effectiveGroupId)
+            .eq("userId", currentUid)
+            .maybeSingle();
+          if (memberData) isMember = true;
+        }
+
+        // Fetch frequency details
+        let freqData: any = null;
+        if (effectiveGroupId) {
+          const { data } = await supabase
+            .from("groups")
+            .select("name, description, image, isPublic")
+            .eq("id", effectiveGroupId)
+            .maybeSingle();
+          freqData = data;
+        }
+
+        let computedStatus: InviteModalDetails["status"] = "pending";
+        if (invRow.status === "pending") {
+          computedStatus = isMember ? "already_joined" : "pending";
+        } else if (invRow.status === "declined") {
+          computedStatus = "declined";
+        } else if (invRow.status === "revoked") {
+          computedStatus = "revoked";
+        } else if (invRow.status === "accepted") {
+          computedStatus = isMember ? "already_joined" : "unavailable";
+        }
+
+        if (isMounted) {
+          setInviteModalInfo({
+            loading: false,
+            invitationId: invId,
+            groupId: effectiveGroupId,
+            status: computedStatus,
+            frequencyName: freqData?.name,
+            frequencyDescription: freqData?.description,
+            frequencyImage: freqData?.image,
+            isPublic: freqData?.isPublic,
+          });
+        }
+      } else {
+        // Legacy invite without invitationId
+        let isMember = false;
+        if (currentUid && grpId) {
+          const { data: memberData } = await supabase
+            .from("groupMembers")
+            .select("id")
+            .eq("groupId", grpId)
+            .eq("userId", currentUid)
+            .maybeSingle();
+          if (memberData) isMember = true;
+        }
+
+        let freqData: any = null;
+        if (grpId) {
+          const { data } = await supabase
+            .from("groups")
+            .select("name, description, image, isPublic")
+            .eq("id", grpId)
+            .maybeSingle();
+          freqData = data;
+        }
+
+        if (isMounted) {
+          setInviteModalInfo({
+            loading: false,
+            invitationId: null,
+            groupId: grpId,
+            status: isMember ? "already_joined" : "pending",
+            frequencyName: freqData?.name,
+            frequencyDescription: freqData?.description,
+            frequencyImage: freqData?.image,
+            isPublic: freqData?.isPublic,
+          });
+        }
+      }
+    }
+
+    loadInviteDetails();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedInvite]);
 
   const getNotificationDestination = (notification: any): string | null => {
     // 1. Stored target url or link
@@ -437,7 +623,11 @@ export default function NotificationsPage() {
       return senderId ? `/profile/${senderId}` : "/home";
     }
 
-    if (notifType.includes("invite") || notifType.includes("frequency")) {
+    if (
+      notifType.includes("invite") ||
+      notifType.includes("frequency") ||
+      notifType.includes("groupinvite")
+    ) {
       return null; // Will trigger the invite modal via isFrequencyInvite
     }
 
@@ -481,11 +671,28 @@ export default function NotificationsPage() {
   };
 
   const handleJoinFrequency = async () => {
-    if (!selectedInvite) return;
+    if (!selectedInvite || !inviteModalInfo) return;
 
     setIsJoining(true);
-    const frequencyId = await getFrequencyId(selectedInvite);
+    const invitationId = inviteModalInfo.invitationId;
+    const frequencyId =
+      inviteModalInfo.groupId || (await getFrequencyId(selectedInvite));
 
+    if (invitationId) {
+      const res = await respondFrequencyInvitation(invitationId, "accepted");
+      setIsJoining(false);
+
+      if (res.success) {
+        showToast("Joined frequency successfully!", "success");
+        setSelectedInvite(null);
+        if (frequencyId) router.push(`/frequencies/${frequencyId}`);
+      } else {
+        showToast(res.error || "Failed to accept invitation.", "error");
+      }
+      return;
+    }
+
+    // Legacy fallback without invitation ID
     if (!frequencyId) {
       setIsJoining(false);
       showToast("Could not find frequency ID for this invitation.", "error");
@@ -496,6 +703,7 @@ export default function NotificationsPage() {
     setIsJoining(false);
 
     if (res.success) {
+      showToast("Joined frequency successfully!", "success");
       setSelectedInvite(null);
       router.push(`/frequencies/${frequencyId}`);
     } else {
@@ -503,9 +711,35 @@ export default function NotificationsPage() {
     }
   };
 
+  const handleDeclineFrequency = async () => {
+    if (!selectedInvite || !inviteModalInfo) return;
+
+    setIsDeclining(true);
+    const invitationId = inviteModalInfo.invitationId;
+
+    if (invitationId) {
+      const res = await respondFrequencyInvitation(invitationId, "declined");
+      setIsDeclining(false);
+
+      if (res.success) {
+        showToast("Invitation declined.", "success");
+        setInviteModalInfo((prev) => (prev ? { ...prev, status: "declined" } : null));
+      } else {
+        showToast(res.error || "Failed to decline invitation.", "error");
+      }
+      return;
+    }
+
+    // Legacy fallback without invitation ID
+    setIsDeclining(false);
+    showToast("Invitation declined.", "success");
+    setSelectedInvite(null);
+  };
+
   const handleViewFrequency = async () => {
-    if (!selectedInvite) return;
-    const frequencyId = await getFrequencyId(selectedInvite);
+    const frequencyId =
+      inviteModalInfo?.groupId ||
+      (selectedInvite ? await getFrequencyId(selectedInvite) : null);
     setSelectedInvite(null);
     if (frequencyId) {
       router.push(`/frequencies/${frequencyId}`);
@@ -1139,58 +1373,198 @@ export default function NotificationsPage() {
 
       {/* Invite Modal */}
       {selectedInvite && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
           <div
-            className="bg-white rounded-[24px] p-6 shadow-2xl flex flex-col gap-4 mx-auto"
-            style={{ maxWidth: "420px", width: "100%" }}
+            className="bg-white rounded-[24px] p-6 shadow-2xl flex flex-col gap-5 mx-auto relative border border-gray-100"
+            style={{ maxWidth: "440px", width: "100%" }}
           >
+            {/* Top close button */}
+            <button
+              onClick={() => setSelectedInvite(null)}
+              className="absolute top-5 right-5 text-gray-400 hover:text-gray-600 transition-colors p-1"
+              aria-label="Close"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
             {/* Sender info header */}
-            <div className="flex items-center gap-3.5">
+            <div className="flex items-center gap-3.5 pr-6">
               <div className="flex-shrink-0">
                 {selectedInvite.sender?.profileImage ? (
                   <img
                     src={selectedInvite.sender.profileImage}
-                    className="w-12 h-12 rounded-full object-cover bg-gray-100"
+                    className="w-12 h-12 rounded-full object-cover bg-gray-100 border border-gray-200"
                     alt=""
                   />
                 ) : (
-                  <div className="w-12 h-12 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-lg">
+                  <div className="w-12 h-12 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-lg shadow-sm">
                     {formatSenderName(selectedInvite.sender)[0]?.toUpperCase() || "U"}
                   </div>
                 )}
               </div>
 
               <div className="flex flex-col min-w-0 flex-1">
-                <h3 className="text-base font-bold text-gray-900 truncate leading-snug">
+                <h3 className="text-[15px] font-bold text-gray-900 truncate leading-snug">
                   {formatSenderName(selectedInvite.sender)}
                 </h3>
-                <p className="text-sm text-gray-600 truncate leading-snug">
+                <p className="text-xs text-gray-500 truncate leading-snug">
                   {getNotificationText(selectedInvite)}
                 </p>
               </div>
             </div>
 
+            {/* Modal Body depending on invitation state */}
+            {inviteModalInfo?.loading ? (
+              <div className="py-8 flex flex-col items-center justify-center gap-2">
+                <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                <span className="text-xs text-gray-500 font-medium">Checking invitation...</span>
+              </div>
+            ) : inviteModalInfo?.status === "declined" ? (
+              <div className="p-4 rounded-2xl bg-red-50 border border-red-100 flex flex-col gap-1.5">
+                <div className="flex items-center gap-2 text-red-700 font-semibold text-sm">
+                  <XCircle className="w-4 h-4 shrink-0 text-red-600" />
+                  <span>Invitation Declined</span>
+                </div>
+                <p className="text-xs text-red-600 leading-relaxed">
+                  {inviteModalInfo.isPublic
+                    ? "You previously declined this invitation. However, this frequency is public, so you can still discover and view it."
+                    : "You declined this invitation. A new invitation from a frequency admin is required to join."}
+                </p>
+              </div>
+            ) : inviteModalInfo?.status === "revoked" || inviteModalInfo?.status === "unavailable" ? (
+              <div className="p-4 rounded-2xl bg-gray-50 border border-gray-200 flex flex-col gap-1.5">
+                <div className="flex items-center gap-2 text-gray-700 font-semibold text-sm">
+                  <AlertCircle className="w-4 h-4 shrink-0 text-gray-500" />
+                  <span>Invitation Unavailable</span>
+                </div>
+                <p className="text-xs text-gray-500 leading-relaxed">
+                  This invitation is no longer active, has expired, or was revoked by an administrator.
+                </p>
+              </div>
+            ) : inviteModalInfo?.status === "already_joined" ? (
+              <div className="p-4 rounded-2xl bg-blue-50 border border-blue-100 flex flex-col gap-1.5">
+                <div className="flex items-center gap-2 text-blue-800 font-semibold text-sm">
+                  <ShieldCheck className="w-4 h-4 shrink-0 text-blue-600" />
+                  <span>Already a Member</span>
+                </div>
+                <p className="text-xs text-blue-600 leading-relaxed">
+                  You are already a member of this frequency.
+                </p>
+              </div>
+            ) : (
+              /* Pending invitation: show frequency preview card */
+              <div className="p-3.5 rounded-2xl bg-gray-50 border border-gray-100 flex flex-col gap-2.5">
+                <div className="flex items-center gap-3">
+                  {inviteModalInfo?.frequencyImage ? (
+                    <img
+                      src={inviteModalInfo.frequencyImage}
+                      alt=""
+                      className="w-10 h-10 rounded-xl object-cover bg-gray-200"
+                    />
+                  ) : (
+                    <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center font-bold">
+                      <Users className="w-5 h-5" />
+                    </div>
+                  )}
+                  <div className="flex flex-col min-w-0 flex-1">
+                    <span className="text-sm font-bold text-gray-900 truncate">
+                      {inviteModalInfo?.frequencyName || "Frequency Invitation"}
+                    </span>
+                    <span className="inline-flex items-center gap-1 text-[11px] text-gray-500">
+                      {inviteModalInfo?.isPublic ? (
+                        <>
+                          <Globe className="w-3 h-3 text-gray-400" /> Public Frequency
+                        </>
+                      ) : (
+                        <>
+                          <Lock className="w-3 h-3 text-gray-400" /> Private Frequency
+                        </>
+                      )}
+                    </span>
+                  </div>
+                </div>
+                {inviteModalInfo?.frequencyDescription && (
+                  <p className="text-xs text-gray-600 line-clamp-2 leading-relaxed">
+                    {inviteModalInfo.frequencyDescription}
+                  </p>
+                )}
+              </div>
+            )}
+
             {/* Action buttons row */}
-            <div className="flex items-center gap-2.5 pt-1">
-              <button
-                onClick={handleJoinFrequency}
-                disabled={isJoining}
-                className="px-5 py-2 bg-blue-600 text-white font-semibold text-sm rounded-full hover:bg-blue-700 transition-colors shadow-sm disabled:opacity-50 min-w-[70px]"
-              >
-                {isJoining ? "..." : "Join"}
-              </button>
-              <button
-                onClick={handleViewFrequency}
-                className="px-5 py-2 bg-blue-600 text-white font-semibold text-sm rounded-full hover:bg-blue-700 transition-colors shadow-sm min-w-[70px]"
-              >
-                View
-              </button>
-              <button
-                onClick={() => setSelectedInvite(null)}
-                className="px-5 py-2 bg-white border border-blue-600 text-blue-600 font-semibold text-sm rounded-full hover:bg-blue-50 transition-colors min-w-[70px]"
-              >
-                Close
-              </button>
+            <div className="flex items-center justify-end gap-2.5 pt-1">
+              {inviteModalInfo?.status === "declined" ? (
+                <>
+                  {inviteModalInfo.isPublic && (
+                    <button
+                      type="button"
+                      onClick={handleViewFrequency}
+                      className="px-4 py-2 bg-blue-600 text-white font-semibold text-sm rounded-full hover:bg-blue-700 transition-colors shadow-sm"
+                    >
+                      View Public Frequency
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setSelectedInvite(null)}
+                    className="px-5 py-2 bg-white border border-gray-300 text-gray-700 font-semibold text-sm rounded-full hover:bg-gray-50 transition-colors"
+                  >
+                    Close
+                  </button>
+                </>
+              ) : inviteModalInfo?.status === "revoked" || inviteModalInfo?.status === "unavailable" ? (
+                <button
+                  type="button"
+                  onClick={() => setSelectedInvite(null)}
+                  className="px-5 py-2 bg-white border border-gray-300 text-gray-700 font-semibold text-sm rounded-full hover:bg-gray-50 transition-colors"
+                >
+                  Close
+                </button>
+              ) : inviteModalInfo?.status === "already_joined" ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={handleViewFrequency}
+                    className="px-5 py-2 bg-blue-600 text-white font-semibold text-sm rounded-full hover:bg-blue-700 transition-colors shadow-sm"
+                  >
+                    Go to Frequency
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedInvite(null)}
+                    className="px-5 py-2 bg-white border border-gray-300 text-gray-700 font-semibold text-sm rounded-full hover:bg-gray-50 transition-colors"
+                  >
+                    Close
+                  </button>
+                </>
+              ) : (
+                /* Pending state buttons */
+                <>
+                  <button
+                    type="button"
+                    onClick={handleDeclineFrequency}
+                    disabled={isDeclining || isJoining || inviteModalInfo?.loading}
+                    className="px-4 py-2 border border-red-300 text-red-600 font-semibold text-sm rounded-full hover:bg-red-50 hover:border-red-400 transition-colors disabled:opacity-50"
+                  >
+                    {isDeclining ? "Declining..." : "Decline"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleJoinFrequency}
+                    disabled={isJoining || isDeclining || inviteModalInfo?.loading}
+                    className="px-5 py-2 bg-blue-600 text-white font-semibold text-sm rounded-full hover:bg-blue-700 transition-colors shadow-sm disabled:opacity-50"
+                  >
+                    {isJoining ? "Joining..." : "Join"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedInvite(null)}
+                    className="px-4 py-2 bg-white border border-gray-300 text-gray-700 font-semibold text-sm rounded-full hover:bg-gray-50 transition-colors"
+                  >
+                    Close
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </div>

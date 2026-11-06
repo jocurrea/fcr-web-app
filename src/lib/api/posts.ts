@@ -42,6 +42,31 @@ export interface Comment {
 }
 
 /**
+ * Resolves a file reference to an authenticated displayable URL:
+ * - If stored as `frequency-media://<path>`, creates a temporary signed URL using authenticated user Storage access
+ * - If already a full URL or legacy path, returns it directly
+ */
+export async function resolvePostFileUrl(fileString: string | null): Promise<string | null> {
+  if (!fileString) return null;
+  if (fileString.startsWith("frequency-media://")) {
+    const mediaPath = fileString.replace("frequency-media://", "");
+    try {
+      const { data, error } = await supabase.storage
+        .from("frequency-media")
+        .createSignedUrl(mediaPath, 3600); // 1-hour temporary URL honoring RLS
+      if (!error && data?.signedUrl) {
+        return data.signedUrl;
+      }
+      console.warn("Failed to generate signed URL for frequency-media:", error);
+    } catch (e) {
+      console.error("Error in resolvePostFileUrl:", e);
+    }
+    return null;
+  }
+  return fileString;
+}
+
+/**
  * Fetch posts (either global or for a specific frequency)
  */
 export async function fetchPosts(frequencyId?: string): Promise<Post[]> {
@@ -170,7 +195,12 @@ async function buildPostsWithResumes(data: any[], mode?: string): Promise<Post[]
     }
   }
 
-  return data.map((post: any) => {
+  // Resolve signed URLs for frequency-media attachments
+  const fileUrls = await Promise.all(
+    data.map((p: any) => resolvePostFileUrl(p.file || null))
+  );
+
+  return data.map((post: any, idx: number) => {
     // u from nested join (mode=withUser), or from direct users query
     const uFromJoin = post.user;
     const uFromDirect = usersMap[post.userId];
@@ -260,7 +290,7 @@ async function buildPostsWithResumes(data: any[], mode?: string): Promise<Post[]
       user_id: post.userId,
       frequency_id: post.groupId,
       text: post.body || '',
-      image: post.file || null,
+      image: fileUrls[idx] || null,
       author: {
         name: authorName || 'User',
         avatar: authorAvatar,
@@ -360,13 +390,15 @@ export async function fetchPostById(postId: string): Promise<Post | null> {
     authorAvatar = `https://api.dicebear.com/7.x/shapes/svg?seed=${encodeURIComponent(data.userId || 'user')}`;
   }
 
+  const resolvedImage = await resolvePostFileUrl(data.file || null);
+
   return {
     id: data.id,
     created_at: formatDate(data.created_at),
     user_id: data.userId,
     frequency_id: data.groupId,
     text: data.body || '',
-    image: data.file || null,
+    image: resolvedImage || null,
     author: {
       name: authorName || 'User',
       avatar: authorAvatar,
@@ -477,24 +509,40 @@ export async function createPost(text: string, frequencyId?: string, imageFile?:
 
   // Upload image if provided
   if (imageFile) {
-    const fileExt = imageFile.name.split('.').pop();
-    const fileName = `${Math.random()}.${fileExt}`;
-    const filePath = `posts/${userData.user.id}-${fileName}`;
+    const fileExt = imageFile.name.split('.').pop() || 'png';
+    const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}.${fileExt}`;
 
-    const { error: uploadError } = await supabase.storage
-      .from('uploads')
-      .upload(filePath, imageFile);
+    if (frequencyId) {
+      // Frequency post attachments: private frequency-media bucket
+      const filePath = `${frequencyId}/${userData.user.id}/${fileName}`;
+      const { error: uploadError } = await supabase.storage
+        .from('frequency-media')
+        .upload(filePath, imageFile);
 
-    if (uploadError) {
-      console.error('Error uploading image:', uploadError);
-      return { success: false, error: 'Failed to upload image: ' + uploadError.message };
+      if (uploadError) {
+        console.error('Error uploading frequency media:', uploadError);
+        return { success: false, error: 'Failed to upload frequency media: ' + uploadError.message };
+      }
+
+      imageUrl = `frequency-media://${filePath}`;
+    } else {
+      // Global feed: public-posts in uploads bucket
+      const filePath = `public-posts/${userData.user.id}/${fileName}`;
+      const { error: uploadError } = await supabase.storage
+        .from('uploads')
+        .upload(filePath, imageFile);
+
+      if (uploadError) {
+        console.error('Error uploading image to uploads:', uploadError);
+        return { success: false, error: 'Failed to upload image: ' + uploadError.message };
+      }
+
+      const { data: publicUrlData } = supabase.storage
+        .from('uploads')
+        .getPublicUrl(filePath);
+
+      imageUrl = publicUrlData.publicUrl;
     }
-
-    const { data: publicUrlData } = supabase.storage
-      .from('uploads')
-      .getPublicUrl(filePath);
-      
-    imageUrl = publicUrlData.publicUrl;
   }
 
   // Sync author's profile to Supabase database so other users can see name and avatar
@@ -572,24 +620,40 @@ export async function updatePost(postId: string, text: string, frequencyId?: str
 
   // Upload image if provided
   if (imageFile) {
-    const fileExt = imageFile.name.split('.').pop();
-    const fileName = `${Math.random()}.${fileExt}`;
-    const filePath = `posts/${userData.user.id}-${fileName}`;
+    const fileExt = imageFile.name.split('.').pop() || 'png';
+    const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}.${fileExt}`;
 
-    const { error: uploadError } = await supabase.storage
-      .from('uploads')
-      .upload(filePath, imageFile);
+    if (frequencyId) {
+      // Frequency post attachments: private frequency-media bucket
+      const filePath = `${frequencyId}/${userData.user.id}/${fileName}`;
+      const { error: uploadError } = await supabase.storage
+        .from('frequency-media')
+        .upload(filePath, imageFile);
 
-    if (uploadError) {
-      console.error('Error uploading image:', uploadError);
-      return false;
+      if (uploadError) {
+        console.error('Error uploading frequency media:', uploadError);
+        return false;
+      }
+
+      imageUrl = `frequency-media://${filePath}`;
+    } else {
+      // Global feed: public-posts in uploads bucket
+      const filePath = `public-posts/${userData.user.id}/${fileName}`;
+      const { error: uploadError } = await supabase.storage
+        .from('uploads')
+        .upload(filePath, imageFile);
+
+      if (uploadError) {
+        console.error('Error uploading image:', uploadError);
+        return false;
+      }
+
+      const { data: publicUrlData } = supabase.storage
+        .from('uploads')
+        .getPublicUrl(filePath);
+
+      imageUrl = publicUrlData.publicUrl;
     }
-
-    const { data: publicUrlData } = supabase.storage
-      .from('uploads')
-      .getPublicUrl(filePath);
-      
-    imageUrl = publicUrlData.publicUrl;
   }
 
   const { error } = await supabase

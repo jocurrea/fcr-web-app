@@ -164,7 +164,28 @@ export async function createFrequency(
     iconUrl = publicUrlData.publicUrl;
   }
 
-  // Insert frequency
+  // 1. Try atomic create_frequency RPC first
+  const inviteeIds = selectedUsers.filter((id) => id !== userData.user.id);
+  try {
+    const { data: createdGroup, error: rpcError } = await supabase.rpc("create_frequency", {
+      p_name: name,
+      p_description: description || null,
+      p_image: iconUrl || null,
+      p_is_public: isPublic ? 1 : 0,
+      p_invitee_ids: inviteeIds,
+    });
+
+    if (!rpcError && createdGroup) {
+      return { success: true };
+    }
+    if (rpcError) {
+      console.warn("create_frequency RPC returned error, attempting fallback insert:", rpcError);
+    }
+  } catch (rpcErr) {
+    console.warn("create_frequency RPC failed, falling back to manual creation:", rpcErr);
+  }
+
+  // Fallback insert if RPC is unavailable
   const { data: newFreq, error: createError } = await supabase
     .from('groups')
     .insert({
@@ -281,7 +302,17 @@ export async function joinFrequency(frequencyId: string | number): Promise<{ suc
   const numericId = Number(frequencyId);
   const targetGroupId = !isNaN(numericId) && String(numericId) === String(frequencyId).trim() ? numericId : frequencyId;
 
-  // 1. Check if user is ALREADY a member
+  // 1. Try atomic join_public_frequency RPC first
+  try {
+    const { data: memberData, error: joinRpcError } = await supabase.rpc("join_public_frequency", {
+      p_group_id: targetGroupId,
+    });
+    if (!joinRpcError && memberData) {
+      return { success: true };
+    }
+  } catch {}
+
+  // 2. Check if user is ALREADY a member
   const { data: existingMember } = await supabase
     .from('groupMembers')
     .select('*')
@@ -360,11 +391,26 @@ export async function fetchFrequencyById(frequencyId: string): Promise<Frequency
 
 /**
  * Leave a frequency
+ * Uses RPC leave_frequency (handles admin succession and last-member deletion atomically)
  */
 export async function leaveFrequency(frequencyId: string): Promise<boolean> {
   const { data: userData } = await supabase.auth.getUser();
   if (!userData?.user) return false;
 
+  // 1. Try atomic leave_frequency RPC
+  try {
+    const { error: rpcError } = await supabase.rpc("leave_frequency", {
+      p_group_id: frequencyId,
+    });
+    if (!rpcError) {
+      return true;
+    }
+    console.warn("leave_frequency RPC error, falling back to delete:", rpcError);
+  } catch (err) {
+    console.warn("leave_frequency RPC exception, falling back:", err);
+  }
+
+  // 2. Fallback manual delete
   const { error } = await supabase
     .from('groupMembers')
     .delete()
@@ -381,11 +427,36 @@ export async function leaveFrequency(frequencyId: string): Promise<boolean> {
   return true;
 }
 
+/**
+ * Update current member's notification preference for a frequency
+ * Calls RPC set_frequency_notifications
+ */
+export async function setFrequencyNotifications(
+  frequencyId: string | number,
+  enabled: boolean
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { error } = await supabase.rpc("set_frequency_notifications", {
+      p_group_id: frequencyId,
+      p_enabled: enabled,
+    });
+    if (error) {
+      console.error("Error setting frequency notifications:", error);
+      return { success: false, error: error.message };
+    }
+    return { success: true };
+  } catch (err: any) {
+    console.error("Exception setting frequency notifications:", err);
+    return { success: false, error: err?.message };
+  }
+}
+
 export interface FrequencyMember {
   id: string;
   name: string;
   role: string;
   avatar: string;
+  groupRole?: 'admin' | 'member';
 }
 
 /**
@@ -434,7 +505,11 @@ export async function fetchFrequencyMembers(frequencyId: string): Promise<Freque
     const { data: currentAuth } = await supabase.auth.getUser();
     const currentUserId = currentAuth?.user?.id;
 
-    return userIds.map(uid => {
+    const memberRoleMap = new Map(
+      membersData.map((m: any) => [m.userId || m.user_id, m.role || "member"])
+    );
+
+    const result = userIds.map((uid) => {
       const u = usersMap.get(uid) as any;
       const r = resumesMap.get(uid) as any;
       const c = companiesMap.get(uid) as any;
@@ -444,7 +519,7 @@ export async function fetchFrequencyMembers(frequencyId: string): Promise<Freque
       let localFirstName: string | null = null;
       let localLastName: string | null = null;
       let localCompanyName: string | null = null;
-      if (typeof window !== 'undefined' && uid === currentUserId) {
+      if (typeof window !== "undefined" && uid === currentUserId) {
         localPhoto = localStorage.getItem("userProfilePhoto");
         try {
           const localPers = localStorage.getItem("onboarding_personal");
@@ -461,28 +536,277 @@ export async function fetchFrequencyMembers(frequencyId: string): Promise<Freque
         } catch {}
       }
 
-      const firstName = u?.firstName || r?.personal?.firstName || localFirstName || '';
-      const lastName = u?.lastName || r?.personal?.lastName || localLastName || '';
+      const firstName = u?.firstName || r?.personal?.firstName || localFirstName || "";
+      const lastName = u?.lastName || r?.personal?.lastName || localLastName || "";
       const fullName = `${firstName} ${lastName}`.trim();
 
-      const isBusinessAccount = u?.accountType === 'business' || !!c || !!localCompanyName;
-      
-      const name = c?.name || u?.companyName || localCompanyName || (isBusinessAccount && u?.username && u.username !== 'user' ? u.username : null) || fullName || u?.username || (isBusinessAccount ? 'Corporate Account' : 'Member');
-      
-      const role = c?.company_type || (isBusinessAccount ? 'Corporate associate account' : (u?.position || r?.personal?.position || r?.work?.position || 'Pilot'));
+      const isBusinessAccount = u?.accountType === "business" || !!c || !!localCompanyName;
 
-      const avatar = localPhoto || c?.logo_url || u?.profileImage || r?.personal?.profilePhoto || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(name || uid)}`;
+      const name =
+        c?.name ||
+        u?.companyName ||
+        localCompanyName ||
+        (isBusinessAccount && u?.username && u.username !== "user" ? u.username : null) ||
+        fullName ||
+        u?.username ||
+        (isBusinessAccount ? "Corporate Account" : "Member");
+
+      const role =
+        c?.company_type ||
+        (isBusinessAccount
+          ? "Corporate associate account"
+          : u?.position || r?.personal?.position || r?.work?.position || "Pilot");
+
+      const avatar =
+        localPhoto ||
+        c?.logo_url ||
+        u?.profileImage ||
+        r?.personal?.profilePhoto ||
+        `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(name || uid)}`;
+
+      const groupRole: "admin" | "member" =
+        (memberRoleMap.get(uid) as any) === "admin" ? "admin" : "member";
 
       return {
         id: uid,
         name,
         role,
-        avatar
+        avatar,
+        groupRole,
       };
     });
+
+    // List admins first, then other joined members alphabetically
+    return result.sort((a, b) => {
+      if (a.groupRole === "admin" && b.groupRole !== "admin") return -1;
+      if (a.groupRole !== "admin" && b.groupRole === "admin") return 1;
+      return a.name.localeCompare(b.name);
+    });
   } catch (err) {
-    console.error('Error fetching frequency members:', err);
+    console.error("Error fetching frequency members:", err);
     return [];
   }
 }
+
+export interface AdminInvitationItem {
+  id: string | number;
+  group_id: string | number;
+  recipient_id: string;
+  invited_by?: string | null;
+  status: "pending" | "declined" | "accepted" | "revoked";
+  created_at: string;
+  sent_at?: string;
+  responded_at?: string;
+  revoked_at?: string;
+  request_id?: string | null;
+  // Enriched user details
+  recipient?: {
+    id: string;
+    name: string;
+    avatar: string;
+    role?: string;
+  };
+}
+
+/**
+ * List latest relevant invitations per non-member for Frequency Admins
+ * Calls RPC list_frequency_invitations
+ */
+export async function listFrequencyInvitations(
+  groupId: string | number,
+  limit = 50,
+  beforeId: string | number | null = null
+): Promise<{ invitations: AdminInvitationItem[]; nextCursor: string | number | null; error?: string }> {
+  try {
+    const { data, error } = await supabase.rpc("list_frequency_invitations", {
+      p_group_id: groupId,
+      p_limit: limit,
+      p_before_id: beforeId ?? null,
+    });
+
+    if (error) {
+      console.error("Error calling list_frequency_invitations:", error);
+      return { invitations: [], nextCursor: null, error: error.message || "Failed to load invitations" };
+    }
+
+    const rows: any[] = Array.isArray(data) ? data : [];
+    if (rows.length === 0) {
+      return { invitations: [], nextCursor: null };
+    }
+
+    const recipientIds = Array.from(new Set(rows.map((r) => r.recipient_id).filter(Boolean)));
+    const { data: usersData } = await supabase
+      .from("users")
+      .select("id, firstName, lastName, username, profileImage, position, companyName")
+      .in("id", recipientIds);
+
+    const userMap = new Map((usersData || []).map((u) => [u.id, u]));
+
+    const enriched: AdminInvitationItem[] = rows.map((inv) => {
+      const u = userMap.get(inv.recipient_id);
+      const fn = u?.firstName || "";
+      const ln = u?.lastName || "";
+      const fullName = [fn, ln].filter(Boolean).join(" ").trim();
+      const displayName = fullName || u?.companyName || u?.username || "Invited User";
+      const avatar =
+        u?.profileImage ||
+        `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(displayName || inv.recipient_id)}`;
+      const role = u?.position || "Member";
+
+      return {
+        ...inv,
+        recipient: {
+          id: inv.recipient_id,
+          name: displayName,
+          avatar,
+          role,
+        },
+      };
+    });
+
+    const nextCursor = rows.length === limit ? rows[rows.length - 1].id : null;
+    return { invitations: enriched, nextCursor };
+  } catch (err: any) {
+    console.error("Exception calling list_frequency_invitations:", err);
+    return { invitations: [], nextCursor: null, error: err?.message || "Failed to load invitations" };
+  }
+}
+
+export interface IssueInvitationResult {
+  success: boolean;
+  data?: any;
+  error?: string;
+  errorCode?: string;
+  requestId: string;
+}
+
+/**
+ * Issue or resend a frequency invitation
+ * Calls RPC issue_frequency_invitation
+ */
+export async function issueFrequencyInvitation(
+  groupId: string | number,
+  recipientId: string,
+  previousInvitationId: string | number | null = null,
+  retryRequestId?: string
+): Promise<IssueInvitationResult> {
+  // Retain the operation UUID on ambiguous network failure
+  const requestId = retryRequestId || (typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `req_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`);
+
+  try {
+    const { data, error } = await supabase.rpc("issue_frequency_invitation", {
+      p_group_id: groupId,
+      p_recipient_id: recipientId,
+      p_request_id: requestId,
+      p_previous_invitation_id: previousInvitationId,
+    });
+
+    if (error) {
+      console.error("Error issuing frequency invitation:", error);
+      let userFriendlyMsg = error.message || error.details || "Failed to send invitation";
+
+      if (error.code === "42501") {
+        userFriendlyMsg = "You must be a frequency admin to send or resend invitations.";
+      } else if (error.code === "55000") {
+        userFriendlyMsg = "Cooldown active or maximum sends reached (wait 60 seconds or max 3 per 24 hours).";
+      } else if (error.code === "22023") {
+        userFriendlyMsg = "Invalid invitation attempt state. Please refresh the page.";
+      }
+
+      return {
+        success: false,
+        error: userFriendlyMsg,
+        errorCode: error.code,
+        requestId,
+      };
+    }
+
+    return {
+      success: true,
+      data,
+      requestId,
+    };
+  } catch (err: any) {
+    console.error("Exception issuing frequency invitation:", err);
+    return {
+      success: false,
+      error: err?.message || "Failed to send invitation",
+      requestId,
+    };
+  }
+}
+
+export interface FrequencyInvitation {
+  id: string | number;
+  group_id: string | number;
+  recipient_id: string;
+  invited_by?: string | null;
+  status: 'pending' | 'accepted' | 'declined' | 'revoked';
+  created_at?: string;
+  sent_at?: string;
+  responded_at?: string;
+  revoked_at?: string;
+  request_id?: string | null;
+}
+
+export interface RespondFrequencyInvitationResult {
+  success: boolean;
+  data?: any;
+  error?: string;
+}
+
+/**
+ * Fetch a frequency invitation record by ID
+ */
+export async function fetchFrequencyInvitation(
+  invitationId: string | number
+): Promise<FrequencyInvitation | null> {
+  try {
+    const { data, error } = await supabase
+      .from('frequency_invitations')
+      .select('*')
+      .eq('id', invitationId)
+      .maybeSingle();
+
+    if (error || !data) {
+      return null;
+    }
+    return data as FrequencyInvitation;
+  } catch (err) {
+    console.error('Error fetching frequency invitation:', err);
+    return null;
+  }
+}
+
+/**
+ * Respond to a frequency invitation using RPC respond_frequency_invitation_v2
+ */
+export async function respondFrequencyInvitation(
+  invitationId: string | number,
+  decision: 'accepted' | 'declined'
+): Promise<RespondFrequencyInvitationResult> {
+  try {
+    const { data, error } = await supabase.rpc('respond_frequency_invitation_v2', {
+      p_invitation_id: invitationId,
+      p_decision: decision
+    });
+
+    if (error) {
+      console.error(`Error responding (${decision}) to frequency invitation:`, error);
+      return {
+        success: false,
+        error: error.message || error.details || `Failed to ${decision} invitation`
+      };
+    }
+
+    return { success: true, data };
+  } catch (err: any) {
+    console.error(`Exception responding (${decision}) to frequency invitation:`, err);
+    return {
+      success: false,
+      error: err?.message || `Failed to ${decision} invitation`
+    };
+  }
+}
+
 
