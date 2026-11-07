@@ -37,6 +37,35 @@ import { computeProfileAreas } from "@/utils/profileCompletion";
 import { revalidateProfileLayout, saveAvailabilityStatusAction } from "@/actions/profile";
 import { useUserProfile } from "@/components/providers/user-profile-provider";
 
+const COUNTRY_NAME_MAP: Record<string, string> = {
+  ar: "Argentina", au: "Australia", at: "Austria", bh: "Bahrain", bd: "Bangladesh",
+  be: "Belgium", br: "Brazil", ca: "Canada", cl: "Chile", cn: "China", co: "Colombia",
+  cz: "Czech Republic", dk: "Denmark", eg: "Egypt", fi: "Finland", fr: "France",
+  de: "Germany", gr: "Greece", hu: "Hungary", in: "India", id: "Indonesia", ie: "Ireland",
+  il: "Israel", it: "Italy", jp: "Japan", ke: "Kenya", kw: "Kuwait", my: "Malaysia",
+  mx: "Mexico", np: "Nepal", nl: "Netherlands", nz: "New Zealand", ng: "Nigeria",
+  no: "Norway", om: "Oman", pk: "Pakistan", pe: "Peru", ph: "Philippines", pl: "Poland",
+  pt: "Portugal", qa: "Qatar", ro: "Romania", ru: "Russia", sa: "Saudi Arabia",
+  sg: "Singapore", za: "South Africa", kr: "South Korea", es: "Spain", lk: "Sri Lanka",
+  se: "Sweden", ch: "Switzerland", th: "Thailand", tr: "Turkey", ae: "United Arab Emirates",
+  gb: "United Kingdom", us: "United States", ve: "Venezuela", vn: "Vietnam"
+};
+
+function formatCountryName(val?: string | null): string {
+  if (!val) return "Not added";
+  const clean = String(val).trim();
+  const lower = clean.toLowerCase();
+  if (COUNTRY_NAME_MAP[lower]) return COUNTRY_NAME_MAP[lower];
+  if (clean.length === 2) {
+    try {
+      const regionNames = new Intl.DisplayNames(["en"], { type: "region" });
+      const resolved = regionNames.of(clean.toUpperCase());
+      if (resolved) return resolved;
+    } catch {}
+  }
+  return clean;
+}
+
 export default function ProfilePage() {
   const router = useRouter();
   const PlusIcon = Plus;
@@ -148,6 +177,15 @@ export default function ProfilePage() {
     personal?.flightHours ||
     personal?.flight_hours ||
     null;
+
+  const rawCountry =
+    personal?.selectedCountry ||
+    personal?.nationality ||
+    personal?.nationalityCountry ||
+    personal?.nationality_country ||
+    personal?.country ||
+    null;
+  const nationalityValue = formatCountryName(rawCountry);
 
   const summaryText =
     personal?.aboutMe ||
@@ -1464,11 +1502,15 @@ export default function ProfilePage() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm text-gray-500">Flight hours</p>
-                  <p className="text-base font-medium text-gray-900">946464</p>
+                  <p className="text-base font-medium text-gray-900">
+                    {flightHoursValue ? Number(flightHoursValue).toLocaleString() : "Not added"}
+                  </p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-500">Nationality</p>
-                  <p className="text-base font-medium text-gray-900">United States</p>
+                  <p className="text-base font-medium text-gray-900">
+                    {nationalityValue}
+                  </p>
                 </div>
               </div>
             </div>
@@ -1485,17 +1527,31 @@ export default function ProfilePage() {
                 </button>
               </div>
               
-              <div className="flex justify-between items-center">
-                 <div>
-                   <p className="text-base font-bold text-gray-900 leading-snug">
-                     ABPL - Aerostatic<br/>Balloon Pilot<br/>License
-                   </p>
-                 </div>
-                 <div className="text-right">
-                   <p className="text-sm text-gray-900">sep. de 2026</p>
-                   <p className="text-xs text-gray-500 mt-1">Medical certificate expires in 16 days</p>
-                 </div>
-              </div>
+              {richLicenses.length > 0 ? (
+                <div className="flex flex-col gap-4">
+                  {richLicenses.map((lic, idx) => (
+                    <div key={lic.id || idx} className="flex justify-between items-start py-2 border-b border-gray-100 last:border-0">
+                      <div>
+                        <p className="text-base font-bold text-gray-900 leading-snug">
+                          {lic.name}
+                        </p>
+                        {lic.number && (
+                          <p className="text-xs text-gray-500 mt-0.5">#{lic.number}</p>
+                        )}
+                      </div>
+                      <div className="text-right">
+                        {lic.expiryDate ? (
+                          <p className="text-sm text-gray-900">{lic.expiryDate}</p>
+                        ) : lic.isPermanent ? (
+                          <p className="text-sm text-gray-900">Permanent</p>
+                        ) : null}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-gray-400 py-1">No licenses added yet.</p>
+              )}
             </div>
           </>
         )}

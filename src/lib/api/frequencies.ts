@@ -136,7 +136,7 @@ export async function createFrequency(
   iconFile: File | undefined,
   isPublic: boolean,
   selectedUsers: string[] = []
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ success: boolean; error?: string; data?: any }> {
   const { data: userData } = await supabase.auth.getUser();
   if (!userData?.user) return { success: false, error: 'Not authenticated' };
 
@@ -164,10 +164,13 @@ export async function createFrequency(
     iconUrl = publicUrlData.publicUrl;
   }
 
-  // 1. Try atomic create_frequency RPC first
-  const inviteeIds = selectedUsers.filter((id) => id !== userData.user.id);
+  // 1. Call atomic create_frequency RPC
+  const inviteeIds = (selectedUsers || []).filter((id) => id && id !== userData.user.id);
+  let lastRpcError: any = null;
+
+  // Attempt 1: p_is_public as integer (0 / 1) as documented
   try {
-    const { data: createdGroup, error: rpcError } = await supabase.rpc("create_frequency", {
+    const { data: createdGroup1, error: rpcError1 } = await supabase.rpc("create_frequency", {
       p_name: name,
       p_description: description || null,
       p_image: iconUrl || null,
@@ -175,62 +178,48 @@ export async function createFrequency(
       p_invitee_ids: inviteeIds,
     });
 
-    if (!rpcError && createdGroup) {
-      return { success: true };
+    if (!rpcError1) {
+      return { success: true, data: createdGroup1 };
     }
-    if (rpcError) {
-      console.warn("create_frequency RPC returned error, attempting fallback insert:", rpcError);
+    lastRpcError = rpcError1;
+    console.warn("create_frequency RPC with integer failed, trying boolean:", rpcError1);
+  } catch (rpcErr1) {
+    lastRpcError = rpcErr1;
+    console.warn("create_frequency integer exception:", rpcErr1);
+  }
+
+  // Attempt 2: p_is_public as boolean (true / false) in case Postgres signature expects boolean
+  try {
+    const { data: createdGroup2, error: rpcError2 } = await supabase.rpc("create_frequency", {
+      p_name: name,
+      p_description: description || null,
+      p_image: iconUrl || null,
+      p_is_public: Boolean(isPublic),
+      p_invitee_ids: inviteeIds,
+    });
+
+    if (!rpcError2) {
+      return { success: true, data: createdGroup2 };
     }
-  } catch (rpcErr) {
-    console.warn("create_frequency RPC failed, falling back to manual creation:", rpcErr);
+    lastRpcError = rpcError2;
+    console.warn("create_frequency RPC with boolean failed:", rpcError2);
+  } catch (rpcErr2) {
+    lastRpcError = rpcErr2;
+    console.warn("create_frequency boolean exception:", rpcErr2);
   }
 
-  // Fallback insert if RPC is unavailable
-  const { data: newFreq, error: createError } = await supabase
-    .from('groups')
-    .insert({
-      name: name,
-      description: description,
-      image: iconUrl,
-      isPublic: isPublic ? 1 : 0,
-      userId: userData.user.id
-    })
-    .select('id')
-    .single();
+  // Direct INSERT on groups is restricted by database security policy.
+  // Return the actual RPC error message so it is transparent.
+  const errorMsg =
+    lastRpcError?.message ||
+    lastRpcError?.details ||
+    lastRpcError?.hint ||
+    "Database RPC create_frequency failed";
 
-  if (createError || !newFreq) {
-    console.error('Error creating frequency:', createError);
-    return { success: false, error: `Error creating frequency: ${createError?.message}` };
-  }
-
-  // Only add creator to groupMembers (invited members receive invitation notifications and join when they accept)
-  const { error: memberError } = await supabase
-    .from('groupMembers')
-    .insert({ groupId: newFreq.id, userId: userData.user.id });
-
-  if (memberError) {
-    console.error('Error adding creator as member:', memberError);
-    return { success: false, error: `Frequency created but failed to set creator member: ${memberError.message}` };
-  }
-
-  if (selectedUsers.length > 0) {
-    try {
-      const notifsToInsert = selectedUsers.map(invitedUserId => ({
-        senderId: userData.user.id,
-        receiverId: invitedUserId,
-        title: 'Frequency Invitation',
-        data: JSON.stringify({ message: `Invited you to ${name}`, frequencyId: newFreq.id }),
-        type: 'frequency_invite',
-        read: 0
-      }));
-
-      await supabase.from('notifications').insert(notifsToInsert);
-    } catch (err) {
-      console.error('Failed to create invitation notifications:', err);
-    }
-  }
-
-  return { success: true };
+  return {
+    success: false,
+    error: `Error creating frequency: ${errorMsg}`,
+  };
 }
 
 /**

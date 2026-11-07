@@ -442,6 +442,25 @@ export function UserProfileProvider({
           localPersonal?.professionalTitle ||
           null,
         role: userData?.role || localPersonal?.role || crewData?.personal?.role || "",
+        nationality:
+          localPersonal?.selectedCountry ||
+          crewData?.personal?.selectedCountry ||
+          userData?.nationalityCountry ||
+          userData?.nationality_country ||
+          myProfileData?.nationality_country ||
+          myProfileData?.nationalityCountry ||
+          userProfileData?.nationalityCountry ||
+          localPersonal?.nationality ||
+          crewData?.personal?.nationality ||
+          null,
+        selectedCountry:
+          localPersonal?.selectedCountry ||
+          crewData?.personal?.selectedCountry ||
+          userData?.nationalityCountry ||
+          userData?.nationality_country ||
+          myProfileData?.nationality_country ||
+          myProfileData?.nationalityCountry ||
+          null,
         totalFlightHours:
           myProfileData?.flight_hours ||
           myProfileData?.flightHours ||
