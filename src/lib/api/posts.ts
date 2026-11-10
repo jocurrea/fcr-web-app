@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { PollData, PollDuration, parsePollFromPost, serializePollData, calculatePollExpiration } from '@/lib/api/polls';
 
 const USER_IDENTITY_SELECT = `
   id,
@@ -20,6 +21,7 @@ export interface Post {
   frequency_id: string | null;
   text: string;
   image: string | null;
+  poll?: PollData | null;
   created_at: string;
   author: {
     name: string;
@@ -48,6 +50,7 @@ export interface Comment {
  */
 export async function resolvePostFileUrl(fileString: string | null): Promise<string | null> {
   if (!fileString) return null;
+  if (fileString.startsWith("poll://")) return null;
   if (fileString.startsWith("frequency-media://")) {
     const mediaPath = fileString.replace("frequency-media://", "");
     try {
@@ -138,7 +141,7 @@ async function buildPostsWithResumes(data: any[], mode?: string): Promise<Post[]
       ? supabase.from('postLikes').select('postId, userId').in('postId', postIds)
       : Promise.resolve({ data: [] }),
     postIds.length > 0 && mode !== 'withUser'
-      ? supabase.from('comments').select('postId').in('postId', postIds)
+      ? supabase.from('comments').select('postId, body').in('postId', postIds)
       : Promise.resolve({ data: [] }),
   ]);
 
@@ -191,6 +194,7 @@ async function buildPostsWithResumes(data: any[], mode?: string): Promise<Post[]
 
   if (commentsRes.status === 'fulfilled' && (commentsRes.value as any)?.data) {
     for (const c of (commentsRes.value as any).data) {
+      if (c.body && c.body.startsWith('[POLL_VOTE:')) continue;
       commentsMap[c.postId] = (commentsMap[c.postId] || 0) + 1;
     }
   }
@@ -284,13 +288,18 @@ async function buildPostsWithResumes(data: any[], mode?: string): Promise<Post[]
       ? (currentUserId ? post.postLikes.some((l: any) => l.userId === currentUserId) : false)
       : (likesMap[post.id]?.userLiked || false);
 
+    const isPoll = post.file?.startsWith('poll://');
+    const poll = parsePollFromPost(post);
+    const postImage = isPoll ? null : (fileUrls[idx] || null);
+
     return {
       id: post.id,
       created_at: formatDate(post.created_at),
       user_id: post.userId,
       frequency_id: post.groupId,
       text: post.body || '',
-      image: fileUrls[idx] || null,
+      image: postImage,
+      poll: poll || null,
       author: {
         name: authorName || 'User',
         avatar: authorAvatar,
@@ -390,7 +399,9 @@ export async function fetchPostById(postId: string): Promise<Post | null> {
     authorAvatar = `https://api.dicebear.com/7.x/shapes/svg?seed=${encodeURIComponent(data.userId || 'user')}`;
   }
 
-  const resolvedImage = await resolvePostFileUrl(data.file || null);
+  const isPoll = data.file?.startsWith('poll://');
+  const poll = parsePollFromPost(data);
+  const resolvedImage = isPoll ? null : await resolvePostFileUrl(data.file || null);
 
   return {
     id: data.id,
@@ -399,6 +410,7 @@ export async function fetchPostById(postId: string): Promise<Post | null> {
     frequency_id: data.groupId,
     text: data.body || '',
     image: resolvedImage || null,
+    poll: poll || null,
     author: {
       name: authorName || 'User',
       avatar: authorAvatar,
@@ -463,7 +475,9 @@ export async function fetchPostComments(postId: string): Promise<Comment[]> {
     }
   }
 
-  return data.map((comment: any) => {
+  return data
+    .filter((comment: any) => !comment.body?.startsWith('[POLL_VOTE:'))
+    .map((comment: any) => {
     const company = companiesMap[comment.userId];
     const resumeInfo = resumesMap[comment.userId];
     const dbFirstLast = [comment.user?.firstName, comment.user?.middleName, comment.user?.lastName].filter(Boolean).join(' ').trim();
@@ -499,16 +513,37 @@ export async function fetchPostComments(postId: string): Promise<Comment[]> {
 /**
  * Create a new post
  */
-export async function createPost(text: string, frequencyId?: string, imageFile?: File): Promise<{success: boolean, error?: string}> {
+export async function createPost(
+  text: string,
+  frequencyId?: string,
+  imageFile?: File,
+  pollData?: { options: string[]; duration: PollDuration }
+): Promise<{success: boolean, error?: string}> {
   const { data: userData } = await supabase.auth.getUser();
   if (!userData?.user) {
     throw new Error("NOT_LOGGED_IN");
   }
 
-  let imageUrl = null;
+  let imageUrl: string | null = null;
 
-  // Upload image if provided
-  if (imageFile) {
+  // HU-07 Acceptance Criteria 2: Media Exclusivity
+  // A post can contain either a Poll OR media attachments (Image/PDF). They are mutually exclusive.
+  if (pollData && pollData.options && pollData.options.some(o => o.trim())) {
+    const validOptions = pollData.options.map(o => o.trim()).filter(Boolean);
+    if (validOptions.length < 2) {
+      return { success: false, error: "Polls must contain at least 2 options." };
+    }
+    if (validOptions.length > 4) {
+      return { success: false, error: "Polls cannot contain more than 4 options." };
+    }
+    // Poll is active: image attachments are strictly excluded
+    imageUrl = serializePollData({
+      question: text.trim(),
+      options: validOptions.map((optText, idx) => ({ id: idx + 1, text: optText })),
+      duration: pollData.duration || "24h",
+    });
+  } else if (imageFile) {
+    // Upload image if provided and no poll is active
     const fileExt = imageFile.name.split('.').pop() || 'png';
     const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}.${fileExt}`;
 
@@ -590,18 +625,32 @@ export async function createPost(text: string, frequencyId?: string, imageFile?:
     console.error('Error syncing profile in createPost:', e);
   }
 
-  const { error } = await supabase
+  const { data: createdPost, error } = await supabase
     .from('posts')
     .insert({
       userId: userData.user.id,
       body: text,
       groupId: frequencyId || null,
       file: imageUrl
-    });
+    })
+    .select('id')
+    .single();
 
   if (error) {
     console.error('Error creating post:', error);
     return { success: false, error: 'Database error: ' + error.message };
+  }
+
+  // HU-04: Dispatch Mention Notifications (Strictly restricted to active members if private frequency)
+  try {
+    const { dispatchMentionNotifications } = await import('@/lib/api/mentions');
+    await dispatchMentionNotifications({
+      text,
+      postId: createdPost?.id,
+      frequencyId: frequencyId || null,
+    });
+  } catch (err) {
+    console.error('Error dispatching mention notifications in createPost:', err);
   }
 
   return { success: true };
@@ -618,8 +667,15 @@ export async function updatePost(postId: string, text: string, frequencyId?: str
 
   let imageUrl = existingImageUrl;
 
-  // Upload image if provided
-  if (imageFile) {
+  // HU-07 Acceptance Criteria 3: Strict Immutability
+  // Once published, the creator CANNOT modify poll options or duration (prevents race conditions/errors while voting is active).
+  if (existingImageUrl?.startsWith("poll://")) {
+    imageUrl = existingImageUrl;
+    imageFile = undefined;
+  }
+
+  // Upload image if provided (only if not a poll)
+  if (imageFile && !existingImageUrl?.startsWith("poll://")) {
     const fileExt = imageFile.name.split('.').pop() || 'png';
     const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}.${fileExt}`;
 
@@ -749,9 +805,18 @@ export async function createComment(postId: string, text: string): Promise<boole
     return false;
   }
 
-  // Add notification
+  // Add notification & handle mentions
   try {
-    const { data: postData } = await supabase.from('posts').select('userId').eq('id', postId).single();
+    const { data: postData } = await supabase.from('posts').select('userId, groupId').eq('id', postId).single();
+    
+    // HU-04: Mention notifications in comments (Strictly restricted to active members if private frequency)
+    const { dispatchMentionNotifications } = await import('@/lib/api/mentions');
+    await dispatchMentionNotifications({
+      text,
+      postId,
+      frequencyId: (postData as any)?.groupId || null,
+    });
+
     if (postData && postData.userId !== userData.user.id) {
       const { data: senderData } = await supabase.from('users').select('firstName, lastName, username').eq('id', userData.user.id).single();
       const senderName = senderData ? ([senderData.firstName, senderData.lastName].filter(Boolean).join(' ').trim() || senderData.username || 'Someone') : 'Someone';

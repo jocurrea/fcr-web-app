@@ -14,9 +14,9 @@ export async function GET(request: NextRequest) {
   const errorDesc = requestUrl.searchParams.get("error_description");
 
   if (errorParam || errorDesc) {
-    const errorMsg = errorDesc || errorParam || "Email verification error";
+    // HU-06 Acceptance Criteria 1: Suppress error banners upon landing from email confirmation
     return NextResponse.redirect(
-      new URL(`/login?error=${encodeURIComponent(errorMsg)}`, request.url)
+      new URL("/login?confirmation_processed=true", request.url)
     );
   }
 
@@ -42,7 +42,8 @@ export async function GET(request: NextRequest) {
     const user = userSessionData.user;
     const userId = user.id;
 
-    // Sync newly confirmed email to public.users and public.user_profiles
+    // HU-06 Acceptance Criteria 3: Backoffice Admin Sync
+    // Double-confirmed email changes must instantly update and sync with the admin dashboard database (user_profiles & users)
     if (user.email) {
       try {
         let adminClient: any = null;
@@ -53,15 +54,22 @@ export async function GET(request: NextRequest) {
         const dbClient = adminClient || supabase;
         await Promise.allSettled([
           dbClient.from("users").update({ email: user.email }).eq("id", userId),
-          dbClient.from("user_profiles").update({ contactEmail: user.email }).eq("userId", userId),
+          dbClient.from("user_profiles").update({ contactEmail: user.email, email: user.email }).eq("userId", userId),
+          dbClient.from("user_profiles").update({ contactEmail: user.email, email: user.email }).eq("user_id", userId),
+          dbClient.from("resumes").select("data").eq("userId", userId).maybeSingle().then(async ({ data: r }: any) => {
+            if (r?.data?.personal) {
+              const updatedData = { ...r.data, personal: { ...r.data.personal, contactEmail: user.email, email: user.email } };
+              await dbClient.from("resumes").update({ data: updatedData }).eq("userId", userId);
+            }
+          }),
         ]);
       } catch (syncErr) {
-        console.error("[email-change-callback] Error syncing email:", syncErr);
+        console.error("[email-change-callback] Error syncing email to user_profiles table:", syncErr);
       }
     }
 
-    const redirectPath = next.startsWith("/") ? next : "/profile?email_changed=true";
-    return NextResponse.redirect(new URL(redirectPath, request.url));
+    // HU-06 Acceptance Criteria 2: Clean Confirmation Success Guidance
+    return NextResponse.redirect(new URL("/login?confirmation_processed=true", request.url));
   }
 
   // Fallback HTML for clients that receive tokens via hash fragment (#access_token=...&type=email_change)
@@ -77,25 +85,9 @@ export async function GET(request: NextRequest) {
       if (hash.includes('message=')) {
         window.location.href = '/login' + hash;
       } else if (hash.includes('access_token')) {
-        var params = new URLSearchParams(hash.replace(/^#/, ''));
-        var error = params.get('error') || params.get('error_description');
-        if (error) {
-          window.location.href = '/login?error=' + encodeURIComponent(error);
-          return;
-        }
-        var type = params.get('type');
-        if (type === 'email_change') {
-          window.location.href = '/login' + hash;
-          return;
-        }
-        var next = new URLSearchParams(window.location.search).get('next') || '/profile?email_changed=true';
-        window.location.href = next + hash;
-      } else if (hash.includes('error=')) {
-        var params = new URLSearchParams(hash.replace(/^#/, ''));
-        var errorDesc = params.get('error_description') || params.get('error') || 'Email change failed';
-        window.location.href = '/login?error=' + encodeURIComponent(errorDesc);
+        window.location.href = '/login?confirmation_processed=true' + hash;
       } else {
-        window.location.href = '/login';
+        window.location.href = '/login?confirmation_processed=true';
       }
     })();
   </script>

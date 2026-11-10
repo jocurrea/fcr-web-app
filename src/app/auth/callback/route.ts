@@ -14,6 +14,25 @@ export async function GET(request: NextRequest) {
 
   if (errorParam || errorDesc) {
     const errorMsg = errorDesc || errorParam || "Authentication error";
+    const isConfirmationOrRecovery =
+      type === "recovery" ||
+      type === "email_change" ||
+      type === "signup" ||
+      requestUrl.searchParams.get("type") === "recovery" ||
+      requestUrl.searchParams.get("type") === "email_change" ||
+      requestUrl.searchParams.get("type") === "signup" ||
+      errorMsg.toLowerCase().includes("expired") ||
+      errorMsg.toLowerCase().includes("token") ||
+      errorMsg.toLowerCase().includes("authentication failed");
+
+    // HU-06 Acceptance Criteria 1: Suppress error banners upon landing from email confirmation or password reset link
+    if (isConfirmationOrRecovery) {
+      if (type === "recovery" || requestUrl.searchParams.get("type") === "recovery") {
+        return NextResponse.redirect(new URL("/reset-password", request.url));
+      }
+      return NextResponse.redirect(new URL("/login?confirmation_processed=true", request.url));
+    }
+
     return NextResponse.redirect(
       new URL(`/login?error=${encodeURIComponent(errorMsg)}`, request.url)
     );
@@ -41,7 +60,8 @@ export async function GET(request: NextRequest) {
     const user = userSessionData.user;
     const userId = user.id;
 
-    // FIX-B.3: Sync verified new email to public.users & public.user_profiles table (with admin client fallback for Backoffice sync)
+    // HU-06 Acceptance Criteria 3: Backoffice Admin Sync
+    // Double-confirmed email changes must instantly update and sync with the admin dashboard database (user_profiles & users)
     if (user.email) {
       try {
         let adminClient: any = null;
@@ -52,15 +72,26 @@ export async function GET(request: NextRequest) {
         const dbClient = adminClient || supabase;
         await Promise.allSettled([
           dbClient.from("users").update({ email: user.email }).eq("id", userId),
-          dbClient.from("user_profiles").update({ contactEmail: user.email }).eq("userId", userId),
+          dbClient.from("user_profiles").update({ contactEmail: user.email, email: user.email }).eq("userId", userId),
+          dbClient.from("user_profiles").update({ contactEmail: user.email, email: user.email }).eq("user_id", userId),
+          dbClient.from("resumes").select("data").eq("userId", userId).maybeSingle().then(async ({ data: r }: any) => {
+            if (r?.data?.personal) {
+              const updatedData = { ...r.data, personal: { ...r.data.personal, contactEmail: user.email, email: user.email } };
+              await dbClient.from("resumes").update({ data: updatedData }).eq("userId", userId);
+            }
+          }),
         ]);
       } catch (syncErr) {
-        console.error("[auth/callback] Error syncing email to users table:", syncErr);
+        console.error("[auth/callback] Error syncing email to users & user_profiles tables:", syncErr);
       }
     }
 
     if (type === "recovery" || next?.startsWith("/reset-password")) {
       return NextResponse.redirect(new URL("/reset-password", request.url));
+    }
+
+    if (type === "email_change") {
+      return NextResponse.redirect(new URL("/login?confirmation_processed=true", request.url));
     }
 
     if (next && next.startsWith("/")) {
@@ -169,20 +200,26 @@ export async function GET(request: NextRequest) {
       var isRecovery = hashParams.get('type') === 'recovery' || new URLSearchParams(window.location.search).get('type') === 'recovery';
       var isEmailChange = hashParams.get('type') === 'email_change' || new URLSearchParams(window.location.search).get('type') === 'email_change';
       var isSignup = hashParams.get('type') === 'signup' || new URLSearchParams(window.location.search).get('type') === 'signup';
-      var next = new URLSearchParams(window.location.search).get('next') || (isRecovery ? '/reset-password' : (isEmailChange ? '/login' : (isSignup ? '/login?confirmed=true' : '/profile')));
+      var next = new URLSearchParams(window.location.search).get('next') || (isRecovery ? '/reset-password' : (isEmailChange ? '/login?confirmation_processed=true' : (isSignup ? '/login?confirmation_processed=true' : '/profile')));
       window.location.href = next + hash;
     } else {
       var search = new URLSearchParams(window.location.search);
       var isRecoveryQuery = search.get('type') === 'recovery';
       var isSignupQuery = search.get('type') === 'signup' || search.get('type') === 'email_confirmation' || search.get('confirmed') === 'true';
+      var isEmailChangeQuery = search.get('type') === 'email_change';
       var err = search.get('error') || search.get('error_description');
 
       if (isRecoveryQuery) {
         window.location.href = '/reset-password' + window.location.search;
-      } else if (isSignupQuery) {
-        window.location.href = '/login?confirmed=true';
+      } else if (isSignupQuery || isEmailChangeQuery) {
+        window.location.href = '/login?confirmation_processed=true';
       } else if (err) {
-        window.location.href = '/login?error=' + encodeURIComponent(err);
+        var errLower = (err || '').toLowerCase();
+        if (errLower.includes('expired') || errLower.includes('token') || errLower.includes('auth')) {
+          window.location.href = '/login?confirmation_processed=true';
+        } else {
+          window.location.href = '/login?error=' + encodeURIComponent(err);
+        }
       } else {
         window.location.href = '/login';
       }

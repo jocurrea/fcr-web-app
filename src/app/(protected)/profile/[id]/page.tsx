@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   MapPin,
@@ -13,9 +13,23 @@ import {
   Pencil,
   ChevronLeft,
   Building2,
+  MessageSquare,
+  Send,
+  X,
+  ShieldCheck,
+  Clock,
+  Ban,
+  Lock,
+  AlertCircle,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
+import {
+  getExistingDirectConversation,
+  initiateMessageRequest,
+  checkSenderContactStatus,
+  ContactStatus,
+} from "@/lib/api/chat";
 
 const ROLE_DISPLAY_NAMES: Record<string, string> = {
   operations_officer: "Operations Officer",
@@ -30,6 +44,7 @@ const ROLE_DISPLAY_NAMES: Record<string, string> = {
 
 export default function PublicProfilePage() {
   const params = useParams();
+  const router = useRouter();
   const profileId = (params?.id as string) || "";
 
   const [loading, setLoading] = useState(true);
@@ -42,6 +57,98 @@ export default function PublicProfilePage() {
     status: string;
     logo?: string | null;
   } | null>(null);
+
+  // HU-01 & HU-02: Message Request state, cooldown & anti-spam restrictions
+  const [contactStatus, setContactStatus] = useState<ContactStatus | null>(null);
+  const [restrictionModal, setRestrictionModal] = useState<{ title: string; message: string } | null>(null);
+  const [isMessageModalOpen, setIsMessageModalOpen] = useState(false);
+  const [messageRequestText, setMessageRequestText] = useState("");
+  const [isCheckingConversation, setIsCheckingConversation] = useState(false);
+  const [isSubmittingRequest, setIsSubmittingRequest] = useState(false);
+  const [requestError, setRequestError] = useState<string | null>(null);
+
+  const handleMessageClick = async () => {
+    if (!profileId || isOwnProfile) return;
+    setIsCheckingConversation(true);
+    try {
+      const status = await checkSenderContactStatus(profileId);
+      setContactStatus(status);
+
+      if (status.reason === "cooldown") {
+        setRestrictionModal({
+          title: "72-Hour Cooldown Active",
+          message: `Your previous message request was declined. In accordance with community anti-spam guidelines, a 72-hour cooldown is in effect before you can submit a 2nd (and final) request. Cooldown expires in ${status.remainingHours}h ${status.remainingMinutes}m.`,
+        });
+        return;
+      }
+
+      if (status.reason === "permanently_declined") {
+        setRestrictionModal({
+          title: "Message Requests Restricted",
+          message: "You have reached the maximum allowed requests for this user (2 requests declined). In accordance with community safety guidelines, you are permanently restricted from contacting this user.",
+        });
+        return;
+      }
+
+      if (status.reason === "blocked") {
+        setRestrictionModal({
+          title: "Contact Restricted",
+          message: "You cannot initiate contact with this user.",
+        });
+        return;
+      }
+
+      if (status.reason === "blocked_by_me") {
+        setRestrictionModal({
+          title: "Contact Blocked",
+          message: "You have blocked this contact. To message them, you must unblock them first from Settings > Blocked Users.",
+        });
+        return;
+      }
+
+      if (status.reason === "business_dms_disabled") {
+        setRestrictionModal({
+          title: "Direct Messages Disabled",
+          message: `${status.businessName || "This business account"} does not accept direct messages at this time.`,
+        });
+        return;
+      }
+
+      const existing = await getExistingDirectConversation(profileId);
+      if (existing?.conversationId && existing.requestStatus === "accepted") {
+        router.push(`/messages/${existing.conversationId}`);
+        return;
+      }
+
+      setIsMessageModalOpen(true);
+    } catch (err) {
+      console.error("Error checking direct conversation:", err);
+      setIsMessageModalOpen(true);
+    } finally {
+      setIsCheckingConversation(false);
+    }
+  };
+
+  const handleSendInitialRequest = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!messageRequestText.trim() || isSubmittingRequest) return;
+    setIsSubmittingRequest(true);
+    setRequestError(null);
+    try {
+      const res = await initiateMessageRequest(profileId, messageRequestText.trim());
+      if (res.success && res.conversationId) {
+        setIsMessageModalOpen(false);
+        setMessageRequestText("");
+        router.push(`/messages/${res.conversationId}`);
+      } else {
+        setRequestError(res.error || "Failed to send message request.");
+      }
+    } catch (err: any) {
+      setRequestError(err?.message || "Failed to send message request.");
+    } finally {
+      setIsSubmittingRequest(false);
+    }
+  };
 
   useEffect(() => {
     async function loadData() {
@@ -128,6 +235,12 @@ export default function PublicProfilePage() {
           }
         } catch (rpcErr) {
           console.warn("Could not load affiliation from get_public_profile:", rpcErr);
+        }
+        if (session?.user?.id && session.user.id !== profileId) {
+          try {
+            const status = await checkSenderContactStatus(profileId);
+            setContactStatus(status);
+          } catch (e) {}
         }
       } catch (err) {
         console.error("Error loading public profile:", err);
@@ -398,7 +511,7 @@ export default function PublicProfilePage() {
                 {isAvailableForWork ? "Available for Work" : statusBadgeText}
               </span>
 
-              {isOwnProfile && (
+              {isOwnProfile ? (
                 <Link
                   href="/onboarding?edit=true&step=1"
                   className="w-7 h-7 rounded-full bg-gray-50 hover:bg-blue-50 border border-gray-200/80 flex items-center justify-center text-gray-500 hover:text-[#1d4ed8] transition-colors cursor-pointer shrink-0"
@@ -406,6 +519,63 @@ export default function PublicProfilePage() {
                 >
                   <Pencil className="w-3.5 h-3.5" />
                 </Link>
+              ) : contactStatus?.reason === "blocked_by_me" ? (
+                <button
+                  type="button"
+                  onClick={handleMessageClick}
+                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 transition cursor-pointer shrink-0"
+                  title="Contact blocked by you"
+                >
+                  <Ban className="w-3.5 h-3.5 text-red-600" />
+                  <span>Blocked</span>
+                </button>
+              ) : contactStatus?.reason === "business_dms_disabled" ? (
+                <button
+                  type="button"
+                  onClick={handleMessageClick}
+                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-600 border border-slate-200 hover:bg-slate-200 transition cursor-pointer shrink-0"
+                  title="Direct messages disabled by company"
+                >
+                  <Lock className="w-3.5 h-3.5 text-slate-500" />
+                  <span>DMs Disabled</span>
+                </button>
+              ) : contactStatus?.reason === "permanently_declined" || contactStatus?.reason === "blocked" ? (
+                <button
+                  type="button"
+                  onClick={handleMessageClick}
+                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-500 border border-gray-200 hover:bg-gray-200 transition cursor-pointer shrink-0"
+                  title="Contact permanently restricted"
+                >
+                  <Ban className="w-3.5 h-3.5 text-gray-400" />
+                  <span>Restricted</span>
+                </button>
+              ) : contactStatus?.reason === "cooldown" ? (
+                <button
+                  type="button"
+                  onClick={handleMessageClick}
+                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 transition cursor-pointer shrink-0"
+                  title="72-hour cooldown active"
+                >
+                  <Clock className="w-3.5 h-3.5 text-amber-600" />
+                  <span>Cooldown ({contactStatus.remainingHours}h)</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  disabled={isCheckingConversation}
+                  onClick={handleMessageClick}
+                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white shadow-xs transition cursor-pointer shrink-0 disabled:opacity-50"
+                  title="Direct Message"
+                >
+                  <MessageSquare className="w-3.5 h-3.5" />
+                  <span>
+                    {isCheckingConversation
+                      ? "Opening..."
+                      : contactStatus?.declinedCount === 1
+                      ? "Message (Final Try)"
+                      : "Message"}
+                  </span>
+                </button>
               )}
             </div>
 
@@ -516,6 +686,138 @@ export default function PublicProfilePage() {
         </div>
 
       </div>
+
+      {/* HU-01: First-Contact Text-Only Message Request Modal */}
+      {isMessageModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-sm w-full p-5 shadow-2xl border border-gray-100 flex flex-col gap-4 animate-in fade-in zoom-in-95 duration-200">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center">
+                  <MessageSquare className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-gray-900 leading-snug">
+                    Message Request
+                  </h3>
+                  <p className="text-[11px] text-gray-500">to {fullName}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsMessageModalOpen(false);
+                  setRequestError(null);
+                }}
+                className="w-7 h-7 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-500 transition"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Explanatory Policy Alert */}
+            {contactStatus?.declinedCount === 1 ? (
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-2xl flex items-start gap-2.5">
+                <Clock className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                <p className="text-[11px] text-amber-900 leading-relaxed">
+                  <strong>2nd & Final Request:</strong> Your previous request was declined. This is your second and final text-only request to {fullName}. If declined again, you will be permanently blocked from contacting this user.
+                </p>
+              </div>
+            ) : (
+              <div className="p-3 bg-blue-50/80 border border-blue-100 rounded-2xl flex items-start gap-2.5">
+                <ShieldCheck className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+                <p className="text-[11px] text-blue-900 leading-relaxed">
+                  Initial contact is strictly limited to <strong>1 text-only message</strong>. Sending attachments or additional messages is disabled until {fullName} accepts.
+                </p>
+              </div>
+            )}
+
+            {/* Error Message */}
+            {requestError && (
+              <div className="p-2.5 bg-red-50 border border-red-200 rounded-xl text-red-600 text-xs">
+                {requestError}
+              </div>
+            )}
+
+            {/* Form */}
+            <form onSubmit={handleSendInitialRequest} className="flex flex-col gap-3">
+              <textarea
+                rows={4}
+                value={messageRequestText}
+                onChange={(e) => setMessageRequestText(e.target.value)}
+                placeholder={`Introduce yourself to ${fullName}...`}
+                maxLength={500}
+                required
+                className="w-full bg-gray-50 border border-gray-200 rounded-2xl p-3 text-xs sm:text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 resize-none transition"
+              />
+              <div className="flex items-center justify-between text-[11px] text-gray-400 px-1">
+                <span>Text-only (no attachments)</span>
+                <span>{messageRequestText.length}/500</span>
+              </div>
+
+              <div className="flex items-center gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setIsMessageModalOpen(false)}
+                  className="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-xl transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={!messageRequestText.trim() || isSubmittingRequest}
+                  className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 disabled:opacity-50 text-white text-xs font-bold rounded-xl shadow-xs transition flex items-center justify-center gap-1.5"
+                >
+                  {isSubmittingRequest ? (
+                    <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <>
+                      <Send className="w-3.5 h-3.5" />
+                      <span>Send Request</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* HU-02: Cooldown & Anti-Spam Restriction Details Dialog */}
+      {restrictionModal && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-sm w-full p-5 shadow-2xl border border-gray-100 flex flex-col gap-4 animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+                  <AlertCircle className="w-4 h-4" />
+                </div>
+                <h3 className="text-sm font-bold text-gray-900 leading-snug">
+                  {restrictionModal.title}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setRestrictionModal(null)}
+                className="w-7 h-7 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-500 transition cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <p className="text-xs text-gray-600 leading-relaxed">
+              {restrictionModal.message}
+            </p>
+            <button
+              type="button"
+              onClick={() => setRestrictionModal(null)}
+              className="w-full py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-bold rounded-xl transition cursor-pointer"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Plus, User, Search, Users, Bot, LogOut, Mail, FileText, Lock, ShieldCheck, Ban, Trash2, FileDown } from "lucide-react";
+import { Plus, User, Search, Users, Bot, LogOut, Mail, FileText, Lock, ShieldCheck, Ban, Trash2, FileDown, MessageSquare } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { NotificationsBell } from "./notifications-bell";
 import { useUserProfile } from "@/components/providers/user-profile-provider";
@@ -161,7 +161,7 @@ export function ProtectedHeader() {
       ? localStorage.getItem("userProfilePhoto")
       : null);
 
-  if (pathname === "/notifications" || pathname === "/newEmail" || pathname === "/resume-preview" || pathname === "/termsAndConditions" || pathname === "/privacyPolicy" || pathname === "/community-safety" || pathname === "/blockedUsers" || pathname.startsWith("/post/")) {
+  if (pathname === "/notifications" || pathname === "/newEmail" || pathname === "/resume-preview" || pathname === "/termsAndConditions" || pathname === "/privacyPolicy" || pathname === "/community-safety" || pathname === "/blockedUsers" || pathname.startsWith("/post/") || pathname.startsWith("/messages")) {
     return null; // Hide the top header on these specific detail pages
   }
 
@@ -175,7 +175,10 @@ export function ProtectedHeader() {
         </Link>
         
         {/* Right side icons */}
-        <div className="ml-auto flex items-center gap-5 relative" ref={dropdownRef}>
+        <div className="ml-auto flex items-center gap-4 relative" ref={dropdownRef}>
+          <Link href="/messages" className="text-gray-600 hover:text-black transition-colors" title="Direct Messages">
+            <MessageSquare className="w-[23px] h-[23px]" />
+          </Link>
           <NotificationsBell />
           <Link href="/new-post" className="text-gray-600 hover:text-black transition-colors">
             <Plus className="w-[26px] h-[26px]" />
@@ -301,6 +304,9 @@ export function ProtectedHeader() {
                 <Link href="/frequencies" onClick={() => setIsDropdownOpen(false)} className="flex items-center gap-3 px-5 py-1.5 hover:bg-gray-100 text-gray-800 text-[15px] font-medium transition-colors">
                   <Users className="w-[18px] h-[18px]" /> Frequencies
                 </Link>
+                <Link href="/messages" onClick={() => setIsDropdownOpen(false)} className="flex items-center gap-3 px-5 py-1.5 hover:bg-gray-100 text-gray-800 text-[15px] font-medium transition-colors">
+                  <MessageSquare className="w-[18px] h-[18px]" /> Messages
+                </Link>
                 <Link href="/copilot" onClick={() => setIsDropdownOpen(false)} className="flex items-center gap-3 px-5 py-1.5 hover:bg-gray-100 text-gray-800 text-[15px] font-medium transition-colors">
                   <Bot className="w-[18px] h-[18px]" /> AI Copilot
                 </Link>
@@ -329,6 +335,9 @@ export function ProtectedHeader() {
                 </Link>
                 <Link href="/frequencies" onClick={() => setIsDropdownOpen(false)} className="flex items-center gap-3 px-4 py-2 hover:bg-gray-50 text-gray-700 text-[15px] font-medium mx-1 rounded-lg transition-colors">
                   <Users className="w-5 h-5" /> Frequencies
+                </Link>
+                <Link href="/messages" onClick={() => setIsDropdownOpen(false)} className="flex items-center gap-3 px-4 py-2 hover:bg-gray-50 text-gray-700 text-[15px] font-medium mx-1 rounded-lg transition-colors">
+                  <MessageSquare className="w-5 h-5" /> Messages
                 </Link>
                 <Link href="/copilot" onClick={() => setIsDropdownOpen(false)} className="flex items-center gap-3 px-4 py-2 hover:bg-gray-50 text-gray-700 text-[15px] font-medium mx-1 rounded-lg transition-colors">
                   <Bot className="w-5 h-5" /> AI Copilot

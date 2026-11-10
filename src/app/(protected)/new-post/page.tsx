@@ -2,7 +2,9 @@
 
 import { useState, useEffect, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ChevronDown, X, Info, Clock } from "lucide-react";
+import { ChevronDown, X, Info, Clock, BarChart2 } from "lucide-react";
+import { MentionTextarea } from "@/components/mentions/mention-textarea";
+import { PollCreator, PollCreatorState } from "@/components/polls/poll-creator";
 
 function NewPostContent() {
   const router = useRouter();
@@ -19,6 +21,8 @@ function NewPostContent() {
   const [attachedImage, setAttachedImage] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [pollState, setPollState] = useState<PollCreatorState | null>(null);
+  const [isPollImmutable, setIsPollImmutable] = useState(false);
   const [isPosting, setIsPosting] = useState(false);
   const [isCompanyPending, setIsCompanyPending] = useState(false);
   const [showPendingModal, setShowPendingModal] = useState(false);
@@ -115,6 +119,14 @@ function NewPostContent() {
             setText(post.text || "");
             setAttachedImage(post.image || null);
             setSelectedFrequency(post.frequency_id || "");
+            if (post.poll) {
+              setPollState({
+                options: post.poll.options.map(o => o.text),
+                duration: post.poll.duration,
+              });
+              // HU-07 Acceptance Criteria 3: Strict Immutability once published
+              setIsPollImmutable(true);
+            }
           }
         });
       });
@@ -140,6 +152,13 @@ function NewPostContent() {
   }, [editId]);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // HU-07 Acceptance Criteria 2: Media Exclusivity
+    if (pollState) {
+      alert("A post can contain either a Poll OR media attachments. Please remove the poll before attaching media.");
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+
     const file = e.target.files?.[0];
     if (file) {
       if (file.size > 1.9 * 1024 * 1024) {
@@ -156,12 +175,41 @@ function NewPostContent() {
     }
   };
 
+  const handleTogglePoll = () => {
+    // HU-07 Acceptance Criteria 2: Media Exclusivity
+    if (attachedImage) {
+      alert("A post can contain either a Poll OR media attachments. Please remove the attached media to create a poll.");
+      return;
+    }
+    if (pollState) {
+      setPollState(null);
+    } else {
+      setPollState({
+        options: ["", ""],
+        duration: "24h",
+      });
+    }
+  };
+
   const handlePost = async () => {
     if (isCompanyPending) {
       setShowPendingModal(true);
       return;
     }
-    if (!text.trim() && !attachedImage) return;
+
+    const validPollOptions = pollState ? pollState.options.map(o => o.trim()).filter(Boolean) : [];
+    if (pollState && !isPollImmutable) {
+      if (validPollOptions.length < 2) {
+        alert("Polls must contain at least 2 non-empty options.");
+        return;
+      }
+      if (validPollOptions.length > 4) {
+        alert("Polls cannot contain more than 4 options.");
+        return;
+      }
+    }
+
+    if (!text.trim() && !attachedImage && (!pollState || validPollOptions.length < 2)) return;
 
     setIsPosting(true);
     
@@ -170,12 +218,15 @@ function NewPostContent() {
       let result: { success: boolean; error?: string } = { success: false, error: 'Unknown error' };
       
       if (editId) {
-        // Only pass attachedImage if there's no new imageFile, to keep existing image
-        // Wait, updatePost wasn't modified to return an object yet. I will assume it still returns boolean.
         const success = await updatePost(editId, text.trim(), selectedFrequency || undefined, imageFile || undefined, imageFile ? null : attachedImage);
         result = { success, error: success ? undefined : 'Error updating post' };
       } else {
-        result = await createPost(text.trim(), selectedFrequency || undefined, imageFile || undefined) as any;
+        result = await createPost(
+          text.trim(),
+          selectedFrequency || undefined,
+          pollState ? undefined : (imageFile || undefined),
+          pollState ? { options: validPollOptions, duration: pollState.duration } : undefined
+        ) as any;
       }
       
       if (result.success) {
@@ -273,12 +324,15 @@ function NewPostContent() {
 
       {/* Input Area */}
       <div className="mb-4 flex flex-col gap-3">
-        <textarea
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          placeholder="What's on your mind?"
-          className="w-full h-[140px] text-[15px] text-gray-800 placeholder-gray-400 outline-none resize-none bg-white border border-gray-300 rounded-[18px] p-5 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all shadow-sm"
-        />
+        <div className="w-full bg-white border border-gray-300 rounded-[18px] p-4 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500 transition-all shadow-sm">
+          <MentionTextarea
+            value={text}
+            onChange={setText}
+            placeholder="What's on your mind? Type @ to mention..."
+            frequencyId={selectedFrequency || null}
+            rows={5}
+          />
+        </div>
         {attachedImage && (
           <div className="relative w-full rounded-2xl overflow-hidden border border-gray-200 shadow-sm">
             {attachedImage.startsWith('data:video/') || /\.(mp4|webm|ogg|mov)(\?.*)?$/i.test(attachedImage) ? (
@@ -288,18 +342,53 @@ function NewPostContent() {
             )}
             <button 
               onClick={() => { setAttachedImage(null); setImageFile(null); if (fileInputRef.current) fileInputRef.current.value = ""; }}
-              className="absolute top-2 right-2 bg-black/60 p-1.5 rounded-full text-white hover:bg-black/80 transition-colors"
+              className="absolute top-2 right-2 bg-black/60 p-1.5 rounded-full text-white hover:bg-black/80 transition-colors cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
           </div>
         )}
+
+        {/* Feed Poll Creator (HU-07: Media Exclusivity) */}
+        {pollState && (
+          <PollCreator
+            pollState={pollState}
+            onChange={setPollState}
+            onRemove={() => setPollState(null)}
+            isImmutable={isPollImmutable}
+          />
+        )}
       </div>
 
       {/* Toolbar */}
-      <div className="flex items-center justify-between border border-gray-300 bg-white rounded-full px-5 py-3.5 mb-8 shadow-sm">
+      <div className="flex items-center justify-between border border-gray-300 bg-white rounded-full px-5 py-3 mb-8 shadow-sm">
         <span className="text-[15px] font-semibold text-gray-700">Add to your post</span>
-        <div className="flex items-center gap-5 text-[#4A4A4A]">
+        <div className="flex items-center gap-4 text-[#4A4A4A]">
+          {/* Poll Button */}
+          <button
+            type="button"
+            onClick={handleTogglePoll}
+            disabled={isPollImmutable}
+            className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+              pollState
+                ? "bg-blue-100 text-blue-600 font-semibold"
+                : attachedImage
+                ? "opacity-30 cursor-not-allowed text-gray-400"
+                : "hover:text-blue-600 hover:bg-gray-100"
+            }`}
+            title={
+              isPollImmutable
+                ? "Poll is published and immutable"
+                : attachedImage
+                ? "Cannot add poll to a post with media"
+                : pollState
+                ? "Remove poll"
+                : "Add a poll"
+            }
+          >
+            <BarChart2 className="w-[22px] h-[22px]" />
+          </button>
+
           <input 
             type="file" 
             accept="image/*,video/*" 
@@ -307,14 +396,40 @@ function NewPostContent() {
             ref={fileInputRef} 
             onChange={handleImageUpload} 
           />
-          <button onClick={() => fileInputRef.current?.click()} className="hover:text-gray-900 transition-colors">
+          <button
+            type="button"
+            onClick={() => {
+              if (pollState) {
+                alert("A post can contain either a Poll OR media attachments. Please remove the poll before attaching media.");
+                return;
+              }
+              fileInputRef.current?.click();
+            }}
+            className={`hover:text-gray-900 transition-colors cursor-pointer ${
+              pollState ? "opacity-30 cursor-not-allowed" : ""
+            }`}
+            title={pollState ? "Media attachments cannot be combined with polls" : "Add photo"}
+          >
             <svg className="w-[24px] h-[24px]" viewBox="0 0 24 24">
               <rect x="1" y="2" width="22" height="20" rx="4" fill="currentColor" />
               <circle cx="16" cy="8" r="2" fill="white" />
               <path d="M1 17L8 10L14 16L18 12L23 18V18C23 20.2091 21.2091 22 19 22H5C2.79086 22 1 20.2091 1 18V17Z" fill="white" />
             </svg>
           </button>
-          <button onClick={() => fileInputRef.current?.click()} className="hover:text-gray-900 transition-colors">
+          <button
+            type="button"
+            onClick={() => {
+              if (pollState) {
+                alert("A post can contain either a Poll OR media attachments. Please remove the poll before attaching media.");
+                return;
+              }
+              fileInputRef.current?.click();
+            }}
+            className={`hover:text-gray-900 transition-colors cursor-pointer ${
+              pollState ? "opacity-30 cursor-not-allowed" : ""
+            }`}
+            title={pollState ? "Media attachments cannot be combined with polls" : "Add video"}
+          >
             <svg className="w-[24px] h-[24px]" viewBox="0 0 24 24">
               <rect x="1" y="3" width="22" height="15" rx="3" fill="currentColor" />
               <polygon points="10,7 16,10.5 10,14" fill="white" />
@@ -327,9 +442,11 @@ function NewPostContent() {
       {/* Post Button */}
       <button 
         onClick={handlePost}
-        disabled={isPosting || (!text.trim() && !attachedImage)}
+        disabled={isPosting || (!text.trim() && !attachedImage && (!pollState || pollState.options.filter(o => o.trim()).length < 2))}
         className={`w-full py-3.5 mt-auto rounded-full font-bold text-[16px] transition-all shadow-sm ${
-          text.trim() || attachedImage ? "bg-[#1a73e8] text-white hover:bg-blue-700" : "bg-[#1a73e8] text-white opacity-50 cursor-not-allowed"
+          text.trim() || attachedImage || (pollState && pollState.options.filter(o => o.trim()).length >= 2)
+            ? "bg-[#1a73e8] text-white hover:bg-blue-700 cursor-pointer"
+            : "bg-[#1a73e8] text-white opacity-50 cursor-not-allowed"
         }`}
       >
         <span className="font-bold text-[15px]">{isPosting ? (editId ? "Updating..." : "Posting...") : (editId ? "Update" : "Post")}</span>

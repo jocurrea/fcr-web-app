@@ -25,6 +25,7 @@ import {
   ShieldCheck,
   Check,
   AlertTriangle,
+  MessageSquare,
 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
@@ -32,6 +33,7 @@ import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
 import { fetchPosts } from "@/lib/api/posts";
+import { getBusinessDirectMessageSetting, updateBusinessDirectMessageSetting } from "@/lib/api/business";
 import { PostCard } from "@/components/home/post-card";
 import { computeProfileAreas } from "@/utils/profileCompletion";
 import { revalidateProfileLayout, saveAvailabilityStatusAction } from "@/actions/profile";
@@ -119,6 +121,34 @@ export default function ProfilePage() {
   const [showAvailabilityModal, setShowAvailabilityModal] = useState(false);
   const [loadingVisitors, setLoadingVisitors] = useState(false);
   const [loadingLikers, setLoadingLikers] = useState(false);
+
+  // HU-05: Business direct message toggle state
+  const [allowBusinessDMs, setAllowBusinessDMs] = useState<boolean>(true);
+  const [togglingBusinessDMs, setTogglingBusinessDMs] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (isBusiness) {
+      getBusinessDirectMessageSetting().then((val) => setAllowBusinessDMs(val));
+    }
+  }, [isBusiness]);
+
+  const handleToggleBusinessDMs = async () => {
+    if (togglingBusinessDMs) return;
+    setTogglingBusinessDMs(true);
+    const nextVal = !allowBusinessDMs;
+    setAllowBusinessDMs(nextVal);
+    try {
+      const res = await updateBusinessDirectMessageSetting(nextVal);
+      if (!res.success) {
+        setAllowBusinessDMs(!nextVal); // revert
+        alert(res.error || "Failed to update direct messaging setting");
+      }
+    } catch {
+      setAllowBusinessDMs(!nextVal);
+    } finally {
+      setTogglingBusinessDMs(false);
+    }
+  };
 
 
   const loading = contextLoading;
@@ -841,6 +871,49 @@ export default function ProfilePage() {
             </div>
           </div>
         )}
+
+        {/* 6. Direct Messaging Rules Card (HU-05) */}
+        <div className="bg-white rounded-3xl p-6 flex flex-col shadow-xs border border-gray-100 gap-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <MessageSquare className="w-5 h-5 text-[#1d4ed8]" />
+              <h2 className="font-extrabold text-base text-gray-900">Direct messaging</h2>
+            </div>
+            <Link
+              href="/onboarding-business?edit=visibility&from=profile"
+              className="text-[#1d4ed8] hover:text-[#1e40af] transition-colors p-1"
+              title="Edit community visibility"
+            >
+              <Pencil className="w-4 h-4" />
+            </Link>
+          </div>
+
+          <div className="flex items-center justify-between pt-2">
+            <div className="flex flex-col pr-4">
+              <span className="text-sm font-bold text-gray-900">Allow Direct Messages</span>
+              <span className="text-xs text-gray-500 mt-0.5 leading-relaxed">
+                Allow crew members and professionals to message your business. When turned off, existing chats enter read-only mode until re-enabled.
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={handleToggleBusinessDMs}
+              disabled={togglingBusinessDMs}
+              className={cn(
+                "w-12 h-6.5 rounded-full transition-colors relative flex items-center p-0.5 shrink-0 cursor-pointer disabled:opacity-50",
+                allowBusinessDMs ? "bg-blue-600" : "bg-gray-300"
+              )}
+              title={allowBusinessDMs ? "Disable Direct Messages" : "Enable Direct Messages"}
+            >
+              <span
+                className={cn(
+                  "w-5.5 h-5.5 rounded-full bg-white shadow-md transform transition-transform",
+                  allowBusinessDMs ? "translate-x-5.5" : "translate-x-0"
+                )}
+              />
+            </button>
+          </div>
+        </div>
       </div>
     );
   }
@@ -1576,9 +1649,11 @@ export default function ProfilePage() {
                   date={post.created_at}
                   content={post.text}
                   image={post.image || undefined}
+                  poll={post.poll}
                   likes={post.likes}
                   liked={post.liked}
                   comments={post.comments}
+                  frequencyId={post.frequency_id || null}
                 />
               ))}
             </div>

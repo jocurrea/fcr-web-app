@@ -178,9 +178,11 @@ function HomeContent() {
             date={post.created_at}
             content={post.text}
             image={post.image || undefined}
+            poll={post.poll}
             likes={post.likes}
             liked={post.liked}
             comments={post.comments}
+            frequencyId={post.frequency_id || null}
           />
         ))
       )}

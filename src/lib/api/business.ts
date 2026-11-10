@@ -605,3 +605,85 @@ export async function submitBusinessOnboarding(
     return { success: false, error: error instanceof Error ? error.message : "Could not submit company profile." };
   }
 }
+
+/**
+ * HU-05: Fetch "Allow Direct Messages" toggle state for the authenticated business account
+ */
+export async function getBusinessDirectMessageSetting(): Promise<boolean> {
+  try {
+    const userId = await getCurrentUserId();
+    const { data: company } = await supabase
+      .from("companies")
+      .select("id")
+      .eq("owner_user_id", userId)
+      .maybeSingle();
+
+    if (!company) return true;
+
+    const { data: settings } = await supabase
+      .from("company_settings")
+      .select("allow_crew_direct_messages")
+      .eq("company_id", company.id)
+      .maybeSingle();
+
+    if (!settings) return true;
+    return settings.allow_crew_direct_messages !== false;
+  } catch (err) {
+    console.error("Error fetching business direct message setting:", err);
+    return true;
+  }
+}
+
+/**
+ * HU-05: Update "Allow Direct Messages" toggle for the authenticated business account
+ */
+export async function updateBusinessDirectMessageSetting(
+  allowDirectMessages: boolean
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const userId = await getCurrentUserId();
+    const { data: company } = await supabase
+      .from("companies")
+      .select("id")
+      .eq("owner_user_id", userId)
+      .maybeSingle();
+
+    if (!company) {
+      return { success: false, error: "Company profile not found" };
+    }
+
+    const { data: existingSettings } = await supabase
+      .from("company_settings")
+      .select("id")
+      .eq("company_id", company.id)
+      .maybeSingle();
+
+    let error;
+    if (existingSettings) {
+      const { error: updateError } = await supabase
+        .from("company_settings")
+        .update({ allow_crew_direct_messages: allowDirectMessages })
+        .eq("company_id", company.id);
+      error = updateError;
+    } else {
+      const { error: insertError } = await supabase
+        .from("company_settings")
+        .insert({
+          company_id: company.id,
+          allow_crew_direct_messages: allowDirectMessages,
+        });
+      error = insertError;
+    }
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    return { success: true };
+  } catch (err: any) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : "Could not update setting",
+    };
+  }
+}

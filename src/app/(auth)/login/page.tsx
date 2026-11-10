@@ -25,6 +25,7 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [emailChangeNotice, setEmailChangeNotice] = useState<EmailChangeNotice | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [isWebConfirmationSuccess, setIsWebConfirmationSuccess] = useState(false);
 
   // Clean any residual parameters (like ?edit=true&from=onboarding) from the URL or session
   const cleanResidualParams = useCallback(() => {
@@ -264,9 +265,11 @@ export default function LoginPage() {
                   const updatedEmail = data.user.email;
                   setEmail(updatedEmail);
                   try {
+                    // HU-06 Acceptance Criteria 3: Double-confirmed email changes must instantly update and sync with admin dashboard database (user_profiles & users)
                     await Promise.allSettled([
                       supabase.from("users").update({ email: updatedEmail }).eq("id", data.user.id),
-                      supabase.from("user_profiles").update({ contactEmail: updatedEmail }).eq("userId", data.user.id),
+                      supabase.from("user_profiles").update({ contactEmail: updatedEmail, email: updatedEmail }).eq("userId", data.user.id),
+                      supabase.from("user_profiles").update({ contactEmail: updatedEmail, email: updatedEmail }).eq("user_id", data.user.id),
                     ]);
                   } catch (e) {
                     console.warn("Could not sync email update to database:", e);
@@ -280,10 +283,10 @@ export default function LoginPage() {
 
           setEmailChangeNotice({
             step: "email_change_success",
-            title: "Email Successfully Updated!",
-            subtitle: "Your new email is now active",
+            title: "Request Processed Successfully",
+            subtitle: "Your email change is complete",
             message:
-              "Your email address has been verified and updated. You can now use your new email address to sign in.",
+              "Your request has been successfully processed. You may now close this browser window and return to the mobile app.",
             detail:
               "All notifications and account recovery messages will now be sent to your updated email address.",
           });
@@ -292,7 +295,10 @@ export default function LoginPage() {
         else if (hashError) {
           window.history.replaceState(null, "", window.location.pathname);
           const decoded = hashError.replace(/\+/g, " ");
-          if (!decoded.toLowerCase().includes("authentication failed")) {
+          const isSuppressedNoise = /authentication failed|otp_expired|invalid.*expired|token|access_denied|bad_jwt/i.test(decoded);
+          const isConfirmationContext = rawHash.includes("type=recovery") || rawHash.includes("type=signup") || rawHash.includes("type=email_change");
+          // HU-06 Acceptance Criteria 1: Suppress error banners on landing from auth confirmation/recovery links
+          if (!isSuppressedNoise && !isConfirmationContext) {
             setError(decoded);
           }
         }
@@ -305,13 +311,16 @@ export default function LoginPage() {
         return;
       }
 
-      // Check search params for confirmation success
-      if (
+      // HU-06 Acceptance Criteria 2: Clean Confirmation Success Guidance
+      const isConfirmedSuccess =
+        urlParams.get("confirmation_processed") === "true" ||
         urlParams.get("confirmed") === "true" ||
         urlParams.get("email_confirmed") === "true" ||
-        urlParams.get("type") === "signup"
-      ) {
-        setSuccessMessage("Your email address has been verified successfully! Please log in to continue.");
+        urlParams.get("type") === "signup";
+
+      if (isConfirmedSuccess) {
+        setIsWebConfirmationSuccess(true);
+        setError(null);
       }
 
       // Capture invitation token and redirect if present in URL
@@ -326,8 +335,9 @@ export default function LoginPage() {
       const searchError = urlParams.get("error") || urlParams.get("error_description");
       if (searchError) {
         const decoded = searchError.replace(/\+/g, " ");
-        // Explicitly suppress default "Authentication failed" upon landing from an auth redirect
-        if (!decoded.toLowerCase().includes("authentication failed")) {
+        const isSuppressedNoise = /authentication failed|otp_expired|invalid.*expired|token|access_denied|bad_jwt/i.test(decoded);
+        // HU-06 Acceptance Criteria 1: Landing via email confirmation, signup, or password reset MUST NOT display default red error banners
+        if (!isSuppressedNoise && !isConfirmedSuccess && urlParams.get("type") !== "recovery") {
           setError(decoded);
         }
       }
@@ -335,8 +345,14 @@ export default function LoginPage() {
 
     cleanResidualParams();
 
-    // Do not check session or auto-redirect if an email change action is being displayed
-    if (isEmailChangeAction) {
+    // Do not check session or auto-redirect if an email change action or web confirmation screen is active
+    const urlParamsCheck = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
+    if (
+      isEmailChangeAction ||
+      urlParamsCheck?.get("confirmation_processed") === "true" ||
+      urlParamsCheck?.get("confirmed") === "true" ||
+      urlParamsCheck?.get("email_confirmed") === "true"
+    ) {
       return;
     }
 
@@ -478,21 +494,7 @@ export default function LoginPage() {
                   onClick={() => setEmailChangeNotice(null)}
                   className="w-full text-white font-bold text-base py-3.5 rounded-full bg-[#2d73f5] hover:bg-[#2d73f5]/90 transition-colors shadow-sm cursor-pointer"
                 >
-                  Sign In with New Email
-                </button>
-                <button
-                  type="button"
-                  onClick={async () => {
-                    const { data: { session } } = await supabase.auth.getSession();
-                    if (session?.user) {
-                      await handlePostLoginRedirect(session.user.id, session);
-                    } else {
-                      setEmailChangeNotice(null);
-                    }
-                  }}
-                  className="w-full text-gray-700 font-semibold text-sm py-3 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors cursor-pointer"
-                >
-                  Continue to App
+                  Continue to Web Login
                 </button>
               </>
             )}
@@ -503,6 +505,33 @@ export default function LoginPage() {
         <div className="text-center py-2">
           <p className="text-xs text-gray-400">FlightCrew &bull; Security &amp; Verification</p>
         </div>
+      </div>
+    );
+  }
+
+  // HU-06 Acceptance Criteria 2: Web Confirmation Success Screen
+  if (isWebConfirmationSuccess) {
+    return (
+      <div className="flex flex-col min-h-screen px-6 py-12 justify-center items-center text-center max-w-md mx-auto w-full">
+        <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mb-6 shadow-sm">
+          <CheckCircle2 className="w-10 h-10 text-emerald-600" />
+        </div>
+        <h1 className="text-2xl font-bold text-gray-900 leading-tight mb-3">
+          Request Processed Successfully
+        </h1>
+        <p className="text-sm sm:text-base text-gray-600 leading-relaxed mb-8">
+          Your request has been successfully processed. You may now close this browser window and return to the mobile app.
+        </p>
+        <button
+          type="button"
+          onClick={() => {
+            setIsWebConfirmationSuccess(false);
+            window.history.replaceState(null, "", window.location.pathname);
+          }}
+          className="text-xs text-blue-600 hover:text-blue-800 font-semibold"
+        >
+          Continue to Web Login &rarr;
+        </button>
       </div>
     );
   }

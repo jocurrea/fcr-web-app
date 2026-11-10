@@ -2,6 +2,9 @@ import { useState, useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { MoreHorizontal, Heart, MessageCircle, Flag, Forward, X, User, ChevronRight } from "lucide-react";
+import { MentionRenderer } from "@/components/mentions/mention-renderer";
+import { PollData } from "@/lib/api/polls";
+import { PollCard } from "@/components/polls/poll-card";
 import { cn } from "@/lib/utils";
 
 interface PostCardProps {
@@ -14,17 +17,21 @@ interface PostCardProps {
   date: string;
   content: string;
   image?: string;
+  poll?: PollData | null;
   likes: number;
   liked?: boolean;
   comments: number;
   hideActions?: boolean;
+  frequencyId?: string | null;
+  isPrivateFrequency?: boolean;
 }
 
-export function PostCard({ id, user, date, content, image, likes, liked, comments, hideActions }: PostCardProps) {
+export function PostCard({ id, user, date, content, image, poll, likes, liked, comments, hideActions, frequencyId, isPrivateFrequency }: PostCardProps) {
   const router = useRouter();
   const pathname = usePathname();
   const [isLiked, setIsLiked] = useState(liked || false);
   const [likeCount, setLikeCount] = useState(likes || 0);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   const [showLikersModal, setShowLikersModal] = useState(false);
   const [likersList, setLikersList] = useState<any[]>([]);
@@ -34,6 +41,14 @@ export function PostCard({ id, user, date, content, image, likes, liked, comment
     setIsLiked(liked || false);
     setLikeCount(likes || 0);
   }, [liked, likes]);
+
+  useEffect(() => {
+    import('@/lib/supabase').then(({ supabase }) => {
+      supabase.auth.getUser().then(({ data }) => {
+        if (data?.user?.id) setCurrentUserId(data.user.id);
+      });
+    });
+  }, []);
 
   const handleProfileClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -127,7 +142,16 @@ export function PostCard({ id, user, date, content, image, likes, liked, comment
       {/* Content */}
       {content && (
         <div className="px-4 pb-3">
-          <p className="text-gray-800 text-sm">{content}</p>
+          <p className="text-gray-800 text-sm">
+            <MentionRenderer content={content} frequencyId={frequencyId || undefined} isPrivateFrequency={isPrivateFrequency} />
+          </p>
+        </div>
+      )}
+
+      {/* Poll (HU-07: Media Exclusivity - either Poll OR Media) */}
+      {poll && id && (
+        <div className="px-4 pb-2">
+          <PollCard postId={id} initialPoll={poll} currentUserId={currentUserId} />
         </div>
       )}
 

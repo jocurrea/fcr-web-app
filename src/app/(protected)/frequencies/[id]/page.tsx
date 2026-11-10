@@ -4,15 +4,18 @@ import { useState, useEffect } from "react";
 import { ChevronLeft, MoreHorizontal, Heart, MessageCircle } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
+import { MentionRenderer } from "@/components/mentions/mention-renderer";
+import { PollCard } from "@/components/polls/poll-card";
 
 export default function FrequencyFeedPage() {
   const params = useParams();
   const router = useRouter();
   const id = params.id as string;
-  
+
   const [posts, setPosts] = useState<any[]>([]);
   const [frequencyName, setFrequencyName] = useState("test");
   const [frequencyBanner, setFrequencyBanner] = useState("https://images.unsplash.com/photo-1544015759-237f88e55f56?auto=format&fit=crop&q=80&w=800");
+  const [isPrivate, setIsPrivate] = useState(false);
   const [showLeaveModal, setShowLeaveModal] = useState(false);
   const [canEdit, setCanEdit] = useState(false);
 
@@ -22,12 +25,13 @@ export default function FrequencyFeedPage() {
       const { fetchFrequencyById } = await import("@/lib/api/frequencies");
       const { supabase } = await import("@/lib/supabase");
       const { data: { session } } = await supabase.auth.getSession();
-      
+
       const freq = await fetchFrequencyById(id);
-      
+
       if (freq) {
         setFrequencyName(freq.name);
         if (freq.image) setFrequencyBanner(freq.image);
+        setIsPrivate((freq.isPublic as any) === 0 || freq.isPublic === false || (freq as any).is_public === 0 || (freq as any).is_public === false);
         if (session && freq.userId === session.user.id) {
           setCanEdit(true);
         }
@@ -57,7 +61,7 @@ export default function FrequencyFeedPage() {
     if (!post) return;
 
     const newLiked = !post.liked;
-    
+
     // Optimistic update
     const updatedPosts = posts.map((p) => {
       if (p.id === postId) {
@@ -74,7 +78,7 @@ export default function FrequencyFeedPage() {
     // Sync to Supabase
     const { toggleLike: syncLike } = await import("@/lib/api/posts");
     const success = await syncLike(postId, !newLiked);
-    
+
     if (!success) {
       // Revert on failure
       const reverted = posts.map((p) => {
@@ -95,8 +99,8 @@ export default function FrequencyFeedPage() {
     <div className="max-w-lg mx-auto flex flex-col w-full bg-[#f8f9fa] min-h-screen pb-10 relative">
       {/* Header */}
       <header className="flex items-center py-5 px-4 relative mt-2 bg-[#f8f9fa]">
-        <Link 
-          href="/frequencies" 
+        <Link
+          href="/frequencies"
           className="p-2.5 bg-white hover:bg-gray-100 transition-colors rounded-full shadow-sm border border-gray-100"
         >
           <ChevronLeft className="w-5 h-5 text-gray-800 stroke-[2.5]" />
@@ -107,13 +111,13 @@ export default function FrequencyFeedPage() {
       {/* Banner */}
       <div className="relative w-full h-[180px] shrink-0 px-4">
         <div className="w-full h-full rounded-3xl overflow-hidden relative shadow-sm bg-gray-200">
-          <img 
-            src={frequencyBanner} 
-            alt="Frequency Banner" 
+          <img
+            src={frequencyBanner}
+            alt="Frequency Banner"
             className="w-full h-full object-cover"
           />
           {canEdit && (
-            <Link 
+            <Link
               href={`/frequencies/${id}/edit`}
               className="absolute top-3 right-3 bg-white text-blue-600 font-semibold text-[14px] px-5 py-1.5 rounded-full shadow-md hover:bg-gray-50 transition-colors z-10"
             >
@@ -137,7 +141,7 @@ export default function FrequencyFeedPage() {
         {posts.length === 0 && (
           <div className="mt-20 text-center text-[15px] text-gray-500 font-medium">No posts</div>
         )}
-        
+
         {/* Dynamic Posts */}
         {posts.map((post) => (
           <div key={post.id} className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
@@ -153,11 +157,20 @@ export default function FrequencyFeedPage() {
                 <MoreHorizontal className="w-5 h-5" />
               </button>
             </div>
-            
+
             <div className="px-4 pb-3">
-              <p className="text-[14.5px] text-gray-800 whitespace-pre-wrap">{post.text}</p>
+              <p className="text-[14.5px] text-gray-800 whitespace-pre-wrap">
+                <MentionRenderer content={post.text} frequencyId={id} isPrivateFrequency={isPrivate} />
+              </p>
             </div>
-            
+
+            {/* Poll (HU-07: Media Exclusivity - either Poll OR Media) */}
+            {post.poll && post.id && (
+              <div className="px-4 pb-2">
+                <PollCard postId={post.id} initialPoll={post.poll} />
+              </div>
+            )}
+
             {post.image && (
               <div className="w-full">
                 {/\.(mp4|webm|ogg|mov)(\?.*)?$/i.test(post.image) || post.image.startsWith('data:video/') ? (
@@ -167,10 +180,10 @@ export default function FrequencyFeedPage() {
                 )}
               </div>
             )}
-            
+
             {/* Post Interactions */}
             <div className="px-4 py-3 flex items-center gap-4 text-gray-500">
-              <button 
+              <button
                 onClick={() => handleToggleLike(post.id)}
                 className={`flex items-center gap-1.5 transition-colors ${post.liked ? 'text-red-500' : 'hover:text-red-500'}`}
               >
@@ -194,13 +207,13 @@ export default function FrequencyFeedPage() {
               Are you sure you want to leave <span className="font-semibold text-gray-800">{frequencyName}</span>? You won't be able to post into this frequency or see any of its posts.
             </p>
             <div className="flex gap-3 w-full">
-              <button 
+              <button
                 onClick={() => setShowLeaveModal(false)}
                 className="flex-1 py-2.5 rounded-full border border-[#1a73e8] text-[#1a73e8] font-semibold text-[15px] hover:bg-blue-50 transition-colors"
               >
                 Cancel
               </button>
-              <button 
+              <button
                 onClick={handleLeaveFrequency}
                 className="flex-1 py-2.5 rounded-full bg-[#ef4444] text-white font-semibold text-[15px] hover:bg-red-600 transition-colors"
               >

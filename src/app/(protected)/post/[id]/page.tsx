@@ -8,6 +8,8 @@ import { PostCard } from "@/components/home/post-card";
 import { fetchPostById, fetchPostComments, createComment, deleteComment, deletePost, updateComment, Post, Comment } from "@/lib/api/posts";
 import { supabase } from "@/lib/supabase";
 import { ConfirmationModal } from "@/components/ui/confirmation-modal";
+import { MentionRenderer } from "@/components/mentions/mention-renderer";
+import { MentionTextarea } from "@/components/mentions/mention-textarea";
 
 import { Suspense } from "react";
 
@@ -21,6 +23,7 @@ function PostDetailContent() {
   const [comments, setComments] = useState<Comment[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [isPrivateFrequency, setIsPrivateFrequency] = useState(false);
   
   const [commentText, setCommentText] = useState("");
   const [commentToDelete, setCommentToDelete] = useState<string | number | null>(null);
@@ -70,6 +73,17 @@ function PostDetailContent() {
       const postData = await fetchPostById(id);
       if (postData) {
         setPost(postData);
+        if (postData.frequency_id) {
+          try {
+            const { fetchFrequencyById } = await import("@/lib/api/frequencies");
+            const freq = await fetchFrequencyById(postData.frequency_id);
+            if (freq) {
+              setIsPrivateFrequency((freq.isPublic as any) === 0 || freq.isPublic === false || (freq as any).is_public === 0 || (freq as any).is_public === false);
+            }
+          } catch (e) {
+            console.error("Error fetching frequency details for mentions:", e);
+          }
+        }
         const commentsData = await fetchPostComments(id);
         setComments(commentsData);
       }
@@ -231,10 +245,13 @@ function PostDetailContent() {
             date={post.created_at}
             content={post.text}
             image={post.image || undefined}
+            poll={post.poll}
             likes={post.likes}
             liked={post.liked}
             comments={comments.length}
             hideActions={true}
+            frequencyId={post.frequency_id || null}
+            isPrivateFrequency={isPrivateFrequency}
           />
         </div>
 
@@ -254,13 +271,14 @@ function PostDetailContent() {
         ) : (
           <div className="flex items-center gap-3 mt-1">
             <div className="flex-1">
-              <input 
-                type="text" 
+              <MentionTextarea 
                 value={commentText}
-                onChange={(e) => setCommentText(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleAddComment()}
+                onChange={setCommentText}
+                onEnterSubmit={handleAddComment}
                 placeholder="Write a comment..."
-                className="w-full border border-gray-300 rounded-full px-5 py-2.5 text-[13.5px] outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors text-gray-700"
+                frequencyId={post.frequency_id || null}
+                rows={1}
+                className="w-full border border-gray-300 rounded-full px-5 py-2.5 text-[13.5px] outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors text-gray-700 bg-white"
               />
             </div>
             <button 
@@ -366,7 +384,13 @@ function PostDetailContent() {
                           </button>
                         </div>
                       ) : (
-                        <p className="text-[14px] text-gray-800 mt-1 leading-snug">{c.text}</p>
+                        <p className="text-[14px] text-gray-800 mt-1 leading-snug">
+                          <MentionRenderer 
+                            content={c.text} 
+                            frequencyId={post?.frequency_id || undefined} 
+                            isPrivateFrequency={isPrivateFrequency} 
+                          />
+                        </p>
                       )}
                     </div>
                   </div>
