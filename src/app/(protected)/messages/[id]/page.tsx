@@ -285,6 +285,35 @@ export default function ConversationThreadPage() {
     };
   }, [conversationId, currentUserId, otherUser?.id]);
 
+  // Contract Section 6: Private invalidation channel 'chat:user:<currentUserId>' with 'chat_changed'
+  useEffect(() => {
+    if (!currentUserId) return;
+    const userChannel = supabase.channel(`chat:user:${currentUserId}`, {
+      config: { private: true },
+    });
+    userChannel
+      .on("broadcast", { event: "chat_changed" }, () => {
+        loadConversation();
+      })
+      .subscribe();
+
+    // Acknowledge incoming messages as Read via RPC
+    const incomingIds = messages.filter((m) => m.sender_id !== currentUserId).map((m) => m.id);
+    if (incomingIds.length > 0 && conversationId) {
+      supabase
+        .rpc("chat_acknowledge_messages", {
+          p_conversation_id: conversationId,
+          p_message_ids: incomingIds.slice(-50),
+          p_read: true,
+        })
+        .then(undefined, () => {});
+    }
+
+    return () => {
+      supabase.removeChannel(userChannel);
+    };
+  }, [currentUserId, conversationId, messages.length]);
+
   // Status computation based on HU-01 specifications
   const isPending = request?.status === "pending";
   const isDeclined = request?.status === "declined";

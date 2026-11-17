@@ -5,6 +5,7 @@ import { Lock, User, AtSign } from "lucide-react";
 import {
   fetchFrequencyMentionableMembers,
   filterMentionSuggestions,
+  searchMentionCandidates,
   MentionMember,
 } from "@/lib/api/mentions";
 import { cn } from "@/lib/utils";
@@ -56,6 +57,21 @@ export function MentionTextarea({
     }
     loadMembers();
   }, [frequencyId]);
+
+  // Contract search: Query candidates dynamically using searchMentionCandidates
+  useEffect(() => {
+    let active = true;
+    if (showSuggestions) {
+      searchMentionCandidates(mentionQuery, frequencyId || null).then((candidates) => {
+        if (active && candidates.length > 0) {
+          setMembers(candidates);
+        }
+      });
+    }
+    return () => {
+      active = false;
+    };
+  }, [mentionQuery, showSuggestions, frequencyId]);
 
   // Handle textarea text changes and detect '@'
   const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {

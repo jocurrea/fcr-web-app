@@ -67,6 +67,69 @@ export async function fetchFrequencyMentionableMembers(
 }
 
 /**
+ * Contract RPC: search_mention_candidates
+ * Searches for mentionable candidate profiles.
+ * Inside a Frequency, restricts strictly to joined active members.
+ * In Global context, searches platform profiles.
+ */
+export async function searchMentionCandidates(
+  query: string,
+  groupId?: string | null
+): Promise<MentionMember[]> {
+  try {
+    const { data, error } = await supabase.rpc("search_mention_candidates", {
+      p_group_id: groupId || null,
+      p_query: query || "",
+      p_limit: 20,
+      p_after_name: null,
+      p_after_user_id: null,
+    });
+
+    if (!error && data) {
+      const items = Array.isArray(data) ? data : ((data as any)?.items || []);
+      if (items.length > 0) {
+        return items.map((u: any) => ({
+          id: u.id,
+          name: u.name,
+          username: u.username || formatUsernameHandle({ name: u.name }),
+          avatar: u.avatar || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(u.name || u.id)}`,
+          role: u.role || "Member",
+        }));
+      }
+    }
+  } catch (err) {
+    console.warn("search_mention_candidates RPC not available, using fallback:", err);
+  }
+
+  // Resilient fallback
+  if (groupId) {
+    const { members } = await fetchFrequencyMentionableMembers(groupId);
+    return filterMentionSuggestions(members, query);
+  } else {
+    try {
+      const q = query.toLowerCase().replace(/^@/, "");
+      let qBuilder = supabase.from("users").select("id, firstName, lastName, username, profileImage");
+      if (q) {
+        qBuilder = qBuilder.or(`username.ilike.%${q}%,firstName.ilike.%${q}%,lastName.ilike.%${q}%`);
+      }
+      const { data: users } = await qBuilder.limit(8);
+      return (users || []).map((u: any) => {
+        const fullName = [u.firstName, u.lastName].filter(Boolean).join(" ").trim() || u.username || "User";
+        return {
+          id: u.id,
+          name: fullName,
+          username: u.username || formatUsernameHandle({ name: fullName }),
+          avatar: u.profileImage || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(u.id)}`,
+          role: "Member",
+        };
+      });
+    } catch {
+      return [];
+    }
+  }
+}
+
+/**
  * Filters members based on search query after '@'
  */
 export function filterMentionSuggestions(

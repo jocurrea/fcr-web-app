@@ -68,6 +68,22 @@ export default function MessagesInboxPage() {
 
   useEffect(() => {
     loadInbox();
+
+    // Contract Section 6: Private invalidation channel 'chat:user:<currentUserId>' with 'chat_changed'
+    import("@/lib/supabase").then(({ supabase }) => {
+      supabase.auth.getUser().then(({ data }) => {
+        const uid = data?.user?.id;
+        if (!uid) return;
+        const channel = supabase.channel(`chat:user:${uid}`, {
+          config: { private: true },
+        });
+        channel
+          .on("broadcast", { event: "chat_changed" }, () => {
+            loadInbox();
+          })
+          .subscribe();
+      });
+    });
   }, []);
 
   const handleAcceptRequest = async (e: React.MouseEvent, conversationId: string) => {

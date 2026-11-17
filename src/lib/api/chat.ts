@@ -369,6 +369,38 @@ export async function initiateMessageRequest(
   }
 
   try {
+    // Contract RPC chat_create_request
+    try {
+      const generatedRequestId = crypto.randomUUID();
+      const { data: rpcData, error: rpcError } = await supabase.rpc("chat_create_request", {
+        p_recipient_id: recipientId,
+        p_text: cleanBody,
+        p_request_id: generatedRequestId,
+      });
+
+      if (!rpcError && rpcData) {
+        const convId = (rpcData as any)?.conversation_id || (rpcData as any)?.id;
+        return { success: true, conversationId: convId || undefined };
+      }
+      if (rpcError) {
+        const msg = rpcError.message || "";
+        if (msg.includes("CHAT_COOLDOWN")) {
+          return { success: false, error: "A 72-hour cooldown is active because your previous request was declined." };
+        }
+        if (msg.includes("CHAT_REQUEST_LIMIT") || msg.includes("CHAT_BLOCKED")) {
+          return { success: false, error: "You can’t send a message request to this person." };
+        }
+        if (msg.includes("CHAT_BUSINESS_DISABLED")) {
+          return { success: false, error: "Direct messaging has been disabled by this business account." };
+        }
+        if (msg.includes("CHAT_REQUEST_PENDING")) {
+          return { success: false, error: "You already have a pending message request with this user." };
+        }
+      }
+    } catch (rpcErr) {
+      console.warn("chat_create_request RPC not available, using table fallback:", rpcErr);
+    }
+
     let conversationId = contactStatus.existingConversationId;
 
     if (!conversationId) {
@@ -449,17 +481,45 @@ export async function respondToMessageRequest(
   if (!currentUserId) return { success: false, error: "Unauthorized" };
 
   try {
-    // 1. Fetch current request to get sender_id
+    // 1. Fetch current request to get id & sender_id
     const { data: currentReq } = await supabase
       .from("chat_requests")
-      .select("sender_id")
+      .select("id, sender_id")
       .eq("conversation_id", conversationId)
       .eq("recipient_id", currentUserId)
       .maybeSingle();
 
     const senderId = currentReq?.sender_id;
+    const reqId = currentReq?.id;
 
-    // 2. Update status and responded_at
+    // Contract RPC chat_respond_request
+    if (reqId) {
+      try {
+        const { error: rpcError } = await supabase.rpc("chat_respond_request", {
+          p_request_id: reqId,
+          p_decision: decision,
+        });
+
+        if (!rpcError) {
+          let declinedCount = 1;
+          if (decision === "declined" && senderId) {
+            const { data: allDeclined } = await supabase
+              .from("chat_requests")
+              .select("id")
+              .eq("sender_id", senderId)
+              .eq("recipient_id", currentUserId)
+              .eq("status", "declined");
+
+            declinedCount = (allDeclined || []).length || 1;
+          }
+          return { success: true, declinedCount, senderId: senderId || undefined };
+        }
+      } catch (e) {
+        console.warn("chat_respond_request RPC not available, using table fallback:", e);
+      }
+    }
+
+    // 2. Fallback: Update status and responded_at directly
     const { error } = await supabase
       .from("chat_requests")
       .update({
@@ -806,7 +866,23 @@ export async function sendChatMessage(
       };
     }
 
-    // Insert message
+    // Contract RPC chat_send_message
+    try {
+      const msgId = crypto.randomUUID();
+      const { data: rpcMsg, error: rpcError } = await supabase.rpc("chat_send_message", {
+        p_conversation_id: conversationId,
+        p_message_id: msgId,
+        p_text: body.trim(),
+      });
+
+      if (!rpcError && rpcMsg) {
+        return { success: true, data: rpcMsg };
+      }
+    } catch (e) {
+      console.warn("chat_send_message RPC not available, using table fallback:", e);
+    }
+
+    // Fallback: Insert message directly into chat_messages
     const { data: newMsg, error } = await supabase
       .from("chat_messages")
       .insert({
