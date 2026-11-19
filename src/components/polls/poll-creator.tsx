@@ -86,11 +86,11 @@ export function PollCreator({ pollState, onChange, onRemove, isImmutable = false
                 value={opt}
                 onChange={(e) => handleOptionChange(idx, e.target.value)}
                 placeholder={`Option ${idx + 1}`}
-                maxLength={60}
+                maxLength={100}
                 className="w-full px-3.5 py-2.5 bg-white border border-gray-300 rounded-xl text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-600 disabled:cursor-not-allowed shadow-xs"
               />
               <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 pointer-events-none">
-                {opt.length}/60
+                {opt.length}/100
               </span>
             </div>
 

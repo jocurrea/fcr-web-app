@@ -1,5 +1,14 @@
 import { supabase } from '@/lib/supabase';
-import { PollData, PollDuration, parsePollFromPost, serializePollData, calculatePollExpiration } from '@/lib/api/polls';
+import {
+  PollData,
+  PollView,
+  PollDuration,
+  parsePollFromPost,
+  serializePollData,
+  calculatePollExpiration,
+  getPostPolls,
+  createPostWithPoll,
+} from '@/lib/api/polls';
 
 const USER_IDENTITY_SELECT = `
   id,
@@ -21,7 +30,7 @@ export interface Post {
   frequency_id: string | null;
   text: string;
   image: string | null;
-  poll?: PollData | null;
+  poll?: PollView | PollData | null;
   created_at: string;
   author: {
     name: string;
@@ -204,6 +213,17 @@ async function buildPostsWithResumes(data: any[], mode?: string): Promise<Post[]
     data.map((p: any) => resolvePostFileUrl(p.file || null))
   );
 
+  // Batch hydrate polls via official RPC get_post_polls (poll-posts.md / Migrations 088–090)
+  let pollViewsMap = new Map<string, PollView>();
+  try {
+    const polls = await getPostPolls(postIds);
+    if (polls && polls.length > 0) {
+      pollViewsMap = new Map(polls.map((pl) => [String(pl.post_id), pl]));
+    }
+  } catch (err) {
+    console.warn('[fetchPosts] getPostPolls hydration error:', err);
+  }
+
   return data.map((post: any, idx: number) => {
     // u from nested join (mode=withUser), or from direct users query
     const uFromJoin = post.user;
@@ -288,8 +308,10 @@ async function buildPostsWithResumes(data: any[], mode?: string): Promise<Post[]
       ? (currentUserId ? post.postLikes.some((l: any) => l.userId === currentUserId) : false)
       : (likesMap[post.id]?.userLiked || false);
 
-    const isPoll = post.file?.startsWith('poll://');
-    const poll = parsePollFromPost(post);
+    const rpcPoll = pollViewsMap.get(String(post.id));
+    const legacyPoll = parsePollFromPost(post);
+    const poll = rpcPoll || legacyPoll || null;
+    const isPoll = Boolean(rpcPoll || post.file?.startsWith('poll://'));
     const postImage = isPoll ? null : (fileUrls[idx] || null);
 
     return {
@@ -399,8 +421,19 @@ export async function fetchPostById(postId: string): Promise<Post | null> {
     authorAvatar = `https://api.dicebear.com/7.x/shapes/svg?seed=${encodeURIComponent(data.userId || 'user')}`;
   }
 
-  const isPoll = data.file?.startsWith('poll://');
-  const poll = parsePollFromPost(data);
+  let rpcPoll: PollView | null = null;
+  try {
+    const polls = await getPostPolls([String(data.id)]);
+    if (polls && polls.length > 0) {
+      rpcPoll = polls[0];
+    }
+  } catch (err) {
+    console.warn('[fetchPostById] getPostPolls error:', err);
+  }
+
+  const legacyPoll = parsePollFromPost(data);
+  const poll = rpcPoll || legacyPoll || null;
+  const isPoll = Boolean(rpcPoll || data.file?.startsWith('poll://'));
   const resolvedImage = isPoll ? null : await resolvePostFileUrl(data.file || null);
 
   return {
@@ -536,7 +569,32 @@ export async function createPost(
     if (validOptions.length > 4) {
       return { success: false, error: "Polls cannot contain more than 4 options." };
     }
-    // Poll is active: image attachments are strictly excluded
+
+    const durationHours: 24 | 72 | 168 =
+      pollData.duration === "7d" || pollData.duration === 168 ? 168 :
+      pollData.duration === "3d" || pollData.duration === 72 ? 72 : 24;
+
+    // Official atomic publication via RPC: create_post_with_poll (poll-posts.md)
+    try {
+      const { data: pollPostData, error: pollPostError } = await createPostWithPoll({
+        body: text.trim(),
+        options: validOptions,
+        durationHours,
+        groupId: frequencyId || null,
+        mentions: [],
+      });
+
+      if (!pollPostError && pollPostData) {
+        return { success: true };
+      }
+      if (pollPostError) {
+        console.warn("[createPost] create_post_with_poll failed, falling back to legacy:", pollPostError.message);
+      }
+    } catch (rpcEx) {
+      console.warn("[createPost] create_post_with_poll exception, falling back:", rpcEx);
+    }
+
+    // Fallback: poll is active, image attachments are strictly excluded
     imageUrl = serializePollData({
       question: text.trim(),
       options: validOptions.map((optText, idx) => ({ id: idx + 1, text: optText })),

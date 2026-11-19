@@ -1,86 +1,188 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Check, Clock, BarChart2 } from "lucide-react";
-import { PollData, formatPollTimeRemaining, voteOnPoll, getPollVoteState } from "@/lib/api/polls";
+import { useState, useEffect, useRef } from "react";
+import { Check, Clock, BarChart2, Loader2, AlertCircle } from "lucide-react";
+import {
+  PollView,
+  PollData,
+  formatPollTimeRemaining,
+  votePostPoll,
+  getPostPolls,
+  voteOnPoll,
+} from "@/lib/api/polls";
+import { supabase } from "@/lib/supabase";
 
 interface PollCardProps {
   postId: string;
-  initialPoll: PollData;
+  initialPoll: PollView | PollData;
   currentUserId?: string | null;
 }
 
+function normalizeToPollView(p: PollView | PollData, postId: string): PollView {
+  // If already full PollView
+  if (
+    "duration_hours" in p &&
+    p.duration_hours !== undefined &&
+    Array.isArray(p.options) &&
+    p.options.length > 0 &&
+    "label" in p.options[0]
+  ) {
+    return p as PollView;
+  }
+
+  // Legacy PollData conversion
+  const legacy = p as PollData;
+  const totalVotes = legacy.total_votes ?? legacy.totalVotes ?? 0;
+  const isExpired =
+    legacy.is_closed ??
+    legacy.isExpired ??
+    (legacy.expiresAt ? new Date(legacy.expiresAt).getTime() <= Date.now() : false);
+  const selectedOptionId = legacy.selected_option_id
+    ? String(legacy.selected_option_id)
+    : legacy.userVotedOptionId
+    ? String(legacy.userVotedOptionId)
+    : null;
+  const resultsVisible = legacy.results_visible ?? (selectedOptionId !== null || isExpired);
+
+  return {
+    post_id: String(legacy.post_id || postId),
+    duration_hours: (legacy.duration_hours ||
+      (legacy.duration === "3d" ? 72 : legacy.duration === "7d" ? 168 : 24)) as 24 | 72 | 168,
+    created_at: legacy.created_at || legacy.createdAt || new Date().toISOString(),
+    ends_at:
+      legacy.ends_at ||
+      legacy.expiresAt ||
+      new Date(Date.now() + 24 * 3600000).toISOString(),
+    server_time: new Date().toISOString(),
+    is_closed: isExpired,
+    can_vote: !selectedOptionId && !isExpired,
+    selected_option_id: selectedOptionId,
+    results_visible: resultsVisible,
+    total_votes: totalVotes,
+    options: (legacy.options || []).map((opt: any, idx: number) => {
+      const optId = String(opt.id || idx + 1);
+      const label = opt.label || opt.text || `Option ${idx + 1}`;
+      const votes = resultsVisible ? (opt.votesCount ?? opt.votes ?? null) : null;
+      const percentage = resultsVisible ? (opt.percentage ?? null) : null;
+      return {
+        id: optId,
+        position: opt.position || idx + 1,
+        label,
+        votes,
+        percentage,
+      };
+    }),
+  };
+}
+
 export function PollCard({ postId, initialPoll, currentUserId }: PollCardProps) {
-  const [poll, setPoll] = useState<PollData>(initialPoll);
+  const [poll, setPoll] = useState<PollView>(() => normalizeToPollView(initialPoll, postId));
+  const [pendingOptionId, setPendingOptionId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const pollRef = useRef(poll);
+  pollRef.current = poll;
 
-  // Sync vote stats from server/Supabase
+  // Realtime Broadcast Channel & Hydration
   useEffect(() => {
     let isMounted = true;
-    async function syncVotes() {
+    let channel: any = null;
+
+    async function setupRealtimeAndSync() {
       if (!postId) return;
-      const state = await getPollVoteState(postId, initialPoll, currentUserId);
-      if (isMounted) {
-        setPoll(state);
+
+      // 1. Initial hydration via RPC get_post_polls
+      try {
+        const freshPolls = await getPostPolls([postId]);
+        if (isMounted && freshPolls && freshPolls.length > 0) {
+          setPoll(freshPolls[0]);
+        }
+      } catch (err) {
+        console.warn("[PollCard] Initial hydration error:", err);
+      }
+
+      // 2. Subscribe to private broadcast channel: poll:post:<postId>
+      // Migration 090: Both voted and unvoted viewers subscribe
+      try {
+        await supabase.realtime.setAuth();
+
+        channel = supabase
+          .channel(`poll:post:${postId}`, { config: { private: true } })
+          .on("broadcast", { event: "poll_changed" }, async () => {
+            // Invalidation hint received; refresh authorized poll projection
+            const updated = await getPostPolls([postId]);
+            if (isMounted && updated && updated.length > 0) {
+              setPoll(updated[0]);
+            }
+          })
+          .subscribe((status) => {
+            if (status === "SUBSCRIBED") {
+              getPostPolls([postId]).then((res) => {
+                if (isMounted && res && res.length > 0) {
+                  setPoll(res[0]);
+                }
+              });
+            }
+          });
+      } catch (err) {
+        console.warn("[PollCard] Realtime subscription error:", err);
       }
     }
-    syncVotes();
+
+    setupRealtimeAndSync();
+
     return () => {
       isMounted = false;
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
     };
-  }, [postId, initialPoll, currentUserId]);
+  }, [postId]);
 
-  const { text: timeRemaining, isExpired } = formatPollTimeRemaining(poll.expiresAt);
-  const hasVoted = poll.userVotedOptionId !== null && poll.userVotedOptionId !== undefined;
-  // HU-07 Acceptance Criteria 4: Voting Privacy: Live results & percentages are hidden until user votes (or poll expires)
-  const showResults = hasVoted || isExpired;
+  // Server-relative remaining time calculation
+  const { text: timeRemaining, isExpired } = formatPollTimeRemaining(
+    poll.ends_at,
+    poll.server_time
+  );
 
-  const handleVote = async (optionId: number) => {
-    if (hasVoted || isExpired || isSubmitting) return;
+  const hasVoted = Boolean(poll.selected_option_id);
+  const showResults = poll.results_visible || hasVoted || isExpired || poll.is_closed;
+
+  const handleVote = async (optionId: string) => {
+    if (!poll.can_vote || isExpired || poll.is_closed || isSubmitting) return;
 
     setIsSubmitting(true);
+    setPendingOptionId(optionId);
     setError(null);
 
-    // Optimistic UI update
-    const previousState = { ...poll };
-    const optimisticOptions = poll.options.map((opt) => {
-      const isSelected = opt.id === optionId;
-      const newCount = (opt.votesCount || 0) + (isSelected ? 1 : 0);
-      return {
-        ...opt,
-        votesCount: newCount,
-      };
-    });
-    const newTotal = (poll.totalVotes || 0) + 1;
-    const optimisticPoll: PollData = {
-      ...poll,
-      userVotedOptionId: optionId,
-      totalVotes: newTotal,
-      options: optimisticOptions.map((o) => ({
-        ...o,
-        percentage: newTotal > 0 ? Math.round(((o.votesCount || 0) / newTotal) * 100) : 0,
-      })),
-    };
-    setPoll(optimisticPoll);
-
     try {
-      const result = await voteOnPoll(postId, optionId, poll);
-      if (result.success && result.updatedPoll) {
-        setPoll(result.updatedPoll);
-      } else if (!result.success) {
-        setPoll(previousState);
-        setError(result.error || "Failed to submit vote. Please try again.");
+      // 1. Try official RPC vote_post_poll
+      const res = await votePostPoll(postId, optionId);
+      if (res.success && res.data) {
+        setPoll(res.data);
+      } else {
+        // 2. Fallback vote for legacy posts
+        const optNum = parseInt(optionId, 10);
+        const fallbackRes = await voteOnPoll(
+          postId,
+          isNaN(optNum) ? optionId : optNum,
+          poll as any
+        );
+        if (fallbackRes.success && fallbackRes.updatedPoll) {
+          setPoll(normalizeToPollView(fallbackRes.updatedPoll, postId));
+        } else {
+          setError(res.error || fallbackRes.error || "Failed to submit vote. Please try again.");
+        }
       }
-    } catch (e: any) {
-      setPoll(previousState);
-      setError(e?.message || "Error submitting vote.");
+    } catch (err: any) {
+      setError(err?.message || "Failed to submit vote.");
     } finally {
       setIsSubmitting(false);
+      setPendingOptionId(null);
     }
   };
 
-  const totalVotes = poll.totalVotes || 0;
+  const totalVotes = poll.total_votes ?? 0;
 
   return (
     <div className="w-full bg-gray-50/80 border border-gray-200/90 rounded-2xl p-4 my-3 transition-all select-none">
@@ -92,15 +194,17 @@ export function PollCard({ postId, initialPoll, currentUserId }: PollCardProps) 
         </div>
         <div className="flex items-center gap-1 text-xs text-gray-400">
           <Clock className="w-3 h-3" />
-          <span>{timeRemaining}</span>
+          <span>{poll.is_closed ? "Poll ended" : timeRemaining}</span>
         </div>
       </div>
 
       {/* Options List */}
       <div className="flex flex-col gap-2.5">
         {poll.options.map((option) => {
-          const isUserChoice = poll.userVotedOptionId === option.id;
-          const percentage = option.percentage || 0;
+          const isUserChoice = String(poll.selected_option_id) === String(option.id);
+          const isPending = pendingOptionId === String(option.id);
+          const percentage = option.percentage !== null && option.percentage !== undefined ? option.percentage : 0;
+          const votesCount = option.votes !== null && option.votes !== undefined ? option.votes : 0;
 
           if (showResults) {
             // Results Mode (Visible only after voting or after expiration)
@@ -128,37 +232,49 @@ export function PollCard({ postId, initialPoll, currentUserId }: PollCardProps) 
                       <Check className="w-3 h-3 stroke-[3]" />
                     </div>
                   )}
-                  <span className={`text-sm break-words ${isUserChoice ? "text-blue-900 font-medium" : "text-gray-800"}`}>
-                    {option.text}
+                  <span
+                    className={`text-sm break-words ${
+                      isUserChoice ? "text-blue-900 font-medium" : "text-gray-800"
+                    }`}
+                  >
+                    {option.label}
                   </span>
                 </div>
 
                 {/* Percentage & Vote Count */}
                 <div className="relative z-10 flex items-baseline gap-1.5 shrink-0 pl-2">
-                  <span className={`text-sm font-bold ${isUserChoice ? "text-blue-600" : "text-gray-700"}`}>
+                  <span
+                    className={`text-sm font-bold ${
+                      isUserChoice ? "text-blue-600" : "text-gray-700"
+                    }`}
+                  >
                     {percentage}%
                   </span>
-                  <span className="text-[11px] text-gray-400">
-                    ({option.votesCount || 0})
-                  </span>
+                  <span className="text-[11px] text-gray-400">({votesCount})</span>
                 </div>
               </div>
             );
           }
 
-          // Voting Mode (Options clickable, results hidden)
+          // Voting Mode (Labels only, clickable if can_vote)
           return (
             <button
               key={option.id}
               type="button"
-              disabled={isSubmitting}
-              onClick={() => handleVote(option.id)}
-              className="w-full text-left p-3.5 rounded-xl border border-blue-200/80 bg-white hover:bg-blue-50/50 hover:border-blue-400 active:scale-[0.99] transition-all flex items-center justify-between group cursor-pointer shadow-xs"
+              disabled={!poll.can_vote || isSubmitting}
+              onClick={() => handleVote(String(option.id))}
+              className={`w-full text-left p-3.5 rounded-xl border transition-all flex items-center justify-between group cursor-pointer shadow-xs ${
+                isPending
+                  ? "border-blue-500 bg-blue-50/50"
+                  : "border-blue-200/80 bg-white hover:bg-blue-50/50 hover:border-blue-400 active:scale-[0.99]"
+              }`}
             >
               <div className="flex items-center gap-3">
-                <div className="w-4 h-4 rounded-full border-2 border-gray-300 group-hover:border-blue-600 flex items-center justify-center transition-colors" />
+                <div className="w-4 h-4 rounded-full border-2 border-gray-300 group-hover:border-blue-600 flex items-center justify-center transition-colors">
+                  {isPending && <Loader2 className="w-3 h-3 animate-spin text-blue-600" />}
+                </div>
                 <span className="text-sm font-medium text-gray-800 group-hover:text-blue-900">
-                  {option.text}
+                  {option.label}
                 </span>
               </div>
               <span className="text-xs text-blue-600 opacity-0 group-hover:opacity-100 font-semibold transition-opacity">
@@ -171,25 +287,29 @@ export function PollCard({ postId, initialPoll, currentUserId }: PollCardProps) 
 
       {/* Error Notice */}
       {error && (
-        <div className="mt-2 text-xs text-red-600 font-medium bg-red-50 p-2 rounded-lg">
-          {error}
+        <div className="mt-2 text-xs text-red-600 font-medium bg-red-50 p-2 rounded-lg flex items-center gap-1.5">
+          <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+          <span>{error}</span>
         </div>
       )}
 
-      {/* Footer Info */}
+      {/* Footer Info: Migration 090 - ALWAYS DISPLAY TOTAL VOTES */}
       <div className="flex items-center justify-between mt-3 pt-2.5 border-t border-gray-200/60 text-xs text-gray-500">
-        <span>
+        <span className="font-medium text-gray-600">
           {totalVotes} {totalVotes === 1 ? "vote" : "votes"}
         </span>
         {hasVoted ? (
           <span className="text-blue-600 font-medium flex items-center gap-1">
             <Check className="w-3.5 h-3.5" /> Vote recorded
           </span>
-        ) : (
+        ) : poll.is_closed ? (
+          <span className="text-gray-400">Final results</span>
+        ) : poll.can_vote ? (
           <span className="text-gray-400">Select an option to vote</span>
+        ) : (
+          <span className="text-gray-400">Voting closed</span>
         )}
       </div>
     </div>
   );
 }
-

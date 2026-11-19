@@ -120,9 +120,19 @@ function NewPostContent() {
             setAttachedImage(post.image || null);
             setSelectedFrequency(post.frequency_id || "");
             if (post.poll) {
+              const pollOptions = (post.poll.options || []).map((o: any) => o.label || o.text || "");
+              const pollDuration =
+                "duration_hours" in post.poll && post.poll.duration_hours
+                  ? post.poll.duration_hours === 72
+                    ? "3d"
+                    : post.poll.duration_hours === 168
+                    ? "7d"
+                    : "24h"
+                  : (post.poll as any).duration || "24h";
+
               setPollState({
-                options: post.poll.options.map(o => o.text),
-                duration: post.poll.duration,
+                options: pollOptions,
+                duration: pollDuration,
               });
               // HU-07 Acceptance Criteria 3: Strict Immutability once published
               setIsPollImmutable(true);
