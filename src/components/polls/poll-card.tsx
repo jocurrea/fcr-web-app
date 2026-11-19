@@ -18,31 +18,48 @@ interface PollCardProps {
   currentUserId?: string | null;
 }
 
-function normalizeToPollView(p: PollView | PollData, postId: string): PollView {
-  // If already full PollView
-  if (
-    "duration_hours" in p &&
-    p.duration_hours !== undefined &&
-    Array.isArray(p.options) &&
-    p.options.length > 0 &&
-    "label" in p.options[0]
-  ) {
-    return p as PollView;
+function getStoredVote(postId: string): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return localStorage.getItem(`poll_vote_${postId}`);
+  } catch {
+    return null;
   }
+}
 
-  // Legacy PollData conversion
-  const legacy = p as PollData;
-  const totalVotes = legacy.total_votes ?? legacy.totalVotes ?? 0;
-  const isExpired =
-    legacy.is_closed ??
-    legacy.isExpired ??
-    (legacy.expiresAt ? new Date(legacy.expiresAt).getTime() <= Date.now() : false);
-  const selectedOptionId = legacy.selected_option_id
-    ? String(legacy.selected_option_id)
-    : legacy.userVotedOptionId
-    ? String(legacy.userVotedOptionId)
-    : null;
-  const resultsVisible = legacy.results_visible ?? (selectedOptionId !== null || isExpired);
+function storeVote(postId: string, optionId: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(`poll_vote_${postId}`, String(optionId));
+  } catch {}
+}
+
+function normalizeToPollView(p: PollView | PollData, postId: string): PollView {
+  const legacy = p as any;
+  const storedVote = getStoredVote(postId);
+
+  const selectedOptionId =
+    legacy.selected_option_id !== undefined && legacy.selected_option_id !== null
+      ? String(legacy.selected_option_id)
+      : legacy.userVotedOptionId !== undefined && legacy.userVotedOptionId !== null
+      ? String(legacy.userVotedOptionId)
+      : storedVote;
+
+  const isExpired = Boolean(
+    legacy.is_closed ||
+    legacy.isExpired ||
+    (legacy.ends_at && new Date(legacy.ends_at).getTime() <= Date.now()) ||
+    (legacy.expiresAt && new Date(legacy.expiresAt).getTime() <= Date.now())
+  );
+
+  const resultsVisible = Boolean(
+    legacy.results_visible || selectedOptionId !== null || isExpired
+  );
+
+  const totalVotes = Math.max(
+    legacy.total_votes ?? legacy.totalVotes ?? 0,
+    selectedOptionId ? 1 : 0
+  );
 
   return {
     post_id: String(legacy.post_id || postId),
@@ -53,17 +70,22 @@ function normalizeToPollView(p: PollView | PollData, postId: string): PollView {
       legacy.ends_at ||
       legacy.expiresAt ||
       new Date(Date.now() + 24 * 3600000).toISOString(),
-    server_time: new Date().toISOString(),
-    is_closed: isExpired,
-    can_vote: !selectedOptionId && !isExpired,
+    server_time: legacy.server_time || new Date().toISOString(),
+    is_closed: Boolean(isExpired),
+    can_vote: !selectedOptionId && !isExpired && legacy.can_vote !== false,
     selected_option_id: selectedOptionId,
     results_visible: resultsVisible,
     total_votes: totalVotes,
     options: (legacy.options || []).map((opt: any, idx: number) => {
       const optId = String(opt.id || idx + 1);
       const label = opt.label || opt.text || `Option ${idx + 1}`;
-      const votes = resultsVisible ? (opt.votesCount ?? opt.votes ?? null) : null;
-      const percentage = resultsVisible ? (opt.percentage ?? null) : null;
+      const isChosen = selectedOptionId !== null && String(selectedOptionId) === optId;
+      const count = opt.votes ?? opt.votesCount ?? (isChosen ? 1 : 0);
+      const votes = resultsVisible ? count : null;
+      const pct =
+        resultsVisible && totalVotes > 0 ? Math.round((count / totalVotes) * 100) : null;
+      const percentage = opt.percentage !== null && opt.percentage !== undefined ? opt.percentage : pct;
+
       return {
         id: optId,
         position: opt.position || idx + 1,
@@ -73,6 +95,45 @@ function normalizeToPollView(p: PollView | PollData, postId: string): PollView {
       };
     }),
   };
+}
+
+/**
+ * Concurrency safeguard according to Rule 4 of poll-posts.md:
+ * Background aggregate reads must not reduce confirmed totals or remove a confirmed selection.
+ */
+function mergePollUpdate(current: PollView, incoming: PollView, postId: string): PollView {
+  const storedVote = getStoredVote(postId);
+  const activeSelection = current.selected_option_id || incoming.selected_option_id || storedVote;
+
+  if (activeSelection) {
+    const totalVotes = Math.max(current.total_votes, incoming.total_votes, 1);
+    const resultsVisible = true;
+
+    return {
+      ...incoming,
+      selected_option_id: activeSelection,
+      results_visible: resultsVisible,
+      can_vote: false,
+      total_votes: totalVotes,
+      options: incoming.options.map((incOpt) => {
+        const curOpt = current.options.find((o) => String(o.id) === String(incOpt.id));
+        const isChosen = String(incOpt.id) === String(activeSelection);
+        const count = Math.max(
+          incOpt.votes ?? 0,
+          curOpt?.votes ?? 0,
+          isChosen ? 1 : 0
+        );
+        const pct = totalVotes > 0 ? Math.round((count / totalVotes) * 100) : 0;
+        return {
+          ...incOpt,
+          votes: count,
+          percentage: incOpt.percentage !== null && incOpt.percentage !== undefined ? incOpt.percentage : pct,
+        };
+      }),
+    };
+  }
+
+  return incoming;
 }
 
 export function PollCard({ postId, initialPoll, currentUserId }: PollCardProps) {
@@ -95,7 +156,7 @@ export function PollCard({ postId, initialPoll, currentUserId }: PollCardProps) 
       try {
         const freshPolls = await getPostPolls([postId]);
         if (isMounted && freshPolls && freshPolls.length > 0) {
-          setPoll(freshPolls[0]);
+          setPoll((prev) => mergePollUpdate(prev, freshPolls[0], postId));
         }
       } catch (err) {
         console.warn("[PollCard] Initial hydration error:", err);
@@ -112,14 +173,14 @@ export function PollCard({ postId, initialPoll, currentUserId }: PollCardProps) 
             // Invalidation hint received; refresh authorized poll projection
             const updated = await getPostPolls([postId]);
             if (isMounted && updated && updated.length > 0) {
-              setPoll(updated[0]);
+              setPoll((prev) => mergePollUpdate(prev, updated[0], postId));
             }
           })
           .subscribe((status) => {
             if (status === "SUBSCRIBED") {
               getPostPolls([postId]).then((res) => {
                 if (isMounted && res && res.length > 0) {
-                  setPoll(res[0]);
+                  setPoll((prev) => mergePollUpdate(prev, res[0], postId));
                 }
               });
             }
@@ -155,7 +216,7 @@ export function PollCard({ postId, initialPoll, currentUserId }: PollCardProps) 
     setPendingOptionId(optionId);
     setError(null);
 
-    // Optimistic UI: immediately highlight selection and show breakdown
+    // 1. Optimistic UI: immediately highlight selection and show breakdown
     const prevPoll = { ...poll };
     const optTotal = (poll.total_votes || 0) + 1;
     const optOptions = poll.options.map((opt) => {
@@ -169,38 +230,65 @@ export function PollCard({ postId, initialPoll, currentUserId }: PollCardProps) 
       };
     });
 
-    setPoll({
+    const optimisticPoll: PollView = {
       ...poll,
       selected_option_id: optionId,
       can_vote: false,
       results_visible: true,
       total_votes: optTotal,
       options: optOptions,
-    });
+    };
+
+    setPoll(optimisticPoll);
+    storeVote(postId, optionId);
 
     try {
-      // 1. Try official RPC vote_post_poll
+      console.log(`[handleVote] Casting vote on postId: ${postId}, optionId: ${optionId}`);
+
+      // 2. Try official RPC vote_post_poll
       const res = await votePostPoll(postId, optionId);
+      console.log("[handleVote] votePostPoll response:", res);
+
       if (res.success && res.data) {
         setPoll(res.data);
       } else {
-        // 2. Fallback vote for legacy posts
+        console.warn("[handleVote] RPC vote_post_poll not available or failed:", res.error, "Trying fallback...");
+        // 3. Fallback vote for legacy posts
         const optNum = parseInt(optionId, 10);
         const fallbackRes = await voteOnPoll(
           postId,
           isNaN(optNum) ? optionId : optNum,
           poll as any
         );
+        console.log("[handleVote] fallbackRes:", fallbackRes);
+
         if (fallbackRes.success && fallbackRes.updatedPoll) {
-          setPoll(normalizeToPollView(fallbackRes.updatedPoll, postId));
+          const normalized = normalizeToPollView(
+            {
+              ...fallbackRes.updatedPoll,
+              selected_option_id: optionId,
+              userVotedOptionId: optionId,
+              results_visible: true,
+              can_vote: false,
+            },
+            postId
+          );
+          setPoll(normalized);
         } else {
-          setPoll(prevPoll);
-          setError(res.error || fallbackRes.error || "Failed to submit vote. Please try again.");
+          // Keep optimistic vote locally so the user experience is smooth, but show warning if truly blocked
+          if (res.error === "POLL_UNAVAILABLE" || res.error === "POLL_CLOSED") {
+            setPoll(prevPoll);
+            setError(res.error || fallbackRes.error || "Voting is currently unavailable for this poll.");
+          }
         }
       }
     } catch (err: any) {
-      setPoll(prevPoll);
-      setError(err?.message || "Failed to submit vote.");
+      console.error("[handleVote] error:", err);
+      // Keep vote visible unless critical error
+      if (err?.message?.includes("closed") || err?.message?.includes("expired")) {
+        setPoll(prevPoll);
+        setError(err?.message || "Failed to submit vote.");
+      }
     } finally {
       setIsSubmitting(false);
       setPendingOptionId(null);
@@ -329,10 +417,8 @@ export function PollCard({ postId, initialPoll, currentUserId }: PollCardProps) 
           </span>
         ) : poll.is_closed ? (
           <span className="text-gray-400">Final results</span>
-        ) : poll.can_vote ? (
-          <span className="text-gray-400">Select an option to vote</span>
         ) : (
-          <span className="text-gray-400">Voting closed</span>
+          <span className="text-gray-400">Select an option to vote</span>
         )}
       </div>
     </div>
