@@ -209,6 +209,10 @@ function NewPostContent() {
 
     const validPollOptions = pollState ? pollState.options.map(o => o.trim()).filter(Boolean) : [];
     if (pollState && !isPollImmutable) {
+      if (!text.trim()) {
+        alert("Please enter a question or title for your poll in the text box.");
+        return;
+      }
       if (validPollOptions.length < 2) {
         alert("Polls must contain at least 2 non-empty options.");
         return;

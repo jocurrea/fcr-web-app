@@ -303,12 +303,41 @@ export async function getPollVoteState(
           const optKey = String(v.option_id);
           votesMap[optKey] = (votesMap[optKey] || 0) + 1;
           if (currentUserId && v.user_id === currentUserId) {
-            userVotedOptionId = v.option_id;
+            userVotedOptionId = optKey;
           }
         }
       });
     }
   } catch {}
+
+  // Also query comments for resilient fallback on legacy posts
+  try {
+    const { data: commentVotes, error: commentErr } = await supabase
+      .from("comments")
+      .select("userId, body, created_at")
+      .eq("postId", postId)
+      .order("created_at", { ascending: true });
+
+    if (!commentErr && commentVotes) {
+      commentVotes.forEach((c: any) => {
+        if (c.body && c.body.startsWith("[POLL_VOTE:")) {
+          const match = c.body.match(/\[POLL_VOTE:(.+?)\]/);
+          if (match && match[1]) {
+            const optKey = String(match[1]);
+            if (!userVoteRecorded.has(c.userId)) {
+              userVoteRecorded.add(c.userId);
+              votesMap[optKey] = (votesMap[optKey] || 0) + 1;
+              if (currentUserId && c.userId === currentUserId) {
+                userVotedOptionId = optKey;
+              }
+            }
+          }
+        }
+      });
+    }
+  } catch (err) {
+    console.warn("Error reading fallback comment votes:", err);
+  }
 
   const totalVotes = Object.values(votesMap).reduce((acc, count) => acc + count, 0);
 
@@ -369,5 +398,19 @@ export async function voteOnPoll(
   }
 
   const finalState = await getPollVoteState(postId, poll, userId);
+  if (!finalState.userVotedOptionId) {
+    finalState.userVotedOptionId = optionId;
+    finalState.totalVotes = (finalState.totalVotes || 0) + 1;
+    finalState.options = finalState.options.map((o: any) => {
+      const isMatch = String(o.id) === String(optionId);
+      const prev = o.votesCount ?? 0;
+      const count = prev + (isMatch ? 1 : 0);
+      return {
+        ...o,
+        votesCount: count,
+        percentage: finalState.totalVotes! > 0 ? Math.round((count / finalState.totalVotes!) * 100) : 0,
+      };
+    });
+  }
   return { success: true, updatedPoll: finalState };
 }

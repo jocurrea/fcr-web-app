@@ -149,11 +149,34 @@ export function PollCard({ postId, initialPoll, currentUserId }: PollCardProps) 
   const showResults = poll.results_visible || hasVoted || isExpired || poll.is_closed;
 
   const handleVote = async (optionId: string) => {
-    if (!poll.can_vote || isExpired || poll.is_closed || isSubmitting) return;
+    if (poll.selected_option_id || isExpired || poll.is_closed || isSubmitting) return;
 
     setIsSubmitting(true);
     setPendingOptionId(optionId);
     setError(null);
+
+    // Optimistic UI: immediately highlight selection and show breakdown
+    const prevPoll = { ...poll };
+    const optTotal = (poll.total_votes || 0) + 1;
+    const optOptions = poll.options.map((opt) => {
+      const isChosen = String(opt.id) === String(optionId);
+      const prevCount = opt.votes ?? 0;
+      const newVotes = prevCount + (isChosen ? 1 : 0);
+      return {
+        ...opt,
+        votes: newVotes,
+        percentage: optTotal > 0 ? Math.round((newVotes / optTotal) * 100) : 0,
+      };
+    });
+
+    setPoll({
+      ...poll,
+      selected_option_id: optionId,
+      can_vote: false,
+      results_visible: true,
+      total_votes: optTotal,
+      options: optOptions,
+    });
 
     try {
       // 1. Try official RPC vote_post_poll
@@ -171,10 +194,12 @@ export function PollCard({ postId, initialPoll, currentUserId }: PollCardProps) 
         if (fallbackRes.success && fallbackRes.updatedPoll) {
           setPoll(normalizeToPollView(fallbackRes.updatedPoll, postId));
         } else {
+          setPoll(prevPoll);
           setError(res.error || fallbackRes.error || "Failed to submit vote. Please try again.");
         }
       }
     } catch (err: any) {
+      setPoll(prevPoll);
       setError(err?.message || "Failed to submit vote.");
     } finally {
       setIsSubmitting(false);
@@ -256,12 +281,12 @@ export function PollCard({ postId, initialPoll, currentUserId }: PollCardProps) 
             );
           }
 
-          // Voting Mode (Labels only, clickable if can_vote)
+          // Voting Mode (Labels only, clickable until voted or expired)
           return (
             <button
               key={option.id}
               type="button"
-              disabled={!poll.can_vote || isSubmitting}
+              disabled={Boolean(poll.selected_option_id || isExpired || poll.is_closed || isSubmitting)}
               onClick={() => handleVote(String(option.id))}
               className={`w-full text-left p-3.5 rounded-xl border transition-all flex items-center justify-between group cursor-pointer shadow-xs ${
                 isPending
