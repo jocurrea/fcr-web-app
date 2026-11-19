@@ -191,29 +191,29 @@ function OnboardingContent() {
   };
 
   const handleBack = () => {
+    if (step > 1) {
+      setStep(step - 1);
+      return;
+    }
     if (isEditMode) {
       router.push("/profile");
       return;
     }
-    if (step > 1) {
-      setStep(step - 1);
-    } else {
-      try {
-        const personalRaw = localStorage.getItem("onboarding_personal");
-        if (personalRaw) {
-          const parsed = JSON.parse(personalRaw);
-          delete parsed.category;
-          delete parsed.role;
-          delete parsed.professionalRole;
-          delete parsed.professional_role;
-          delete parsed.professionalTitle;
-          delete parsed.professionalRoleLabel;
-          localStorage.setItem("onboarding_personal", JSON.stringify(parsed));
-        }
-        localStorage.removeItem("onboarding_role");
-      } catch (e) {}
-      router.push("/role-selection?edit=true&from=onboarding");
-    }
+    try {
+      const personalRaw = localStorage.getItem("onboarding_personal");
+      if (personalRaw) {
+        const parsed = JSON.parse(personalRaw);
+        delete parsed.category;
+        delete parsed.role;
+        delete parsed.professionalRole;
+        delete parsed.professional_role;
+        delete parsed.professionalTitle;
+        delete parsed.professionalRoleLabel;
+        localStorage.setItem("onboarding_personal", JSON.stringify(parsed));
+      }
+      localStorage.removeItem("onboarding_role");
+    } catch (e) {}
+    router.push("/role-selection?edit=true&from=onboarding");
   };
 
   const getFlightCrewTitle = () => {
@@ -910,27 +910,27 @@ function OnboardingContent() {
   };
 
   if (step === 1) {
-    return <>{ErrorBanner}<ProfessionalTypeStep onBack={handleBack} onNext={() => isEditMode ? handleEditFinish() : setStep(2)} /></>;
+    return <>{ErrorBanner}<ProfessionalTypeStep onBack={handleBack} onNext={() => setStep(2)} /></>;
   }
 
   if (step === 2) {
-    return <>{ErrorBanner}<PersonalIdentificationStep onBack={handleBack} onNext={() => isEditMode ? handleEditFinish() : setStep(3)} /></>;
+    return <>{ErrorBanner}<PersonalIdentificationStep onBack={handleBack} onNext={() => setStep(3)} /></>;
   }
 
   if (step === 3) {
-    return <>{ErrorBanner}<ProfessionalSummaryStep onBack={handleBack} onNext={() => isEditMode ? handleEditFinish() : setStep(4)} /></>;
+    return <>{ErrorBanner}<ProfessionalSummaryStep onBack={handleBack} onNext={() => setStep(4)} /></>;
   }
 
   if (step === 4) {
-    return <>{ErrorBanner}<ContactCredentialsStep onBack={handleBack} onNext={() => isEditMode ? handleEditFinish() : setStep(5)} /></>;
+    return <>{ErrorBanner}<ContactCredentialsStep onBack={handleBack} onNext={() => setStep(5)} /></>;
   }
 
   if (step === 5) {
-    return <>{ErrorBanner}<ComplementaryInfoStep onBack={handleBack} onNext={() => isEditMode ? handleEditFinish() : setStep(6)} onSkip={() => isEditMode ? handleEditFinish() : setStep(6)} /></>;
+    return <>{ErrorBanner}<ComplementaryInfoStep onBack={handleBack} onNext={() => setStep(6)} onSkip={() => setStep(6)} /></>;
   }
 
   if (step === 6) {
-    return <>{ErrorBanner}<SkillsStep onBack={handleBack} onNext={() => isEditMode ? handleEditFinish() : setStep(7)} /></>;
+    return <>{ErrorBanner}<SkillsStep onBack={handleBack} onNext={() => setStep(7)} /></>;
   }
 
   if (step === 7) {
