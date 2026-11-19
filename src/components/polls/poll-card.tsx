@@ -18,32 +18,46 @@ interface PollCardProps {
   currentUserId?: string | null;
 }
 
-function getStoredVote(postId: string): string | null {
-  if (typeof window === "undefined") return null;
+// User-scoped vote persistence (Rule 4 of poll-posts.md: Never share vote state across accounts)
+function getStoredVote(postId: string, userId?: string | null): string | null {
+  if (typeof window === "undefined" || !userId) return null;
   try {
-    return localStorage.getItem(`poll_vote_${postId}`);
+    // Clean up any legacy un-scoped vote
+    localStorage.removeItem(`poll_vote_${postId}`);
+    return localStorage.getItem(`poll_vote_${userId}_${postId}`);
   } catch {
     return null;
   }
 }
 
-function storeVote(postId: string, optionId: string): void {
-  if (typeof window === "undefined") return;
+function storeVote(postId: string, optionId: string, userId?: string | null): void {
+  if (typeof window === "undefined" || !userId) return;
   try {
-    localStorage.setItem(`poll_vote_${postId}`, String(optionId));
+    localStorage.setItem(`poll_vote_${userId}_${postId}`, String(optionId));
   } catch {}
 }
 
-function normalizeToPollView(p: PollView | PollData, postId: string): PollView {
+function normalizeToPollView(
+  p: PollView | PollData,
+  postId: string,
+  userId?: string | null
+): PollView {
   const legacy = p as any;
-  const storedVote = getStoredVote(postId);
+  const storedVote = getStoredVote(postId, userId);
 
-  const selectedOptionId =
-    legacy.selected_option_id !== undefined && legacy.selected_option_id !== null
-      ? String(legacy.selected_option_id)
-      : legacy.userVotedOptionId !== undefined && legacy.userVotedOptionId !== null
-      ? String(legacy.userVotedOptionId)
-      : storedVote;
+  // An active selection is ONLY present if the acting user themselves has voted
+  let selectedOptionId: string | null = null;
+  if (legacy.selected_option_id !== undefined && legacy.selected_option_id !== null) {
+    selectedOptionId = String(legacy.selected_option_id);
+  } else if (
+    legacy.userVotedOptionId !== undefined &&
+    legacy.userVotedOptionId !== null &&
+    (!legacy.user_id || legacy.user_id === userId)
+  ) {
+    selectedOptionId = String(legacy.userVotedOptionId);
+  } else if (storedVote) {
+    selectedOptionId = storedVote;
+  }
 
   const isExpired = Boolean(
     legacy.is_closed ||
@@ -56,10 +70,7 @@ function normalizeToPollView(p: PollView | PollData, postId: string): PollView {
     legacy.results_visible || selectedOptionId !== null || isExpired
   );
 
-  const totalVotes = Math.max(
-    legacy.total_votes ?? legacy.totalVotes ?? 0,
-    selectedOptionId ? 1 : 0
-  );
+  const totalVotes = legacy.total_votes ?? legacy.totalVotes ?? (selectedOptionId ? 1 : 0);
 
   return {
     post_id: String(legacy.post_id || postId),
@@ -71,7 +82,7 @@ function normalizeToPollView(p: PollView | PollData, postId: string): PollView {
       legacy.expiresAt ||
       new Date(Date.now() + 24 * 3600000).toISOString(),
     server_time: legacy.server_time || new Date().toISOString(),
-    is_closed: Boolean(isExpired),
+    is_closed: isExpired,
     can_vote: !selectedOptionId && !isExpired && legacy.can_vote !== false,
     selected_option_id: selectedOptionId,
     results_visible: resultsVisible,
@@ -79,12 +90,15 @@ function normalizeToPollView(p: PollView | PollData, postId: string): PollView {
     options: (legacy.options || []).map((opt: any, idx: number) => {
       const optId = String(opt.id || idx + 1);
       const label = opt.label || opt.text || `Option ${idx + 1}`;
-      const isChosen = selectedOptionId !== null && String(selectedOptionId) === optId;
-      const count = opt.votes ?? opt.votesCount ?? (isChosen ? 1 : 0);
+      const count = opt.votes ?? opt.votesCount ?? 0;
       const votes = resultsVisible ? count : null;
-      const pct =
-        resultsVisible && totalVotes > 0 ? Math.round((count / totalVotes) * 100) : null;
-      const percentage = opt.percentage !== null && opt.percentage !== undefined ? opt.percentage : pct;
+      const percentage = resultsVisible
+        ? opt.percentage !== null && opt.percentage !== undefined
+          ? opt.percentage
+          : totalVotes > 0
+          ? Math.round((count / totalVotes) * 100)
+          : 0
+        : null;
 
       return {
         id: optId,
@@ -99,10 +113,15 @@ function normalizeToPollView(p: PollView | PollData, postId: string): PollView {
 
 /**
  * Concurrency safeguard according to Rule 4 of poll-posts.md:
- * Background aggregate reads must not reduce confirmed totals or remove a confirmed selection.
+ * Background aggregate reads must not reduce confirmed totals or remove a confirmed selection for the acting user.
  */
-function mergePollUpdate(current: PollView, incoming: PollView, postId: string): PollView {
-  const storedVote = getStoredVote(postId);
+function mergePollUpdate(
+  current: PollView,
+  incoming: PollView,
+  postId: string,
+  userId?: string | null
+): PollView {
+  const storedVote = getStoredVote(postId, userId);
   const activeSelection = current.selected_option_id || incoming.selected_option_id || storedVote;
 
   if (activeSelection) {
@@ -117,12 +136,7 @@ function mergePollUpdate(current: PollView, incoming: PollView, postId: string):
       total_votes: totalVotes,
       options: incoming.options.map((incOpt) => {
         const curOpt = current.options.find((o) => String(o.id) === String(incOpt.id));
-        const isChosen = String(incOpt.id) === String(activeSelection);
-        const count = Math.max(
-          incOpt.votes ?? 0,
-          curOpt?.votes ?? 0,
-          isChosen ? 1 : 0
-        );
+        const count = Math.max(incOpt.votes ?? 0, curOpt?.votes ?? 0);
         const pct = totalVotes > 0 ? Math.round((count / totalVotes) * 100) : 0;
         return {
           ...incOpt,
@@ -133,16 +147,39 @@ function mergePollUpdate(current: PollView, incoming: PollView, postId: string):
     };
   }
 
-  return incoming;
+  // If acting user has NOT voted, incoming snapshot determines total_votes and options with hidden breakdown
+  return {
+    ...incoming,
+    selected_option_id: null,
+    results_visible: incoming.results_visible || incoming.is_closed,
+    can_vote: !incoming.is_closed && incoming.can_vote !== false,
+    options: incoming.options.map((opt) => ({
+      ...opt,
+      votes: incoming.results_visible || incoming.is_closed ? opt.votes : null,
+      percentage: incoming.results_visible || incoming.is_closed ? opt.percentage : null,
+    })),
+  };
 }
 
-export function PollCard({ postId, initialPoll, currentUserId }: PollCardProps) {
-  const [poll, setPoll] = useState<PollView>(() => normalizeToPollView(initialPoll, postId));
+export function PollCard({ postId, initialPoll, currentUserId: propUserId }: PollCardProps) {
+  const [actingUserId, setActingUserId] = useState<string | null>(propUserId || null);
+  const [poll, setPoll] = useState<PollView>(() =>
+    normalizeToPollView(initialPoll, postId, propUserId)
+  );
   const [pendingOptionId, setPendingOptionId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const pollRef = useRef(poll);
-  pollRef.current = poll;
+
+  // Sync acting user ID
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      const uid = data?.user?.id || propUserId || null;
+      if (uid !== actingUserId) {
+        setActingUserId(uid);
+        setPoll((prev) => normalizeToPollView(prev, postId, uid));
+      }
+    });
+  }, [propUserId, postId]);
 
   // Realtime Broadcast Channel & Hydration
   useEffect(() => {
@@ -156,7 +193,7 @@ export function PollCard({ postId, initialPoll, currentUserId }: PollCardProps) 
       try {
         const freshPolls = await getPostPolls([postId]);
         if (isMounted && freshPolls && freshPolls.length > 0) {
-          setPoll((prev) => mergePollUpdate(prev, freshPolls[0], postId));
+          setPoll((prev) => mergePollUpdate(prev, freshPolls[0], postId, actingUserId));
         }
       } catch (err) {
         console.warn("[PollCard] Initial hydration error:", err);
@@ -173,14 +210,14 @@ export function PollCard({ postId, initialPoll, currentUserId }: PollCardProps) 
             // Invalidation hint received; refresh authorized poll projection
             const updated = await getPostPolls([postId]);
             if (isMounted && updated && updated.length > 0) {
-              setPoll((prev) => mergePollUpdate(prev, updated[0], postId));
+              setPoll((prev) => mergePollUpdate(prev, updated[0], postId, actingUserId));
             }
           })
           .subscribe((status) => {
             if (status === "SUBSCRIBED") {
               getPostPolls([postId]).then((res) => {
                 if (isMounted && res && res.length > 0) {
-                  setPoll((prev) => mergePollUpdate(prev, res[0], postId));
+                  setPoll((prev) => mergePollUpdate(prev, res[0], postId, actingUserId));
                 }
               });
             }
@@ -198,7 +235,7 @@ export function PollCard({ postId, initialPoll, currentUserId }: PollCardProps) 
         supabase.removeChannel(channel);
       }
     };
-  }, [postId]);
+  }, [postId, actingUserId]);
 
   // Server-relative remaining time calculation
   const { text: timeRemaining, isExpired } = formatPollTimeRemaining(
@@ -216,7 +253,7 @@ export function PollCard({ postId, initialPoll, currentUserId }: PollCardProps) 
     setPendingOptionId(optionId);
     setError(null);
 
-    // 1. Optimistic UI: immediately highlight selection and show breakdown
+    // 1. Optimistic UI: immediately highlight selection and show breakdown for acting user
     const prevPoll = { ...poll };
     const optTotal = (poll.total_votes || 0) + 1;
     const optOptions = poll.options.map((opt) => {
@@ -240,7 +277,7 @@ export function PollCard({ postId, initialPoll, currentUserId }: PollCardProps) 
     };
 
     setPoll(optimisticPoll);
-    storeVote(postId, optionId);
+    storeVote(postId, optionId, actingUserId);
 
     try {
       console.log(`[handleVote] Casting vote on postId: ${postId}, optionId: ${optionId}`);
@@ -271,11 +308,11 @@ export function PollCard({ postId, initialPoll, currentUserId }: PollCardProps) 
               results_visible: true,
               can_vote: false,
             },
-            postId
+            postId,
+            actingUserId
           );
           setPoll(normalized);
         } else {
-          // Keep optimistic vote locally so the user experience is smooth, but show warning if truly blocked
           if (res.error === "POLL_UNAVAILABLE" || res.error === "POLL_CLOSED") {
             setPoll(prevPoll);
             setError(res.error || fallbackRes.error || "Voting is currently unavailable for this poll.");
@@ -284,7 +321,6 @@ export function PollCard({ postId, initialPoll, currentUserId }: PollCardProps) 
       }
     } catch (err: any) {
       console.error("[handleVote] error:", err);
-      // Keep vote visible unless critical error
       if (err?.message?.includes("closed") || err?.message?.includes("expired")) {
         setPoll(prevPoll);
         setError(err?.message || "Failed to submit vote.");
